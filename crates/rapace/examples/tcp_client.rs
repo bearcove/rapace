@@ -30,11 +30,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let stream = TcpStream::connect(addr).await?;
     println!("Connected!");
 
-    // Wrap in transport
+    // Wrap in transport and create session
     let transport = Arc::new(rapace::StreamTransport::new(stream));
+    let session = Arc::new(rapace_testkit::RpcSession::new(transport.clone()));
+
+    // Spawn session runner
+    let session_clone = session.clone();
+    tokio::spawn(async move { session_clone.run().await });
 
     // Create client
-    let client = CalculatorClient::new(transport.clone());
+    let client = CalculatorClient::new(session);
 
     // Make RPC calls
     println!("\nCalling add(10, 20)...");

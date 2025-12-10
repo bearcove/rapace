@@ -67,13 +67,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client_transport = Arc::new(client_transport);
     let server_transport = Arc::new(server_transport);
 
+    // Create sessions for client and server
+    let client_session = Arc::new(rapace_testkit::RpcSession::new(client_transport.clone()));
+    let server_session = Arc::new(rapace_testkit::RpcSession::new(server_transport.clone()));
+
+    // Spawn session runners
+    let client_session_clone = client_session.clone();
+    tokio::spawn(async move { client_session_clone.run().await });
+
+    let server_session_clone = server_session.clone();
+    tokio::spawn(async move { server_session_clone.run().await });
+
     // Create the server and spawn it
     // The serve() method handles the frame loop automatically
     let server = CalculatorServer::new(CalculatorImpl);
     let server_handle = tokio::spawn(server.serve(server_transport));
 
     // Create the client
-    let client = CalculatorClient::new(client_transport.clone());
+    let client = CalculatorClient::new(client_session);
 
     // Make some RPC calls
     println!("Calling add(2, 3)...");
