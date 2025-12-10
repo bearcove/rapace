@@ -143,7 +143,10 @@ async fn main() {
             // Check if it's a TCP address (contains ':') or Unix socket path
             if args.addr.contains(':') {
                 // TCP
-                eprintln!("[http-tunnel-plugin] Connecting to TCP address: {}", args.addr);
+                eprintln!(
+                    "[http-tunnel-plugin] Connecting to TCP address: {}",
+                    args.addr
+                );
                 let stream = TcpStream::connect(&args.addr)
                     .await
                     .expect("failed to connect to host");
@@ -154,7 +157,10 @@ async fn main() {
                 #[cfg(unix)]
                 {
                     use tokio::net::UnixStream;
-                    eprintln!("[http-tunnel-plugin] Connecting to Unix socket: {}", args.addr);
+                    eprintln!(
+                        "[http-tunnel-plugin] Connecting to Unix socket: {}",
+                        args.addr
+                    );
                     let stream = UnixStream::connect(&args.addr)
                         .await
                         .expect("failed to connect to host");
@@ -186,27 +192,28 @@ async fn main() {
                     ShmSessionConfig::default()
                 }
                 ShmSize::Large => {
-                    eprintln!(
-                        "[http-tunnel-plugin] SHM config: LARGE (256 slots × 16KB = 4MB)"
-                    );
+                    eprintln!("[http-tunnel-plugin] SHM config: LARGE (256 slots × 16KB = 4MB)");
                     ShmSessionConfig {
                         ring_capacity: 512,
-                        slot_size: 16384,  // 16KB per slot
-                        slot_count: 256,   // 256 slots = 4MB total
+                        slot_size: 16384, // 16KB per slot
+                        slot_count: 256,  // 256 slots = 4MB total
                     }
                 }
             };
 
             eprintln!("[http-tunnel-plugin] Opening SHM file: {}", args.addr);
-            let session = ShmSession::open_file(&args.addr, config)
-                .expect("failed to open SHM file");
+            let session =
+                ShmSession::open_file(&args.addr, config).expect("failed to open SHM file");
 
             // Create metrics for SHM transport
             let shm_metrics = Arc::new(ShmMetrics::new());
             let transport = Arc::new(ShmTransport::new_with_metrics(session, shm_metrics.clone()));
             eprintln!("[http-tunnel-plugin] SHM mapped!");
             run_plugin(transport).await;
-            eprintln!("[http-tunnel-plugin] SHM metrics: {}", shm_metrics.summary());
+            eprintln!(
+                "[http-tunnel-plugin] SHM metrics: {}",
+                shm_metrics.summary()
+            );
         }
     }
 

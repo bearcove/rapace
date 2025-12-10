@@ -17,8 +17,8 @@ use rapace_transport_mem::InProcTransport;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use rapace_http_tunnel::{
-    create_tunnel_dispatcher, run_host_server, run_http_server, GlobalTunnelMetrics,
-    TcpTunnelImpl, TunnelHost, INTERNAL_HTTP_PORT,
+    create_tunnel_dispatcher, run_host_server, run_http_server, GlobalTunnelMetrics, TcpTunnelImpl,
+    TunnelHost, INTERNAL_HTTP_PORT,
 };
 
 /// Port the host listens on for browser connections.
@@ -88,16 +88,25 @@ async fn main() {
     });
 
     // Create the tunnel host
-    let tunnel_host = Arc::new(TunnelHost::with_metrics(host_session.clone(), host_metrics.clone()));
+    let tunnel_host = Arc::new(TunnelHost::with_metrics(
+        host_session.clone(),
+        host_metrics.clone(),
+    ));
 
     // ========== RUN ==========
-    println!("Internal HTTP server running on 127.0.0.1:{}", INTERNAL_HTTP_PORT);
+    println!(
+        "Internal HTTP server running on 127.0.0.1:{}",
+        INTERNAL_HTTP_PORT
+    );
     println!("Host server running on 127.0.0.1:{}", HOST_PORT);
     println!();
     println!("Test with:");
     println!("  curl http://127.0.0.1:{}/hello", HOST_PORT);
     println!("  curl http://127.0.0.1:{}/health", HOST_PORT);
-    println!("  curl -X POST -d 'test data' http://127.0.0.1:{}/echo", HOST_PORT);
+    println!(
+        "  curl -X POST -d 'test data' http://127.0.0.1:{}/echo",
+        HOST_PORT
+    );
     println!();
     println!("Press Ctrl+C to exit\n");
 

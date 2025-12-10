@@ -379,14 +379,18 @@ fn run_bench(
     let mut all_results: Vec<BenchResult> = Vec::new();
 
     // Helper to run oha and parse results
-    let run_oha = |url: &str, c: u32, duration: &str| -> Result<OhaResult, Box<dyn std::error::Error>> {
-        let c_str = c.to_string();
-        let output = cmd!(sh, "oha {url} -z {duration} -c {c_str} --output-format json")
+    let run_oha =
+        |url: &str, c: u32, duration: &str| -> Result<OhaResult, Box<dyn std::error::Error>> {
+            let c_str = c.to_string();
+            let output = cmd!(
+                sh,
+                "oha {url} -z {duration} -c {c_str} --output-format json"
+            )
             .quiet()
             .read()?;
-        let result: OhaResult = serde_json::from_str(&output)?;
-        Ok(result)
-    };
+            let result: OhaResult = serde_json::from_str(&output)?;
+            Ok(result)
+        };
 
     // Cleanup helper
     let cleanup = || {
@@ -587,7 +591,11 @@ fn run_bench(
 
     // Start host with --shm-large flag
     let mut host_proc = std::process::Command::new(&host_path)
-        .args(["--transport=shm", &format!("--addr={}", SHM_FILE), "--shm-large"])
+        .args([
+            "--transport=shm",
+            &format!("--addr={}", SHM_FILE),
+            "--shm-large",
+        ])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()?;
@@ -596,7 +604,11 @@ fn run_bench(
 
     // Start plugin (must also pass --shm-large since config is not stored in file)
     let mut plugin_proc = std::process::Command::new(&plugin_path)
-        .args(["--transport=shm", &format!("--addr={}", SHM_FILE), "--shm-large"])
+        .args([
+            "--transport=shm",
+            &format!("--addr={}", SHM_FILE),
+            "--shm-large",
+        ])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()?;
@@ -652,7 +664,10 @@ fn run_bench(
 
     for (endpoint, _) in &endpoints {
         println!("/{} endpoint:", endpoint);
-        println!("  {:>10} {:>8} {:>12} {:>12}", "Transport", "Conc", "RPS Δ%", "p99 Δ%");
+        println!(
+            "  {:>10} {:>8} {:>12} {:>12}",
+            "Transport", "Conc", "RPS Δ%", "p99 Δ%"
+        );
 
         for &c in &concurrency_levels {
             let baseline = all_results
@@ -661,10 +676,9 @@ fn run_bench(
 
             if let Some(base) = baseline {
                 for transport in &["stream", "shm", "shm-large"] {
-                    if let Some(tunnel) = all_results
-                        .iter()
-                        .find(|r| r.name == *transport && r.endpoint == *endpoint && r.concurrency == c)
-                    {
+                    if let Some(tunnel) = all_results.iter().find(|r| {
+                        r.name == *transport && r.endpoint == *endpoint && r.concurrency == c
+                    }) {
                         let rps_delta = ((tunnel.rps - base.rps) / base.rps) * 100.0;
                         let p99_delta = ((tunnel.p99_ms - base.p99_ms) / base.p99_ms) * 100.0;
                         println!(

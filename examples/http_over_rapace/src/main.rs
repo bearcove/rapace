@@ -21,8 +21,8 @@ use rapace_transport_mem::InProcTransport;
 use tokio::net::TcpListener;
 
 use rapace_http_over_rapace::{
-    AxumHttpService, HttpServiceClient, convert_hyper_to_rapace, convert_rapace_to_hyper,
-    create_http_service_dispatcher,
+    convert_hyper_to_rapace, convert_rapace_to_hyper, create_http_service_dispatcher,
+    AxumHttpService, HttpServiceClient,
 };
 
 #[tokio::main]
@@ -164,15 +164,13 @@ async fn main() {
                     let rapace_resp = match http_client.handle(rapace_req).await {
                         Ok(r) => r,
                         Err(e) => {
-                            return Ok(
-                                hyper::Response::builder()
-                                    .status(502)
-                                    .body(http_body_util::Full::new(Bytes::from(format!(
-                                        "RPC error: {:?}",
-                                        e
-                                    ))))
-                                    .unwrap(),
-                            );
+                            return Ok(hyper::Response::builder()
+                                .status(502)
+                                .body(http_body_util::Full::new(Bytes::from(format!(
+                                    "RPC error: {:?}",
+                                    e
+                                ))))
+                                .unwrap());
                         }
                     };
 
@@ -494,8 +492,8 @@ mod tests {
         let test_bodies = [
             b"Hello".to_vec(),
             b"A longer message with more content".to_vec(),
-            vec![0u8; 1000],           // Binary data
-            vec![42u8; 10000],         // Larger payload
+            vec![0u8; 1000],   // Binary data
+            vec![42u8; 10000], // Larger payload
         ];
 
         for body in test_bodies {

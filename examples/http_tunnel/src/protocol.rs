@@ -4,7 +4,6 @@
 //! After calling `open()`, both sides use the tunnel APIs on `RpcSession` to
 //! send and receive chunks on the returned channel.
 
-
 // Required by the macro
 #[allow(unused)]
 use rapace_registry;
@@ -37,4 +36,3 @@ pub trait TcpTunnel {
     /// After this returns, the channel transitions from RPC mode to tunnel mode.
     async fn open(&self) -> crate::protocol::TunnelHandle;
 }
-

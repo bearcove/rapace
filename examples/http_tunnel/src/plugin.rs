@@ -158,7 +158,11 @@ impl<T: Transport + Send + Sync + 'static> TcpTunnel for TcpTunnelImpl<T> {
 /// This is used to integrate the tunnel service with RpcSession's dispatcher.
 pub fn create_tunnel_dispatcher<T: Transport + Send + Sync + 'static>(
     service: Arc<TcpTunnelImpl<T>>,
-) -> impl Fn(u32, u32, Vec<u8>) -> Pin<Box<dyn std::future::Future<Output = Result<Frame, RpcError>> + Send>>
+) -> impl Fn(
+    u32,
+    u32,
+    Vec<u8>,
+) -> Pin<Box<dyn std::future::Future<Output = Result<Frame, RpcError>> + Send>>
        + Send
        + Sync
        + 'static {

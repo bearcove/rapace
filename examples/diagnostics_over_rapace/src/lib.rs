@@ -126,4 +126,3 @@ impl Diagnostics for DiagnosticsImpl {
         Box::pin(tokio_stream::wrappers::ReceiverStream::new(rx))
     }
 }
-

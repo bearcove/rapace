@@ -26,7 +26,8 @@ impl TunnelMetrics {
     }
 
     pub fn record_recv(&self, bytes: usize) {
-        self.bytes_received.fetch_add(bytes as u64, Ordering::Relaxed);
+        self.bytes_received
+            .fetch_add(bytes as u64, Ordering::Relaxed);
         self.chunks_received.fetch_add(1, Ordering::Relaxed);
     }
 

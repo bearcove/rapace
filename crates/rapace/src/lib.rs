@@ -214,7 +214,10 @@ pub mod server {
     ///     });
     /// }
     /// ```
-    pub fn serve_connection(stream: TcpStream) -> Arc<crate::StreamTransport<tokio::io::ReadHalf<TcpStream>, tokio::io::WriteHalf<TcpStream>>> {
+    pub fn serve_connection(
+        stream: TcpStream,
+    ) -> Arc<crate::StreamTransport<tokio::io::ReadHalf<TcpStream>, tokio::io::WriteHalf<TcpStream>>>
+    {
         Arc::new(crate::StreamTransport::new(stream))
     }
 
@@ -267,7 +270,12 @@ pub mod server {
         /// Serve requests from the TCP transport until the connection closes.
         fn serve_tcp(
             self,
-            transport: Arc<crate::StreamTransport<tokio::io::ReadHalf<TcpStream>, tokio::io::WriteHalf<TcpStream>>>,
+            transport: Arc<
+                crate::StreamTransport<
+                    tokio::io::ReadHalf<TcpStream>,
+                    tokio::io::WriteHalf<TcpStream>,
+                >,
+            >,
         ) -> impl std::future::Future<Output = Result<(), crate::RpcError>> + Send;
     }
 }

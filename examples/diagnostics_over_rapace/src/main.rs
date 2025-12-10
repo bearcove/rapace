@@ -165,7 +165,12 @@ fn main() {
     fn verify_diagnostics(diagnostics: &[Diagnostic]) {
         // Should have 4 diagnostics: 2 TODOs, 1 FIXME, 1 NOTE
         // TODO on line 4, FIXME on line 6, NOTE on line 8, TODO on line 10
-        assert_eq!(diagnostics.len(), 4, "Expected 4 diagnostics, got {:?}", diagnostics);
+        assert_eq!(
+            diagnostics.len(),
+            4,
+            "Expected 4 diagnostics, got {:?}",
+            diagnostics
+        );
 
         // Verify order (should be in line order)
         assert_eq!(diagnostics[0].code, "TODO001");
@@ -188,8 +193,12 @@ fn main() {
     #[tokio::test]
     async fn test_inproc_transport() {
         let (host_transport, plugin_transport) = InProcTransport::pair();
-        let diagnostics =
-            run_scenario(Arc::new(host_transport), Arc::new(plugin_transport), TEST_SOURCE).await;
+        let diagnostics = run_scenario(
+            Arc::new(host_transport),
+            Arc::new(plugin_transport),
+            TEST_SOURCE,
+        )
+        .await;
         verify_diagnostics(&diagnostics);
     }
 
@@ -243,7 +252,10 @@ fn main() {
         let (host_transport, plugin_transport) = InProcTransport::pair();
         let diagnostics =
             run_scenario(Arc::new(host_transport), Arc::new(plugin_transport), "").await;
-        assert!(diagnostics.is_empty(), "Empty source should produce no diagnostics");
+        assert!(
+            diagnostics.is_empty(),
+            "Empty source should produce no diagnostics"
+        );
     }
 
     #[tokio::test]
@@ -252,7 +264,10 @@ fn main() {
         let (host_transport, plugin_transport) = InProcTransport::pair();
         let diagnostics =
             run_scenario(Arc::new(host_transport), Arc::new(plugin_transport), source).await;
-        assert!(diagnostics.is_empty(), "Clean source should produce no diagnostics");
+        assert!(
+            diagnostics.is_empty(),
+            "Clean source should produce no diagnostics"
+        );
     }
 
     #[tokio::test]
@@ -264,8 +279,12 @@ fn main() {
         }
 
         let (host_transport, plugin_transport) = InProcTransport::pair();
-        let diagnostics =
-            run_scenario(Arc::new(host_transport), Arc::new(plugin_transport), &source).await;
+        let diagnostics = run_scenario(
+            Arc::new(host_transport),
+            Arc::new(plugin_transport),
+            &source,
+        )
+        .await;
 
         assert_eq!(diagnostics.len(), 100, "Should have 100 diagnostics");
 

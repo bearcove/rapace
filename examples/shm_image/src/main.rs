@@ -35,8 +35,7 @@ use std::sync::Arc;
 
 use rapace_core::{Streaming, Transport};
 use rapace_transport_shm::{
-    allocator_api2::vec::Vec as AllocVec,
-    ShmAllocator, ShmMetrics, ShmSession, ShmTransport,
+    allocator_api2::vec::Vec as AllocVec, ShmAllocator, ShmMetrics, ShmSession, ShmTransport,
 };
 
 // Required by the macro
@@ -107,10 +106,12 @@ impl ImageService for ImageServiceImpl {
             let img = match image::load_from_memory(&png_data) {
                 Ok(img) => img,
                 Err(e) => {
-                    let _ = tx.send(Err(rapace_core::RpcError::Status {
-                        code: rapace_core::ErrorCode::InvalidArgument,
-                        message: format!("Invalid PNG: {}", e),
-                    })).await;
+                    let _ = tx
+                        .send(Err(rapace_core::RpcError::Status {
+                            code: rapace_core::ErrorCode::InvalidArgument,
+                            message: format!("Invalid PNG: {}", e),
+                        }))
+                        .await;
                     return;
                 }
             };
@@ -194,7 +195,10 @@ async fn main() {
     let alloc = ShmAllocator::new(session_a.clone());
 
     println!("Session created:");
-    println!("  Slot size: {} bytes", session_a.data_segment().slot_size());
+    println!(
+        "  Slot size: {} bytes",
+        session_a.data_segment().slot_size()
+    );
     println!("  Slot count: {}", session_a.data_segment().slot_count());
     println!("  Max allocation: {} bytes", alloc.max_allocation_size());
     println!();

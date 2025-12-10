@@ -960,7 +960,11 @@ fn generate_dispatch_arm_unary(method: &MethodInfo, method_id: u32) -> TokenStre
 ///
 /// This generates a function that registers the service and its methods
 /// with a `ServiceRegistry`, capturing request/response schemas via facet.
-fn generate_register_fn(service_name: &str, service_doc: &str, methods: &[MethodInfo]) -> TokenStream2 {
+fn generate_register_fn(
+    service_name: &str,
+    service_doc: &str,
+    methods: &[MethodInfo],
+) -> TokenStream2 {
     let method_registrations: Vec<TokenStream2> = methods
         .iter()
         .map(|m| {
@@ -969,16 +973,20 @@ fn generate_register_fn(service_name: &str, service_doc: &str, methods: &[Method
             let arg_types: Vec<_> = m.args.iter().map(|(_, ty)| ty).collect();
 
             // Generate argument info
-            let arg_infos: Vec<TokenStream2> = m.args.iter().map(|(name, ty)| {
-                let name_str = name.to_string();
-                let type_str = quote!(#ty).to_string();
-                quote! {
-                    ::rapace_registry::ArgInfo {
-                        name: #name_str,
-                        type_name: #type_str,
+            let arg_infos: Vec<TokenStream2> = m
+                .args
+                .iter()
+                .map(|(name, ty)| {
+                    let name_str = name.to_string();
+                    let type_str = quote!(#ty).to_string();
+                    quote! {
+                        ::rapace_registry::ArgInfo {
+                            name: #name_str,
+                            type_name: #type_str,
+                        }
                     }
-                }
-            }).collect();
+                })
+                .collect();
 
             // Request shape: tuple of arg types, or () if no args, or single type if one arg
             let request_shape_expr = if arg_types.is_empty() {

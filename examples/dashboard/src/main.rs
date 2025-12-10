@@ -22,8 +22,8 @@
 use std::sync::Arc;
 
 use axum::{response::Html, routing::get, Router};
+use facet_core::{Def, ScalarType, Shape, Type, UserType};
 use owo_colors::OwoColorize;
-use facet_core::{Def, Shape, Type, UserType, ScalarType};
 use rapace_core::Streaming;
 use rapace_registry::ServiceRegistry;
 use rapace_transport_websocket::WebSocketTransport;
@@ -121,11 +121,21 @@ fn shape_to_info(shape: &'static Shape) -> ShapeInfo {
                 type_name: shape.type_identifier.to_string(),
                 affinity: "float".to_string(),
             },
-            ScalarType::I8 | ScalarType::I16 | ScalarType::I32 | ScalarType::I64 | ScalarType::I128 | ScalarType::ISize => ShapeInfo::Scalar {
+            ScalarType::I8
+            | ScalarType::I16
+            | ScalarType::I32
+            | ScalarType::I64
+            | ScalarType::I128
+            | ScalarType::ISize => ShapeInfo::Scalar {
                 type_name: shape.type_identifier.to_string(),
                 affinity: "integer".to_string(),
             },
-            ScalarType::U8 | ScalarType::U16 | ScalarType::U32 | ScalarType::U64 | ScalarType::U128 | ScalarType::USize => ShapeInfo::Scalar {
+            ScalarType::U8
+            | ScalarType::U16
+            | ScalarType::U32
+            | ScalarType::U64
+            | ScalarType::U128
+            | ScalarType::USize => ShapeInfo::Scalar {
                 type_name: shape.type_identifier.to_string(),
                 affinity: "unsigned".to_string(),
             },
@@ -160,34 +170,45 @@ fn shape_to_info(shape: &'static Shape) -> ShapeInfo {
     // Use `ty` for structs, enums
     match &shape.ty {
         Type::User(UserType::Struct(struct_type)) => {
-            let fields = struct_type.fields.iter().map(|field| {
-                FieldInfo {
+            let fields = struct_type
+                .fields
+                .iter()
+                .map(|field| FieldInfo {
                     name: field.name.to_string(),
                     shape: shape_to_info(field.shape()),
-                }
-            }).collect();
+                })
+                .collect();
             ShapeInfo::Struct {
                 type_name: shape.type_identifier.to_string(),
                 fields,
             }
         }
         Type::User(UserType::Enum(enum_type)) => {
-            let variants = enum_type.variants.iter().map(|variant| {
-                let fields = if variant.data.fields.is_empty() {
-                    None
-                } else {
-                    Some(variant.data.fields.iter().map(|field| {
-                        FieldInfo {
-                            name: field.name.to_string(),
-                            shape: shape_to_info(field.shape()),
-                        }
-                    }).collect())
-                };
-                VariantInfo {
-                    name: variant.name.to_string(),
-                    fields,
-                }
-            }).collect();
+            let variants = enum_type
+                .variants
+                .iter()
+                .map(|variant| {
+                    let fields = if variant.data.fields.is_empty() {
+                        None
+                    } else {
+                        Some(
+                            variant
+                                .data
+                                .fields
+                                .iter()
+                                .map(|field| FieldInfo {
+                                    name: field.name.to_string(),
+                                    shape: shape_to_info(field.shape()),
+                                })
+                                .collect(),
+                        )
+                    };
+                    VariantInfo {
+                        name: variant.name.to_string(),
+                        fields,
+                    }
+                })
+                .collect();
             ShapeInfo::Enum {
                 type_name: shape.type_identifier.to_string(),
                 variants,
@@ -196,12 +217,10 @@ fn shape_to_info(shape: &'static Shape) -> ShapeInfo {
         _ => {
             // Fallback for unhandled types
             match &shape.def {
-                Def::Scalar => {
-                    ShapeInfo::Scalar {
-                        type_name: shape.type_identifier.to_string(),
-                        affinity: "unknown".to_string(),
-                    }
-                }
+                Def::Scalar => ShapeInfo::Scalar {
+                    type_name: shape.type_identifier.to_string(),
+                    affinity: "unknown".to_string(),
+                },
                 _ => ShapeInfo::Unknown {
                     type_name: shape.type_identifier.to_string(),
                 },
@@ -449,8 +468,11 @@ impl Explorer for ExplorerImpl {
                     // Note: For single-arg primitive methods, the request_shape is the primitive itself,
                     // not a struct wrapper
                     let field_shapes: Vec<(&str, &'static Shape)> =
-                        if let Type::User(UserType::Struct(struct_type)) = &method.request_shape.ty {
-                            struct_type.fields.iter()
+                        if let Type::User(UserType::Struct(struct_type)) = &method.request_shape.ty
+                        {
+                            struct_type
+                                .fields
+                                .iter()
                                 .map(|f| (f.name, f.shape()))
                                 .collect()
                         } else {
@@ -463,21 +485,27 @@ impl Explorer for ExplorerImpl {
                         };
 
                     // Match args with field shapes by position (they should be in the same order)
-                    method.args.iter().enumerate().map(|(i, arg)| {
-                        // Try to find by name first, then by position
-                        let shape = field_shapes.iter()
-                            .find(|(name, _)| *name == arg.name)
-                            .or_else(|| field_shapes.get(i))
-                            .map(|(_, s)| shape_to_info(s))
-                            .unwrap_or_else(|| ShapeInfo::Unknown {
-                                type_name: arg.type_name.to_string()
-                            });
-                        ArgDetail {
-                            name: arg.name.to_string(),
-                            type_name: arg.type_name.to_string(),
-                            shape,
-                        }
-                    }).collect()
+                    method
+                        .args
+                        .iter()
+                        .enumerate()
+                        .map(|(i, arg)| {
+                            // Try to find by name first, then by position
+                            let shape = field_shapes
+                                .iter()
+                                .find(|(name, _)| *name == arg.name)
+                                .or_else(|| field_shapes.get(i))
+                                .map(|(_, s)| shape_to_info(s))
+                                .unwrap_or_else(|| ShapeInfo::Unknown {
+                                    type_name: arg.type_name.to_string(),
+                                });
+                            ArgDetail {
+                                name: arg.name.to_string(),
+                                type_name: arg.type_name.to_string(),
+                                shape,
+                            }
+                        })
+                        .collect()
                 },
                 is_streaming: method.is_streaming,
                 request_type: format!("{}", method.request_shape),
@@ -558,10 +586,7 @@ impl Explorer for ExplorerImpl {
             return Box::pin(tokio_stream::wrappers::ReceiverStream::new(rx));
         }
 
-        let n = args
-            .get("n")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(10) as u32;
+        let n = args.get("n").and_then(|v| v.as_u64()).unwrap_or(10) as u32;
 
         let (tx, rx) = tokio::sync::mpsc::channel(16);
 
@@ -640,13 +665,11 @@ impl ExplorerImpl {
                 let a = args
                     .get("a")
                     .and_then(|v| v.as_i64())
-                    .ok_or("Missing argument 'a'")?
-                    as i32;
+                    .ok_or("Missing argument 'a'")? as i32;
                 let b = args
                     .get("b")
                     .and_then(|v| v.as_i64())
-                    .ok_or("Missing argument 'b'")?
-                    as i32;
+                    .ok_or("Missing argument 'b'")? as i32;
                 let result = self.calculator.add(a, b).await;
                 Ok(serde_json::json!(result))
             }
@@ -654,13 +677,11 @@ impl ExplorerImpl {
                 let a = args
                     .get("a")
                     .and_then(|v| v.as_i64())
-                    .ok_or("Missing argument 'a'")?
-                    as i32;
+                    .ok_or("Missing argument 'a'")? as i32;
                 let b = args
                     .get("b")
                     .and_then(|v| v.as_i64())
-                    .ok_or("Missing argument 'b'")?
-                    as i32;
+                    .ok_or("Missing argument 'b'")? as i32;
                 let result = self.calculator.multiply(a, b).await;
                 Ok(serde_json::json!(result))
             }
@@ -668,8 +689,7 @@ impl ExplorerImpl {
                 let n = args
                     .get("n")
                     .and_then(|v| v.as_u64())
-                    .ok_or("Missing argument 'n'")?
-                    as u32;
+                    .ok_or("Missing argument 'n'")? as u32;
                 let result = self.calculator.factorial(n).await;
                 Ok(serde_json::json!(result))
             }
@@ -720,7 +740,9 @@ const HTTP_PORT: u16 = 4269;
 
 async fn run_websocket_server(explorer: Arc<ExplorerImpl>) {
     let addr = format!("127.0.0.1:{}", WS_PORT);
-    let listener = TcpListener::bind(&addr).await.expect("Failed to bind WebSocket server");
+    let listener = TcpListener::bind(&addr)
+        .await
+        .expect("Failed to bind WebSocket server");
 
     while let Ok((stream, addr)) = listener.accept().await {
         let explorer = Arc::clone(&explorer);

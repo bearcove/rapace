@@ -43,7 +43,10 @@ async fn find_available_port() -> u16 {
 }
 
 /// Run the host side of the scenario with a stream transport.
-async fn run_host_scenario_stream<R, W>(transport: StreamTransport<R, W>, source: &str) -> Vec<Diagnostic>
+async fn run_host_scenario_stream<R, W>(
+    transport: StreamTransport<R, W>,
+    source: &str,
+) -> Vec<Diagnostic>
 where
     R: tokio::io::AsyncRead + Unpin + Send + Sync + 'static,
     W: tokio::io::AsyncWrite + Unpin + Send + Sync + 'static,
@@ -194,8 +197,10 @@ async fn test_cross_process_tcp() {
         }
     };
 
-    let transport: StreamTransport<ReadHalf<tokio::net::TcpStream>, WriteHalf<tokio::net::TcpStream>> =
-        StreamTransport::new(stream);
+    let transport: StreamTransport<
+        ReadHalf<tokio::net::TcpStream>,
+        WriteHalf<tokio::net::TcpStream>,
+    > = StreamTransport::new(stream);
 
     // Run host scenario
     let diagnostics = run_host_scenario_stream(transport, TEST_SOURCE).await;
@@ -276,8 +281,10 @@ async fn test_cross_process_unix() {
         }
     };
 
-    let transport: StreamTransport<ReadHalf<tokio::net::UnixStream>, WriteHalf<tokio::net::UnixStream>> =
-        StreamTransport::new(stream);
+    let transport: StreamTransport<
+        ReadHalf<tokio::net::UnixStream>,
+        WriteHalf<tokio::net::UnixStream>,
+    > = StreamTransport::new(stream);
 
     // Run host scenario
     let diagnostics = run_host_scenario_stream(transport, TEST_SOURCE).await;
@@ -383,7 +390,10 @@ async fn test_cross_process_large_file_tcp() {
     let port = find_available_port().await;
     let addr = format!("127.0.0.1:{}", port);
 
-    eprintln!("[test] Testing large file ({} bytes) over TCP", large_source.len());
+    eprintln!(
+        "[test] Testing large file ({} bytes) over TCP",
+        large_source.len()
+    );
 
     let listener = TcpListener::bind(&addr).await.unwrap();
 
@@ -416,8 +426,10 @@ async fn test_cross_process_large_file_tcp() {
         }
     };
 
-    let transport: StreamTransport<ReadHalf<tokio::net::TcpStream>, WriteHalf<tokio::net::TcpStream>> =
-        StreamTransport::new(stream);
+    let transport: StreamTransport<
+        ReadHalf<tokio::net::TcpStream>,
+        WriteHalf<tokio::net::TcpStream>,
+    > = StreamTransport::new(stream);
 
     let diagnostics = run_host_scenario_stream(transport, &large_source).await;
 
@@ -425,7 +437,11 @@ async fn test_cross_process_large_file_tcp() {
     let _ = helper.kill();
 
     // Should have 50 TODOs
-    assert_eq!(diagnostics.len(), 50, "Expected 50 diagnostics for large file");
+    assert_eq!(
+        diagnostics.len(),
+        50,
+        "Expected 50 diagnostics for large file"
+    );
 
     // Verify order
     for (i, diag) in diagnostics.iter().enumerate() {

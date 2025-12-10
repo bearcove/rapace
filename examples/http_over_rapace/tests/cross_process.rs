@@ -61,35 +61,55 @@ async fn run_host_scenario<T: Transport + Send + Sync + 'static>(
     let req = HttpRequest::get("/health");
     eprintln!("[test] GET /health");
     let resp = client.handle(req.clone()).await.expect("RPC call failed");
-    eprintln!("[test] Got response: {} {:?}", resp.status, String::from_utf8_lossy(&resp.body));
+    eprintln!(
+        "[test] Got response: {} {:?}",
+        resp.status,
+        String::from_utf8_lossy(&resp.body)
+    );
     results.push((req, resp));
 
     // Test 2: Hello with parameter
     let req = HttpRequest::get("/hello/CrossProcess");
     eprintln!("[test] GET /hello/CrossProcess");
     let resp = client.handle(req.clone()).await.expect("RPC call failed");
-    eprintln!("[test] Got response: {} {:?}", resp.status, String::from_utf8_lossy(&resp.body));
+    eprintln!(
+        "[test] Got response: {} {:?}",
+        resp.status,
+        String::from_utf8_lossy(&resp.body)
+    );
     results.push((req, resp));
 
     // Test 3: JSON endpoint
     let req = HttpRequest::get("/json");
     eprintln!("[test] GET /json");
     let resp = client.handle(req.clone()).await.expect("RPC call failed");
-    eprintln!("[test] Got response: {} {:?}", resp.status, String::from_utf8_lossy(&resp.body));
+    eprintln!(
+        "[test] Got response: {} {:?}",
+        resp.status,
+        String::from_utf8_lossy(&resp.body)
+    );
     results.push((req, resp));
 
     // Test 4: POST echo
     let req = HttpRequest::post("/echo", b"Hello from cross-process test!".to_vec());
     eprintln!("[test] POST /echo");
     let resp = client.handle(req.clone()).await.expect("RPC call failed");
-    eprintln!("[test] Got response: {} {:?}", resp.status, String::from_utf8_lossy(&resp.body));
+    eprintln!(
+        "[test] Got response: {} {:?}",
+        resp.status,
+        String::from_utf8_lossy(&resp.body)
+    );
     results.push((req, resp));
 
     // Test 5: 404 Not Found
     let req = HttpRequest::get("/nonexistent");
     eprintln!("[test] GET /nonexistent");
     let resp = client.handle(req.clone()).await.expect("RPC call failed");
-    eprintln!("[test] Got response: {} {:?}", resp.status, String::from_utf8_lossy(&resp.body));
+    eprintln!(
+        "[test] Got response: {} {:?}",
+        resp.status,
+        String::from_utf8_lossy(&resp.body)
+    );
     results.push((req, resp));
 
     // Clean up
@@ -183,8 +203,10 @@ async fn test_cross_process_tcp() {
         }
     };
 
-    let transport: StreamTransport<ReadHalf<tokio::net::TcpStream>, WriteHalf<tokio::net::TcpStream>> =
-        StreamTransport::new(stream);
+    let transport: StreamTransport<
+        ReadHalf<tokio::net::TcpStream>,
+        WriteHalf<tokio::net::TcpStream>,
+    > = StreamTransport::new(stream);
 
     // Run the host scenario
     let results = run_host_scenario_stream(transport).await;
@@ -267,8 +289,10 @@ async fn test_cross_process_unix() {
         }
     };
 
-    let transport: StreamTransport<ReadHalf<tokio::net::UnixStream>, WriteHalf<tokio::net::UnixStream>> =
-        StreamTransport::new(stream);
+    let transport: StreamTransport<
+        ReadHalf<tokio::net::UnixStream>,
+        WriteHalf<tokio::net::UnixStream>,
+    > = StreamTransport::new(stream);
 
     // Run the host scenario
     let results = run_host_scenario_stream(transport).await;

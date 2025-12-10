@@ -198,15 +198,15 @@ mod tests {
         assert!(!records.is_empty(), "Should have some records");
 
         // Check we got a span
-        let has_span = records.iter().any(|r| {
-            matches!(r, TraceRecord::NewSpan { meta, .. } if meta.name == "test_span")
-        });
+        let has_span = records
+            .iter()
+            .any(|r| matches!(r, TraceRecord::NewSpan { meta, .. } if meta.name == "test_span"));
         assert!(has_span, "Should have test_span");
 
         // Check we got an event
-        let has_event = records.iter().any(|r| {
-            matches!(r, TraceRecord::Event(e) if e.message.contains("test event"))
-        });
+        let has_event = records
+            .iter()
+            .any(|r| matches!(r, TraceRecord::Event(e) if e.message.contains("test event")));
         assert!(has_event, "Should have test event");
     }
 
@@ -280,8 +280,12 @@ mod tests {
         let has_new_span = records
             .iter()
             .any(|r| matches!(r, TraceRecord::NewSpan { .. }));
-        let has_enter = records.iter().any(|r| matches!(r, TraceRecord::Enter { .. }));
-        let has_exit = records.iter().any(|r| matches!(r, TraceRecord::Exit { .. }));
+        let has_enter = records
+            .iter()
+            .any(|r| matches!(r, TraceRecord::Enter { .. }));
+        let has_exit = records
+            .iter()
+            .any(|r| matches!(r, TraceRecord::Exit { .. }));
         let has_drop = records
             .iter()
             .any(|r| matches!(r, TraceRecord::DropSpan { .. }));
@@ -343,8 +347,14 @@ mod tests {
         let event = event.unwrap();
 
         // Check fields
-        let has_user = event.fields.iter().any(|f| f.name == "user" && f.value == "bob");
-        let has_count = event.fields.iter().any(|f| f.name == "count" && f.value == "42");
+        let has_user = event
+            .fields
+            .iter()
+            .any(|f| f.name == "user" && f.value == "bob");
+        let has_count = event
+            .fields
+            .iter()
+            .any(|f| f.name == "count" && f.value == "42");
         let has_enabled = event
             .fields
             .iter()

@@ -106,7 +106,10 @@ async fn main() {
         TransportType::Stream => {
             if args.addr.contains(':') {
                 // TCP
-                eprintln!("[diagnostics-plugin] Connecting to TCP address: {}", args.addr);
+                eprintln!(
+                    "[diagnostics-plugin] Connecting to TCP address: {}",
+                    args.addr
+                );
                 let stream = TcpStream::connect(&args.addr)
                     .await
                     .expect("failed to connect to host");

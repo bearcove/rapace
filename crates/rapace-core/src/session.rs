@@ -292,13 +292,19 @@ impl<T: Transport + Send + Sync + 'static> RpcSession<T> {
 
             // Send with backpressure; if receiver dropped, remove the tunnel
             if tx.send(chunk).await.is_err() {
-                tracing::debug!(channel_id, "try_route_to_tunnel: receiver dropped, removing tunnel");
+                tracing::debug!(
+                    channel_id,
+                    "try_route_to_tunnel: receiver dropped, removing tunnel"
+                );
                 self.tunnels.lock().remove(&channel_id);
             }
 
             // If EOS, remove the tunnel registration
             if is_eos {
-                tracing::debug!(channel_id, "try_route_to_tunnel: EOS received, removing tunnel");
+                tracing::debug!(
+                    channel_id,
+                    "try_route_to_tunnel: EOS received, removing tunnel"
+                );
                 self.tunnels.lock().remove(&channel_id);
             }
 
@@ -526,7 +532,10 @@ impl<T: Transport + Send + Sync + 'static> RpcSession<T> {
             );
 
             // 1. Try to route to a tunnel first (highest priority)
-            if self.try_route_to_tunnel(channel_id, payload.clone(), flags).await {
+            if self
+                .try_route_to_tunnel(channel_id, payload.clone(), flags)
+                .await
+            {
                 continue;
             }
 
@@ -560,7 +569,6 @@ impl<T: Transport + Send + Sync + 'static> RpcSession<T> {
             };
 
             if let Some(response_future) = response_future {
-
                 // Spawn the dispatch to avoid blocking the demux loop
                 let transport = self.transport.clone();
                 tokio::spawn(async move {
@@ -577,16 +585,19 @@ impl<T: Transport + Send + Sync + 'static> RpcSession<T> {
                             desc.flags = FrameFlags::ERROR | FrameFlags::EOS;
 
                             let (code, message): (u32, String) = match &e {
-                                RpcError::Status { code, message } => (*code as u32, message.clone()),
+                                RpcError::Status { code, message } => {
+                                    (*code as u32, message.clone())
+                                }
                                 RpcError::Transport(_) => {
                                     (ErrorCode::Internal as u32, "transport error".into())
                                 }
                                 RpcError::Cancelled => {
                                     (ErrorCode::Cancelled as u32, "cancelled".into())
                                 }
-                                RpcError::DeadlineExceeded => {
-                                    (ErrorCode::DeadlineExceeded as u32, "deadline exceeded".into())
-                                }
+                                RpcError::DeadlineExceeded => (
+                                    ErrorCode::DeadlineExceeded as u32,
+                                    "deadline exceeded".into(),
+                                ),
                             };
 
                             let mut err_bytes = Vec::with_capacity(8 + message.len());

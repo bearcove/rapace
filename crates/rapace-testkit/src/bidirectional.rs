@@ -140,13 +140,14 @@ async fn run_nested_callback<F: TransportFactory>() -> Result<(), TestError> {
             if method_id == 1 {
                 // Call A's get_prefix
                 let cb_channel = session.next_channel_id();
-                let cb_response = session
-                    .call(cb_channel, 1, vec![])
-                    .await
-                    .map_err(|e| RpcError::Status {
-                        code: ErrorCode::Internal,
-                        message: format!("callback failed: {:?}", e),
-                    })?;
+                let cb_response =
+                    session
+                        .call(cb_channel, 1, vec![])
+                        .await
+                        .map_err(|e| RpcError::Status {
+                            code: ErrorCode::Internal,
+                            message: format!("callback failed: {:?}", e),
+                        })?;
 
                 // Combine prefix + input
                 let mut result = cb_response.payload;
@@ -237,13 +238,14 @@ async fn run_multiple_nested<F: TransportFactory>() -> Result<(), TestError> {
                 // Call A three times
                 for key in [b"a".as_slice(), b"b", b"c"] {
                     let cb_channel = session.next_channel_id();
-                    let cb_response = session
-                        .call(cb_channel, 1, key.to_vec())
-                        .await
-                        .map_err(|e| RpcError::Status {
-                            code: ErrorCode::Internal,
-                            message: format!("callback failed: {:?}", e),
-                        })?;
+                    let cb_response =
+                        session
+                            .call(cb_channel, 1, key.to_vec())
+                            .await
+                            .map_err(|e| RpcError::Status {
+                                code: ErrorCode::Internal,
+                                message: format!("callback failed: {:?}", e),
+                            })?;
                     result.extend(&cb_response.payload);
                     result.push(b',');
                 }

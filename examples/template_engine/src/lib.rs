@@ -112,12 +112,11 @@ impl<T: Transport + Send + Sync + 'static> TemplateEngineImpl<T> {
         }
 
         // Decode response
-        let result: Option<String> = facet_postcard::from_slice(&response.payload).map_err(|e| {
-            RpcError::Status {
+        let result: Option<String> =
+            facet_postcard::from_slice(&response.payload).map_err(|e| RpcError::Status {
                 code: rapace_core::ErrorCode::Internal,
                 message: format!("decode error: {:?}", e),
-            }
-        })?;
+            })?;
 
         Ok(result)
     }
@@ -182,7 +181,11 @@ impl<T: Transport + Send + Sync + 'static> TemplateEngine for TemplateEngineImpl
 /// Create a dispatcher for ValueHost service.
 pub fn create_value_host_dispatcher(
     value_host: Arc<ValueHostImpl>,
-) -> impl Fn(u32, u32, Vec<u8>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Frame, RpcError>> + Send>>
+) -> impl Fn(
+    u32,
+    u32,
+    Vec<u8>,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Frame, RpcError>> + Send>>
        + Send
        + Sync
        + 'static {
@@ -198,7 +201,11 @@ pub fn create_value_host_dispatcher(
 /// Create a dispatcher for TemplateEngine service.
 pub fn create_template_engine_dispatcher<T: Transport + Send + Sync + 'static>(
     session: Arc<RpcSession<T>>,
-) -> impl Fn(u32, u32, Vec<u8>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Frame, RpcError>> + Send>>
+) -> impl Fn(
+    u32,
+    u32,
+    Vec<u8>,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Frame, RpcError>> + Send>>
        + Send
        + Sync
        + 'static {

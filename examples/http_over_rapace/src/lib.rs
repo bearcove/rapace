@@ -29,11 +29,11 @@
 use std::pin::Pin;
 
 use axum::{
-    Router,
     body::Body,
     extract::Path,
     http::{Request, Response, StatusCode},
     routing::get,
+    Router,
 };
 use bytes::Bytes;
 use http_body_util::BodyExt;
@@ -142,12 +142,7 @@ async fn convert_from_axum_response(response: Response<Body>) -> Result<HttpResp
     let headers: Vec<(String, String)> = parts
         .headers
         .iter()
-        .map(|(k, v)| {
-            (
-                k.as_str().to_string(),
-                v.to_str().unwrap_or("").to_string(),
-            )
-        })
+        .map(|(k, v)| (k.as_str().to_string(), v.to_str().unwrap_or("").to_string()))
         .collect();
 
     // Collect body
@@ -219,12 +214,7 @@ where
     let headers: Vec<(String, String)> = parts
         .headers
         .iter()
-        .map(|(k, v)| {
-            (
-                k.as_str().to_string(),
-                v.to_str().unwrap_or("").to_string(),
-            )
-        })
+        .map(|(k, v)| (k.as_str().to_string(), v.to_str().unwrap_or("").to_string()))
         .collect();
 
     // Collect body using http-body-util
@@ -270,7 +260,11 @@ pub fn convert_rapace_to_hyper(
 /// This follows the same pattern as template_engine's dispatcher.
 pub fn create_http_service_dispatcher(
     service: AxumHttpService,
-) -> impl Fn(u32, u32, Vec<u8>) -> Pin<Box<dyn std::future::Future<Output = Result<Frame, RpcError>> + Send>>
+) -> impl Fn(
+    u32,
+    u32,
+    Vec<u8>,
+) -> Pin<Box<dyn std::future::Future<Output = Result<Frame, RpcError>> + Send>>
        + Send
        + Sync
        + 'static {

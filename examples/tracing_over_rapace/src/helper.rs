@@ -153,10 +153,7 @@ async fn main() {
                 #[cfg(unix)]
                 {
                     use tokio::net::UnixStream;
-                    eprintln!(
-                        "[tracing-plugin] Connecting to Unix socket: {}",
-                        args.addr
-                    );
+                    eprintln!("[tracing-plugin] Connecting to Unix socket: {}", args.addr);
                     let stream = UnixStream::connect(&args.addr)
                         .await
                         .expect("failed to connect to host");

@@ -254,7 +254,11 @@ impl TracingConfig for TracingConfigImpl {
 /// Create a dispatcher for TracingConfig service (plugin side).
 pub fn create_tracing_config_dispatcher(
     config: TracingConfigImpl,
-) -> impl Fn(u32, u32, Vec<u8>) -> Pin<Box<dyn std::future::Future<Output = Result<Frame, RpcError>> + Send>>
+) -> impl Fn(
+    u32,
+    u32,
+    Vec<u8>,
+) -> Pin<Box<dyn std::future::Future<Output = Result<Frame, RpcError>> + Send>>
        + Send
        + Sync
        + 'static {
@@ -333,7 +337,9 @@ impl<T: Transport + Send + Sync + 'static> RapaceTracingLayer<T> {
         self.rt.spawn(async move {
             let channel_id = session.next_channel_id();
             let payload = facet_postcard::to_vec(&meta).unwrap();
-            let _ = session.call(channel_id, tracingsink_methods::METHOD_ID_NEW_SPAN, payload).await;
+            let _ = session
+                .call(channel_id, tracingsink_methods::METHOD_ID_NEW_SPAN, payload)
+                .await;
         });
 
         local_id
@@ -345,7 +351,9 @@ impl<T: Transport + Send + Sync + 'static> RapaceTracingLayer<T> {
         self.rt.spawn(async move {
             let channel_id = session.next_channel_id();
             let payload = facet_postcard::to_vec(&(span_id, fields)).unwrap();
-            let _ = session.call(channel_id, tracingsink_methods::METHOD_ID_RECORD, payload).await;
+            let _ = session
+                .call(channel_id, tracingsink_methods::METHOD_ID_RECORD, payload)
+                .await;
         });
     }
 
@@ -355,7 +363,9 @@ impl<T: Transport + Send + Sync + 'static> RapaceTracingLayer<T> {
         self.rt.spawn(async move {
             let channel_id = session.next_channel_id();
             let payload = facet_postcard::to_vec(&event).unwrap();
-            let _ = session.call(channel_id, tracingsink_methods::METHOD_ID_EVENT, payload).await;
+            let _ = session
+                .call(channel_id, tracingsink_methods::METHOD_ID_EVENT, payload)
+                .await;
         });
     }
 
@@ -365,7 +375,9 @@ impl<T: Transport + Send + Sync + 'static> RapaceTracingLayer<T> {
         self.rt.spawn(async move {
             let channel_id = session.next_channel_id();
             let payload = facet_postcard::to_vec(&span_id).unwrap();
-            let _ = session.call(channel_id, tracingsink_methods::METHOD_ID_ENTER, payload).await;
+            let _ = session
+                .call(channel_id, tracingsink_methods::METHOD_ID_ENTER, payload)
+                .await;
         });
     }
 
@@ -375,7 +387,9 @@ impl<T: Transport + Send + Sync + 'static> RapaceTracingLayer<T> {
         self.rt.spawn(async move {
             let channel_id = session.next_channel_id();
             let payload = facet_postcard::to_vec(&span_id).unwrap();
-            let _ = session.call(channel_id, tracingsink_methods::METHOD_ID_EXIT, payload).await;
+            let _ = session
+                .call(channel_id, tracingsink_methods::METHOD_ID_EXIT, payload)
+                .await;
         });
     }
 
@@ -385,7 +399,13 @@ impl<T: Transport + Send + Sync + 'static> RapaceTracingLayer<T> {
         self.rt.spawn(async move {
             let channel_id = session.next_channel_id();
             let payload = facet_postcard::to_vec(&span_id).unwrap();
-            let _ = session.call(channel_id, tracingsink_methods::METHOD_ID_DROP_SPAN, payload).await;
+            let _ = session
+                .call(
+                    channel_id,
+                    tracingsink_methods::METHOD_ID_DROP_SPAN,
+                    payload,
+                )
+                .await;
         });
     }
 }
@@ -598,15 +618,16 @@ impl Default for HostTracingSink {
 impl TracingSink for HostTracingSink {
     async fn new_span(&self, span: SpanMeta) -> u64 {
         let id = self.next_span_id.fetch_add(1, Ordering::Relaxed);
-        self.records.lock().push(TraceRecord::NewSpan {
-            id,
-            meta: span,
-        });
+        self.records
+            .lock()
+            .push(TraceRecord::NewSpan { id, meta: span });
         id
     }
 
     async fn record(&self, span_id: u64, fields: Vec<Field>) {
-        self.records.lock().push(TraceRecord::Record { span_id, fields });
+        self.records
+            .lock()
+            .push(TraceRecord::Record { span_id, fields });
     }
 
     async fn event(&self, event: EventMeta) {
@@ -633,7 +654,11 @@ impl TracingSink for HostTracingSink {
 /// Create a dispatcher for TracingSink service.
 pub fn create_tracing_sink_dispatcher(
     sink: HostTracingSink,
-) -> impl Fn(u32, u32, Vec<u8>) -> Pin<Box<dyn std::future::Future<Output = Result<Frame, RpcError>> + Send>>
+) -> impl Fn(
+    u32,
+    u32,
+    Vec<u8>,
+) -> Pin<Box<dyn std::future::Future<Output = Result<Frame, RpcError>> + Send>>
        + Send
        + Sync
        + 'static {

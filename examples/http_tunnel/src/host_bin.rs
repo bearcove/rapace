@@ -42,8 +42,8 @@ enum TransportType {
 
 #[derive(Debug, Clone, Copy)]
 enum ShmSize {
-    Default,  // 64 slots × 4KB = 256KB
-    Large,    // 256 slots × 16KB = 4MB
+    Default, // 64 slots × 4KB = 256KB
+    Large,   // 256 slots × 16KB = 4MB
 }
 
 #[derive(Debug)]
@@ -101,7 +101,10 @@ async fn run_host<T: Transport + Send + Sync + 'static>(transport: Arc<T>) {
     // Create the tunnel host
     let tunnel_host = Arc::new(TunnelHost::with_metrics(session.clone(), metrics.clone()));
 
-    eprintln!("[http-tunnel-host] Host server running on 127.0.0.1:{}", HOST_PORT);
+    eprintln!(
+        "[http-tunnel-host] Host server running on 127.0.0.1:{}",
+        HOST_PORT
+    );
     eprintln!("[http-tunnel-host] Ready to accept connections");
 
     // Run the host server
@@ -122,8 +125,7 @@ async fn main() {
     // Initialize tracing
     tracing_subscriber::registry()
         .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "warn".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "warn".into()),
         )
         .with(tracing_subscriber::fmt::layer().with_writer(std::io::stderr))
         .init();
@@ -140,11 +142,17 @@ async fn main() {
             // Check if it's a TCP address (contains ':') or Unix socket path
             if args.addr.contains(':') {
                 // TCP: listen and wait for plugin to connect
-                eprintln!("[http-tunnel-host] Listening for TCP connection on: {}", args.addr);
+                eprintln!(
+                    "[http-tunnel-host] Listening for TCP connection on: {}",
+                    args.addr
+                );
                 let listener = TcpListener::bind(&args.addr)
                     .await
                     .expect("failed to bind TCP listener");
-                let (stream, peer) = listener.accept().await.expect("failed to accept connection");
+                let (stream, peer) = listener
+                    .accept()
+                    .await
+                    .expect("failed to accept connection");
                 eprintln!("[http-tunnel-host] Plugin connected from: {}", peer);
                 run_host_stream(stream).await;
             } else {
@@ -154,10 +162,16 @@ async fn main() {
                     use tokio::net::UnixListener;
                     // Remove existing socket if present
                     let _ = std::fs::remove_file(&args.addr);
-                    eprintln!("[http-tunnel-host] Listening for Unix socket connection on: {}", args.addr);
-                    let listener = UnixListener::bind(&args.addr)
-                        .expect("failed to bind Unix listener");
-                    let (stream, _) = listener.accept().await.expect("failed to accept connection");
+                    eprintln!(
+                        "[http-tunnel-host] Listening for Unix socket connection on: {}",
+                        args.addr
+                    );
+                    let listener =
+                        UnixListener::bind(&args.addr).expect("failed to bind Unix listener");
+                    let (stream, _) = listener
+                        .accept()
+                        .await
+                        .expect("failed to accept connection");
                     eprintln!("[http-tunnel-host] Plugin connected!");
                     run_host_stream(stream).await;
                 }
@@ -183,14 +197,14 @@ async fn main() {
                     eprintln!("[http-tunnel-host] SHM config: LARGE (256 slots × 16KB = 4MB)");
                     ShmSessionConfig {
                         ring_capacity: 512,
-                        slot_size: 16384,  // 16KB per slot
-                        slot_count: 256,   // 256 slots = 4MB total
+                        slot_size: 16384, // 16KB per slot
+                        slot_count: 256,  // 256 slots = 4MB total
                     }
                 }
             };
 
-            let session = ShmSession::create_file(&args.addr, config)
-                .expect("failed to create SHM file");
+            let session =
+                ShmSession::create_file(&args.addr, config).expect("failed to create SHM file");
 
             // Create metrics for SHM transport
             let shm_metrics = Arc::new(ShmMetrics::new());

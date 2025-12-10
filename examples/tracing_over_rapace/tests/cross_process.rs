@@ -24,9 +24,7 @@ async fn find_available_port() -> u16 {
 }
 
 /// Run the host side of the scenario with a stream transport.
-async fn run_host_scenario_stream<R, W>(
-    transport: StreamTransport<R, W>,
-) -> Vec<TraceRecord>
+async fn run_host_scenario_stream<R, W>(transport: StreamTransport<R, W>) -> Vec<TraceRecord>
 where
     R: tokio::io::AsyncRead + Unpin + Send + Sync + 'static,
     W: tokio::io::AsyncWrite + Unpin + Send + Sync + 'static,
@@ -73,31 +71,40 @@ fn verify_records(records: &[TraceRecord]) {
     assert!(!records.is_empty(), "Should have some records");
 
     // Check for expected span names
-    let has_outer_span = records.iter().any(|r| {
-        matches!(r, TraceRecord::NewSpan { meta, .. } if meta.name == "outer_span")
-    });
+    let has_outer_span = records
+        .iter()
+        .any(|r| matches!(r, TraceRecord::NewSpan { meta, .. } if meta.name == "outer_span"));
     assert!(has_outer_span, "Should have outer_span");
 
-    let has_inner_span = records.iter().any(|r| {
-        matches!(r, TraceRecord::NewSpan { meta, .. } if meta.name == "inner_span")
-    });
+    let has_inner_span = records
+        .iter()
+        .any(|r| matches!(r, TraceRecord::NewSpan { meta, .. } if meta.name == "inner_span"));
     assert!(has_inner_span, "Should have inner_span");
 
     // Check for expected events
-    let has_started_event = records.iter().any(|r| {
-        matches!(r, TraceRecord::Event(e) if e.message.contains("plugin started"))
-    });
+    let has_started_event = records
+        .iter()
+        .any(|r| matches!(r, TraceRecord::Event(e) if e.message.contains("plugin started")));
     assert!(has_started_event, "Should have 'plugin started' event");
 
-    let has_final_event = records.iter().any(|r| {
-        matches!(r, TraceRecord::Event(e) if e.message.contains("final event"))
-    });
+    let has_final_event = records
+        .iter()
+        .any(|r| matches!(r, TraceRecord::Event(e) if e.message.contains("final event")));
     assert!(has_final_event, "Should have 'final event' event");
 
     // Check for enter/exit pairs
-    let enter_count = records.iter().filter(|r| matches!(r, TraceRecord::Enter { .. })).count();
-    let exit_count = records.iter().filter(|r| matches!(r, TraceRecord::Exit { .. })).count();
-    assert_eq!(enter_count, exit_count, "Enter and exit counts should match");
+    let enter_count = records
+        .iter()
+        .filter(|r| matches!(r, TraceRecord::Enter { .. }))
+        .count();
+    let exit_count = records
+        .iter()
+        .filter(|r| matches!(r, TraceRecord::Exit { .. }))
+        .count();
+    assert_eq!(
+        enter_count, exit_count,
+        "Enter and exit counts should match"
+    );
 }
 
 /// Verify trace records for SHM transport (relaxed assertions).
@@ -109,10 +116,16 @@ fn verify_records_shm(records: &[TraceRecord]) {
     }
 
     // Should have at least some records
-    assert!(records.len() >= 5, "Should have at least 5 records, got {}", records.len());
+    assert!(
+        records.len() >= 5,
+        "Should have at least 5 records, got {}",
+        records.len()
+    );
 
     // Check for expected span names (at least one)
-    let has_any_span = records.iter().any(|r| matches!(r, TraceRecord::NewSpan { .. }));
+    let has_any_span = records
+        .iter()
+        .any(|r| matches!(r, TraceRecord::NewSpan { .. }));
     assert!(has_any_span, "Should have at least one span");
 
     // Check for expected events (at least one)
@@ -181,8 +194,10 @@ async fn test_cross_process_tcp() {
         }
     };
 
-    let transport: StreamTransport<ReadHalf<tokio::net::TcpStream>, WriteHalf<tokio::net::TcpStream>> =
-        StreamTransport::new(stream);
+    let transport: StreamTransport<
+        ReadHalf<tokio::net::TcpStream>,
+        WriteHalf<tokio::net::TcpStream>,
+    > = StreamTransport::new(stream);
 
     // Run host scenario
     let records = run_host_scenario_stream(transport).await;
@@ -262,8 +277,10 @@ async fn test_cross_process_unix() {
         }
     };
 
-    let transport: StreamTransport<ReadHalf<tokio::net::UnixStream>, WriteHalf<tokio::net::UnixStream>> =
-        StreamTransport::new(stream);
+    let transport: StreamTransport<
+        ReadHalf<tokio::net::UnixStream>,
+        WriteHalf<tokio::net::UnixStream>,
+    > = StreamTransport::new(stream);
 
     // Run host scenario
     let records = run_host_scenario_stream(transport).await;

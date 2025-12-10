@@ -139,7 +139,10 @@ async fn test_stream_transport_tcp() {
         }
     };
 
-    let transport: StreamTransport<ReadHalf<tokio::net::TcpStream>, WriteHalf<tokio::net::TcpStream>> = StreamTransport::new(stream);
+    let transport: StreamTransport<
+        ReadHalf<tokio::net::TcpStream>,
+        WriteHalf<tokio::net::TcpStream>,
+    > = StreamTransport::new(stream);
 
     // Run the host scenario
     let rendered = run_host_scenario_stream(transport).await;
@@ -222,8 +225,10 @@ async fn test_stream_transport_unix() {
         }
     };
 
-    let transport: StreamTransport<ReadHalf<tokio::net::UnixStream>, WriteHalf<tokio::net::UnixStream>> =
-        StreamTransport::new(stream);
+    let transport: StreamTransport<
+        ReadHalf<tokio::net::UnixStream>,
+        WriteHalf<tokio::net::UnixStream>,
+    > = StreamTransport::new(stream);
 
     // Run the host scenario
     let rendered = run_host_scenario_stream(transport).await;

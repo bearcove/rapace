@@ -29,16 +29,16 @@
 //! └─────────────────────────────────────────────────────────────────────────┘
 //! ```
 
-pub mod protocol;
-pub mod plugin;
 pub mod host;
 pub mod metrics;
+pub mod plugin;
+pub mod protocol;
 
 // Re-export key types explicitly to avoid ambiguous glob conflicts
-pub use protocol::{TcpTunnel, TcpTunnelClient, TcpTunnelServer, TunnelHandle};
-pub use plugin::{
-    create_tunnel_dispatcher, create_demo_router, run_http_server,
-    TcpTunnelImpl, INTERNAL_HTTP_PORT,
-};
 pub use host::{run_host_server, TunnelHost};
 pub use metrics::{GlobalTunnelMetrics, TunnelMetrics};
+pub use plugin::{
+    create_demo_router, create_tunnel_dispatcher, run_http_server, TcpTunnelImpl,
+    INTERNAL_HTTP_PORT,
+};
+pub use protocol::{TcpTunnel, TcpTunnelClient, TcpTunnelServer, TunnelHandle};

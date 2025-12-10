@@ -36,7 +36,7 @@ use rapace_transport_stream::StreamTransport;
 use tokio::io::{AsyncRead, AsyncWrite, ReadHalf, WriteHalf};
 use tokio::net::TcpStream;
 
-use rapace_http_over_rapace::{AxumHttpService, create_http_service_dispatcher};
+use rapace_http_over_rapace::{create_http_service_dispatcher, AxumHttpService};
 
 #[derive(Debug)]
 enum TransportType {

@@ -37,10 +37,7 @@ impl<T: Transport + Send + Sync + 'static> TunnelHost<T> {
 
     pub fn with_metrics(session: Arc<RpcSession<T>>, metrics: Arc<GlobalTunnelMetrics>) -> Self {
         let client = TcpTunnelClient::new(session);
-        Self {
-            client,
-            metrics,
-        }
+        Self { client, metrics }
     }
 
     pub fn metrics(&self) -> &GlobalTunnelMetrics {
@@ -140,7 +137,10 @@ pub async fn run_host_server<T: Transport + Send + Sync + 'static>(
     listen_port: u16,
 ) -> std::io::Result<()> {
     let listener = TcpListener::bind(format!("127.0.0.1:{}", listen_port)).await?;
-    tracing::info!(port = listen_port, "host server listening for browser connections");
+    tracing::info!(
+        port = listen_port,
+        "host server listening for browser connections"
+    );
 
     loop {
         let (stream, addr) = listener.accept().await?;
