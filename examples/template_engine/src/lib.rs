@@ -9,10 +9,6 @@ use std::sync::Arc;
 use rapace_core::{Frame, FrameFlags, RpcError, Transport};
 use rapace_testkit::RpcSession;
 
-// Required by the macro
-#[allow(unused)]
-use rapace_registry;
-
 // ============================================================================
 // Service Definitions (Transport-Agnostic)
 // ============================================================================
@@ -179,6 +175,7 @@ impl<T: Transport + Send + Sync + 'static> TemplateEngine for TemplateEngineImpl
 // ============================================================================
 
 /// Create a dispatcher for ValueHost service.
+#[allow(clippy::type_complexity)]
 pub fn create_value_host_dispatcher(
     value_host: Arc<ValueHostImpl>,
 ) -> impl Fn(
@@ -199,6 +196,7 @@ pub fn create_value_host_dispatcher(
 }
 
 /// Create a dispatcher for TemplateEngine service.
+#[allow(clippy::type_complexity)]
 pub fn create_template_engine_dispatcher<T: Transport + Send + Sync + 'static>(
     session: Arc<RpcSession<T>>,
 ) -> impl Fn(

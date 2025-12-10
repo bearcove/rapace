@@ -258,6 +258,7 @@ pub fn convert_rapace_to_hyper(
 /// Create a dispatcher for AxumHttpService.
 ///
 /// This follows the same pattern as template_engine's dispatcher.
+#[allow(clippy::type_complexity)]
 pub fn create_http_service_dispatcher(
     service: AxumHttpService,
 ) -> impl Fn(

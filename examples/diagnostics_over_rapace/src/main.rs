@@ -78,8 +78,8 @@ fn process(n: i32) {
                     _ => "?",
                 };
                 println!(
-                    "[{}] {}:{}: {} - {} ({})",
-                    icon, "example.rs", diag.line, diag.column, diag.message, diag.code
+                    "[{}] example.rs:{}:{}: {} ({})",
+                    icon, diag.line, diag.column, diag.message, diag.code
                 );
             }
             Err(e) => {

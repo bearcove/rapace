@@ -156,6 +156,7 @@ impl<T: Transport + Send + Sync + 'static> TcpTunnel for TcpTunnelImpl<T> {
 /// Create a dispatcher for TcpTunnelImpl.
 ///
 /// This is used to integrate the tunnel service with RpcSession's dispatcher.
+#[allow(clippy::type_complexity)]
 pub fn create_tunnel_dispatcher<T: Transport + Send + Sync + 'static>(
     service: Arc<TcpTunnelImpl<T>>,
 ) -> impl Fn(

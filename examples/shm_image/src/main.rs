@@ -38,10 +38,6 @@ use rapace_transport_shm::{
     allocator_api2::vec::Vec as AllocVec, ShmAllocator, ShmMetrics, ShmSession, ShmTransport,
 };
 
-// Required by the macro
-#[allow(unused)]
-use rapace_registry;
-
 // ============================================================================
 // ImageService trait
 // ============================================================================

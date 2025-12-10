@@ -52,10 +52,6 @@
 //! }
 //! ```
 
-// Required by the macro
-#[allow(unused)]
-use rapace_registry;
-
 /// An HTTP request in rapace-native format.
 ///
 /// This type is transport-agnostic and can be serialized via facet.

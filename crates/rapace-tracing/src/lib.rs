@@ -61,10 +61,6 @@ use tracing_subscriber::layer::Context;
 use tracing_subscriber::registry::LookupSpan;
 use tracing_subscriber::Layer;
 
-// Required by the macro
-#[allow(unused)]
-use rapace_registry;
-
 // ============================================================================
 // Facet Types (transport-agnostic)
 // ============================================================================
@@ -252,6 +248,7 @@ impl TracingConfig for TracingConfigImpl {
 }
 
 /// Create a dispatcher for TracingConfig service (plugin side).
+#[allow(clippy::type_complexity)]
 pub fn create_tracing_config_dispatcher(
     config: TracingConfigImpl,
 ) -> impl Fn(
@@ -652,6 +649,7 @@ impl TracingSink for HostTracingSink {
 // ============================================================================
 
 /// Create a dispatcher for TracingSink service.
+#[allow(clippy::type_complexity)]
 pub fn create_tracing_sink_dispatcher(
     sink: HostTracingSink,
 ) -> impl Fn(

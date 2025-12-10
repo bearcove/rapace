@@ -51,7 +51,7 @@ async fn main() {
     let _plugin_handle = tokio::spawn(async move { plugin_session_clone.run().await });
 
     // Create the tracing layer that forwards to host
-    let layer = RapaceTracingLayer::new(plugin_session.clone(), tokio::runtime::Handle::current());
+    let (layer, _filter) = RapaceTracingLayer::new(plugin_session.clone(), tokio::runtime::Handle::current());
 
     // Install the layer (in a real app, this would be done at startup)
     // For this demo, we use a scoped subscriber
