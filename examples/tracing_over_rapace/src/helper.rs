@@ -84,7 +84,8 @@ async fn run_plugin<T: Transport + Send + Sync + 'static>(transport: Arc<T>) {
     let _session_handle = tokio::spawn(async move { session_clone.run().await });
 
     // Create the tracing layer
-    let (layer, _filter) = RapaceTracingLayer::new(session.clone(), tokio::runtime::Handle::current());
+    let (layer, _filter) =
+        RapaceTracingLayer::new(session.clone(), tokio::runtime::Handle::current());
 
     // Use a scoped subscriber for the traces
     let subscriber = tracing_subscriber::registry().with(layer);

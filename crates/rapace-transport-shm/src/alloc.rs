@@ -87,9 +87,7 @@ impl ShmAllocator {
     /// Calculate the full layout including header.
     fn full_layout(user_layout: Layout) -> Result<(Layout, usize), AllocError> {
         let header_layout = Layout::new::<ShmAllocHeader>();
-        header_layout
-            .extend(user_layout)
-            .map_err(|_| AllocError)
+        header_layout.extend(user_layout).map_err(|_| AllocError)
     }
 }
 
