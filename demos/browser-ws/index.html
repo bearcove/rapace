@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>rapace WebSocket Client Demo</title>
+        <title>rapace Browser Demo</title>
         <style>
             body {
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -63,13 +63,20 @@
                 font-family: inherit;
             }
             input {
-                width: 200px;
+                width: 250px;
             }
             textarea {
                 width: 100%;
                 min-height: 80px;
                 font-family: "Monaco", "Menlo", monospace;
                 font-size: 13px;
+            }
+            label {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                margin-right: 12px;
+                font-size: 14px;
             }
             #log {
                 background: #0f0f1a;
@@ -113,95 +120,73 @@
                 background: #ffd93d;
                 color: #1a1a2e;
             }
-            .service-list {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 10px;
-                margin-bottom: 15px;
-            }
-            .service-card {
-                background: #0f3460;
-                border: 1px solid #00d9ff;
-                border-radius: 4px;
-                padding: 10px 15px;
-                cursor: pointer;
-                transition: background 0.2s;
-            }
-            .service-card:hover {
-                background: #1a4a7a;
-            }
-            .service-card.selected {
-                background: #00d9ff;
-                color: #1a1a2e;
-            }
-            .method-list {
-                margin-top: 15px;
-            }
-            .method-item {
+            .result-card {
                 background: #0f0f1a;
                 border: 1px solid #333;
                 border-radius: 4px;
                 padding: 12px;
-                margin-bottom: 10px;
-            }
-            .method-name {
-                color: #00d9ff;
-                font-weight: bold;
+                margin-top: 10px;
                 font-family: "Monaco", "Menlo", monospace;
             }
-            .method-doc {
-                color: #888;
-                font-size: 12px;
-                margin-top: 4px;
+            #countdownList {
+                list-style: none;
+                padding-left: 0;
+                margin: 0;
             }
-            .method-args {
-                margin-top: 10px;
-            }
-            .arg-input {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                margin-top: 8px;
-            }
-            .arg-label {
-                min-width: 80px;
-                color: #ffd93d;
-            }
-            .streaming-badge {
-                background: #ffd93d;
-                color: #1a1a2e;
-                padding: 2px 6px;
-                border-radius: 3px;
-                font-size: 11px;
-                margin-left: 8px;
-            }
-            #services-container,
-            #methods-container {
-                display: none;
+            #countdownList li {
+                background: #0f0f1a;
+                border: 1px solid #333;
+                border-radius: 4px;
+                padding: 8px 12px;
+                margin-bottom: 6px;
+                font-family: "Monaco", "Menlo", monospace;
             }
         </style>
     </head>
     <body>
-        <h1>rapace Explorer Demo</h1>
+        <h1>rapace Browser Demo</h1>
 
         <div class="section">
             <h2>
                 Connection <span id="status" class="status status-disconnected">Disconnected</span>
             </h2>
-            <input type="text" id="wsUrl" value="ws://127.0.0.1:4268" placeholder="WebSocket URL" />
+            <input type="text" id="wsUrl" value="ws://127.0.0.1:4788" placeholder="WebSocket URL" />
             <button id="connectBtn" onclick="connect()">Connect</button>
             <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
         </div>
 
-        <div class="section" id="services-container">
-            <h2>Services</h2>
-            <div id="service-list" class="service-list"></div>
-            <button class="secondary" onclick="refreshServices()">Refresh Services</button>
+        <div class="section">
+            <h2>Summarize Numbers</h2>
+            <p>Enter comma-separated integers. The server computes sum/mean/min/max via the BrowserDemo RPC.</p>
+            <input type="text" id="numbersInput" data-requires-connection placeholder="e.g. 1, 2, 3, 5" />
+            <button id="numbersBtn" data-requires-connection onclick="runNumbers()" disabled>
+                Summarize
+            </button>
+            <div id="numbersResult" class="result-card">No data yet.</div>
         </div>
 
-        <div class="section" id="methods-container">
-            <h2>Methods for <span id="selected-service-name">-</span></h2>
-            <div id="method-list" class="method-list"></div>
+        <div class="section">
+            <h2>Transform Phrase</h2>
+            <p>Send text to the BrowserDemo service and let it title-case or shout the output.</p>
+            <input type="text" id="phraseInput" data-requires-connection placeholder="enter a phrase" />
+            <label>
+                <input type="checkbox" id="shoutToggle" data-requires-connection disabled />
+                Shout
+            </label>
+            <button id="phraseBtn" data-requires-connection onclick="runPhrase()" disabled>
+                Transform
+            </button>
+            <div id="phraseResult" class="result-card">No data yet.</div>
+        </div>
+
+        <div class="section">
+            <h2>Countdown Stream</h2>
+            <p>The streaming RPC emits one event per tick. We render each event as soon as it arrives.</p>
+            <input type="number" id="countdownStart" min="0" value="3" data-requires-connection />
+            <button id="countdownBtn" data-requires-connection onclick="runCountdown()" disabled>
+                Countdown
+            </button>
+            <ul id="countdownList"></ul>
         </div>
 
         <div class="section">
@@ -211,11 +196,10 @@
         </div>
 
         <script type="module">
-            import init, { ExplorerClient } from "./pkg/rapace_wasm_client.js";
+            import init, { BrowserDemoHarness } from "./pkg/rapace_browser_tests_client.js";
 
-            let client = null;
-            let services = [];
-            let selectedService = null;
+            let harness = null;
+            let wasmReady = null;
 
             function log(msg, className = "log-info") {
                 const logEl = document.getElementById("log");
@@ -238,238 +222,124 @@
                 document.getElementById("connectBtn").disabled = connected;
                 document.getElementById("disconnectBtn").disabled = !connected;
                 document.getElementById("wsUrl").disabled = connected;
-                document.getElementById("services-container").style.display = connected
-                    ? "block"
-                    : "none";
-                if (!connected) {
-                    document.getElementById("methods-container").style.display = "none";
+                document.querySelectorAll("[data-requires-connection]").forEach((el) => {
+                    if (el.tagName === "BUTTON" || el.tagName === "INPUT") {
+                        el.disabled = !connected;
+                    }
+                });
+            }
+
+            async function ensureWasm() {
+                if (!wasmReady) {
+                    log("Loading rapace wasm bindings...");
+                    wasmReady = init();
                 }
+                await wasmReady;
+            }
+
+            function requireHarness() {
+                if (!harness) {
+                    throw new Error("Not connected");
+                }
+                return harness;
             }
 
             window.connect = async function () {
                 try {
+                    await ensureWasm();
+                    const url = document.getElementById("wsUrl").value.trim();
                     setStatus("Connecting");
-                    log("Initializing WASM module...");
-                    await init();
-
-                    const url = document.getElementById("wsUrl").value;
                     log(`Connecting to ${url}...`);
-                    client = await ExplorerClient.connect(url);
-
+                    harness = await BrowserDemoHarness.connect(url);
                     setStatus("Connected");
                     setConnected(true);
-                    log("Connected!", "log-success");
-
-                    // Auto-discover services
-                    await refreshServices();
+                    log("Connected to BrowserDemo service", "log-success");
                 } catch (e) {
+                    harness = null;
                     setStatus("Disconnected");
                     setConnected(false);
-                    log("Connection failed: " + e, "log-error");
+                    log(`Connection failed: ${e}`, "log-error");
                 }
             };
 
-            window.disconnect = function () {
-                if (client) {
-                    client.close();
-                    client = null;
+            window.disconnect = async function () {
+                if (harness) {
+                    try {
+                        await harness.disconnect();
+                    } catch (e) {
+                        log(`Disconnect error: ${e}`, "log-error");
+                    }
                 }
+                harness = null;
                 setStatus("Disconnected");
                 setConnected(false);
-                services = [];
-                selectedService = null;
                 log("Disconnected");
             };
 
-            window.refreshServices = async function () {
-                if (!client) return;
-
+            window.runNumbers = async function () {
                 try {
-                    log("Discovering services...");
-                    services = await client.listServices();
-                    log(`Found ${services.length} service(s)`, "log-success");
+                    const client = requireHarness();
+                    const raw = document.getElementById("numbersInput").value.trim();
+                    const values = raw.length
+                        ? raw.split(",").map((v) => Number(v.trim()))
+                        : [];
+                    if (values.some((v) => Number.isNaN(v))) {
+                        throw new Error("values must be numbers");
+                    }
 
-                    renderServices();
+                    const jsArray = window.Array.from(values);
+                    log(`summarize_numbers(${JSON.stringify(values)})`);
+                    const summary = await client.summarizeNumbers(jsArray);
+                    const summaryText = `sum=${summary.sum}, mean=${summary.mean.toFixed(2)}, min=${summary.min}, max=${summary.max}`;
+                    document.getElementById("numbersResult").textContent = summaryText;
+                    log(`Summary result: ${summaryText}`, "log-success");
                 } catch (e) {
-                    log("Failed to list services: " + e, "log-error");
+                    log(`summarize_numbers failed: ${e}`, "log-error");
                 }
             };
 
-            function renderServices() {
-                const container = document.getElementById("service-list");
-                container.innerHTML = "";
-
-                for (const svc of services) {
-                    const card = document.createElement("div");
-                    card.className =
-                        "service-card" + (selectedService?.id === svc.id ? " selected" : "");
-                    card.innerHTML = `<strong>${svc.name}</strong><br><small>${svc.method_count} methods</small>`;
-                    card.onclick = () => selectService(svc);
-                    container.appendChild(card);
-                }
-            }
-
-            async function selectService(svc) {
-                selectedService = svc;
-                renderServices();
-
-                document.getElementById("selected-service-name").textContent = svc.name;
-                document.getElementById("methods-container").style.display = "block";
-
+            window.runPhrase = async function () {
                 try {
-                    log(`Loading methods for ${svc.name}...`);
-                    const details = await client.getService(svc.id);
-
-                    if (details) {
-                        renderMethods(details);
-                        log(`Loaded ${details.methods.length} method(s)`, "log-success");
-                    } else {
-                        log("Service not found", "log-error");
-                    }
+                    const client = requireHarness();
+                    const phrase = document.getElementById("phraseInput").value;
+                    const shout = document.getElementById("shoutToggle").checked;
+                    log(`transform_phrase(phrase="${phrase}", shout=${shout})`);
+                    const response = await client.transformPhrase(phrase, shout);
+                    const text = `title="${response.title}", original_len=${response.original_len}`;
+                    document.getElementById("phraseResult").textContent = text;
+                    log(`Phrase response: ${text}`, "log-success");
                 } catch (e) {
-                    log("Failed to get service details: " + e, "log-error");
-                }
-            }
-
-            function renderMethods(service) {
-                const container = document.getElementById("method-list");
-                container.innerHTML = "";
-
-                for (const method of service.methods) {
-                    const item = document.createElement("div");
-                    item.className = "method-item";
-
-                    let argsHtml = "";
-                    for (const arg of method.args) {
-                        argsHtml += `
-                        <div class="arg-input">
-                            <span class="arg-label">${arg.name}:</span>
-                            <input type="text" id="arg-${method.id}-${arg.name}"
-                                   placeholder="${arg.type_name}"
-                                   data-shape='${JSON.stringify(arg.shape)}'>
-                        </div>
-                    `;
-                    }
-
-                    item.innerHTML = `
-                    <div>
-                        <span class="method-name">${method.name}</span>
-                        ${method.is_streaming ? '<span class="streaming-badge">streaming</span>' : ""}
-                    </div>
-                    ${method.doc ? `<div class="method-doc">${method.doc}</div>` : ""}
-                    <div class="method-args">${argsHtml}</div>
-                    <button onclick="callMethod('${service.name}', '${method.name}', ${method.id}, ${method.is_streaming}, ${JSON.stringify(method.args).replace(/"/g, "&quot;")})">
-                        Call ${method.name}()
-                    </button>
-                `;
-
-                    container.appendChild(item);
-                }
-            }
-
-            window.callMethod = async function (
-                serviceName,
-                methodName,
-                methodId,
-                isStreaming,
-                args,
-            ) {
-                if (!client) {
-                    log("Not connected", "log-error");
-                    return;
-                }
-
-                // Collect argument values
-                const argsObj = {};
-                for (const arg of args) {
-                    const input = document.getElementById(`arg-${methodId}-${arg.name}`);
-                    const value = input.value;
-                    const shape = JSON.parse(input.dataset.shape);
-
-                    // Parse based on shape
-                    argsObj[arg.name] = parseValue(value, shape);
-                }
-
-                log(`Calling ${serviceName}.${methodName}(${JSON.stringify(argsObj)})...`);
-
-                try {
-                    if (isStreaming) {
-                        const stream = client.callStreaming(serviceName, methodName, argsObj);
-                        let count = 0;
-
-                        while (true) {
-                            const item = await stream.next();
-                            if (item === null) break;
-
-                            const value = JSON.parse(item.value_json);
-                            log(`  [${count}] ${JSON.stringify(value)}`, "log-stream");
-                            count++;
-                        }
-
-                        log(`Stream complete (${count} items)`, "log-success");
-                    } else {
-                        const response = await client.callUnary(serviceName, methodName, argsObj);
-
-                        if (response.error) {
-                            log(`Error: ${response.error}`, "log-error");
-                        } else {
-                            const result = JSON.parse(response.result_json);
-                            log(`Result: ${JSON.stringify(result, null, 2)}`, "log-success");
-                        }
-                    }
-                } catch (e) {
-                    log("Call failed: " + e, "log-error");
+                    log(`transform_phrase failed: ${e}`, "log-error");
                 }
             };
 
-            function parseValue(str, shape) {
-                if (!str) return null;
-
-                switch (shape.kind) {
-                    case "Scalar":
-                        if (shape.affinity === "integer" || shape.affinity === "unsigned") {
-                            return parseInt(str, 10);
-                        } else if (shape.affinity === "float") {
-                            return parseFloat(str);
-                        } else if (shape.affinity === "boolean") {
-                            return str.toLowerCase() === "true";
-                        }
-                        return str;
-
-                    case "String":
-                        return str;
-
-                    case "Option":
-                        if (str === "" || str === "null") return null;
-                        return parseValue(str, shape.inner);
-
-                    case "List":
-                        try {
-                            return JSON.parse(str);
-                        } catch {
-                            return str.split(",").map((s) => parseValue(s.trim(), shape.item));
-                        }
-
-                    case "Struct":
-                    case "Map":
-                        try {
-                            return JSON.parse(str);
-                        } catch {
-                            return str;
-                        }
-
-                    default:
-                        // Try JSON parse, fall back to string
-                        try {
-                            return JSON.parse(str);
-                        } catch {
-                            return str;
-                        }
+            window.runCountdown = async function () {
+                try {
+                    const client = requireHarness();
+                    const startRaw = document.getElementById("countdownStart").value;
+                    const start = Number(startRaw);
+                    if (Number.isNaN(start) || start < 0) {
+                        throw new Error("start must be a non-negative integer");
+                    }
+                    log(`countdown(${start})...`);
+                    const events = await client.countdown(start);
+                    const eventsArray = Array.from(events);
+                    const list = document.getElementById("countdownList");
+                    list.innerHTML = "";
+                    eventsArray.forEach((event, idx) => {
+                        const li = document.createElement("li");
+                        li.textContent = `value=${event.value}, remaining=${event.remaining}`;
+                        list.appendChild(li);
+                        log(`[countdown ${idx}] ${li.textContent}`, "log-stream");
+                    });
+                    log("Countdown complete", "log-success");
+                } catch (e) {
+                    log(`countdown failed: ${e}`, "log-error");
                 }
-            }
+            };
 
-            // Init
-            log('Page loaded. Enter WebSocket URL and click "Connect" to start.');
+            setConnected(false);
+            log('Ready. Connect to ws://127.0.0.1:4788 and exercise BrowserDemo RPCs.');
         </script>
     </body>
 </html>

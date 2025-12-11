@@ -7,5 +7,5 @@ repository.workspace = true
 description = "Shared rapace service definitions for browser tests"
 
 [dependencies]
-rapace = { workspace = true, default-features = false }
+rapace = { path = "../../crates/rapace", default-features = false }
 facet = { workspace = true }

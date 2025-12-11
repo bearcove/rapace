@@ -1,8 +1,12 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, Page } from "@playwright/test";
 
-test.describe("rapace Explorer client", () => {
+async function connectToService(page: Page) {
+  await page.click("#connectBtn");
+  await expect(page.locator("#status")).toHaveText("Connected", { timeout: 10000 });
+}
+
+test.describe("BrowserDemo harness", () => {
   test.beforeEach(async ({ page }) => {
-    // Capture console messages for debugging
     page.on("console", (msg) => {
       if (msg.type() === "error") {
         console.log(`BROWSER ERROR: ${msg.text()}`);
@@ -13,124 +17,52 @@ test.describe("rapace Explorer client", () => {
       console.log(`PAGE ERROR: ${err.message}`);
     });
 
-    // Navigate to the test page
     await page.goto("/");
-
-    // Wait for page to load
-    await expect(page.locator("h1")).toContainText("rapace Explorer Demo");
+    await expect(page.locator("h1")).toContainText("rapace Browser Demo");
   });
 
-  test("should connect and discover services", async ({ page }) => {
-    // Click connect
-    await page.click("#connectBtn");
-
-    // Wait for connection
-    await expect(page.locator("#status")).toHaveText("Connected", { timeout: 10000 });
-
-    // Check that services were discovered
-    await expect(page.locator("#log")).toContainText("Connected!");
-    await expect(page.locator("#log")).toContainText("Discovering services...");
-    await expect(page.locator("#log")).toContainText("Found", { timeout: 5000 });
-
-    // Services section should be visible
-    await expect(page.locator("#services-container")).toBeVisible();
-
-    // Should have at least one service card
-    await expect(page.locator(".service-card")).toHaveCount(1, { timeout: 5000 });
+  test("connects to the BrowserDemo service", async ({ page }) => {
+    await connectToService(page);
+    await expect(page.locator("#log")).toContainText("BrowserDemo service", { timeout: 5000 });
   });
 
-  test("should list service methods", async ({ page }) => {
-    // Connect
-    await page.click("#connectBtn");
-    await expect(page.locator("#status")).toHaveText("Connected", { timeout: 10000 });
+  test("summarizes numbers over RPC", async ({ page }) => {
+    await connectToService(page);
 
-    // Wait for services to load
-    await expect(page.locator(".service-card")).toHaveCount(1, { timeout: 5000 });
+    await page.fill("#numbersInput", "5, 10, 15");
+    await page.click("#numbersBtn");
 
-    // Click on the first service
-    await page.locator(".service-card").first().click();
-
-    // Methods section should appear
-    await expect(page.locator("#methods-container")).toBeVisible();
-    await expect(page.locator("#log")).toContainText("Loading methods");
-
-    // Should have method items
-    await expect(page.locator(".method-item")).not.toHaveCount(0, { timeout: 5000 });
+    await expect(page.locator("#numbersResult")).toContainText("sum=30", { timeout: 5000 });
+    await expect(page.locator("#log")).toContainText("Summary result", { timeout: 5000 });
   });
 
-  test("should call a unary method", async ({ page }) => {
-    // Connect
-    await page.click("#connectBtn");
-    await expect(page.locator("#status")).toHaveText("Connected", { timeout: 10000 });
+  test("transforms phrases", async ({ page }) => {
+    await connectToService(page);
 
-    // Wait for services
-    await expect(page.locator(".service-card")).toHaveCount(1, { timeout: 5000 });
+    await page.fill("#phraseInput", "hello from rapace");
+    await page.check("#shoutToggle");
+    await page.click("#phraseBtn");
 
-    // Click Calculator service (or first service)
-    await page.locator(".service-card").first().click();
-    await expect(page.locator(".method-item")).not.toHaveCount(0, { timeout: 5000 });
-
-    // Find the add method and call it
-    const addMethod = page.locator(".method-item").filter({ hasText: "add" }).first();
-
-    // Fill in arguments (a and b)
-    await addMethod.locator("input").first().fill("7");
-    await addMethod.locator("input").nth(1).fill("13");
-
-    // Click the call button
-    await addMethod.locator("button").click();
-
-    // Check for result in log
-    await expect(page.locator("#log")).toContainText("Result:", { timeout: 5000 });
-    await expect(page.locator("#log")).toContainText("20");
+    await expect(page.locator("#phraseResult")).toContainText("HELLO FROM RAPACE", { timeout: 5000 });
   });
 
-  test("should call a streaming method", async ({ page }) => {
-    // Connect
-    await page.click("#connectBtn");
-    await expect(page.locator("#status")).toHaveText("Connected", { timeout: 10000 });
+  test("streams countdown events", async ({ page }) => {
+    await connectToService(page);
 
-    // Wait for services
-    await expect(page.locator(".service-card")).toHaveCount(1, { timeout: 5000 });
+    await page.fill("#countdownStart", "3");
+    await page.click("#countdownBtn");
 
-    // Click first service
-    await page.locator(".service-card").first().click();
-    await expect(page.locator(".method-item")).not.toHaveCount(0, { timeout: 5000 });
-
-    // Find a streaming method (has streaming badge)
-    const streamingMethod = page
-      .locator(".method-item")
-      .filter({ has: page.locator(".streaming-badge") })
-      .first();
-
-    // If there's a streaming method, test it
-    const count = await streamingMethod.count();
-    if (count > 0) {
-      // Fill in argument
-      await streamingMethod.locator("input").first().fill("3");
-
-      // Click call
-      await streamingMethod.locator("button").click();
-
-      // Wait for stream items
-      await expect(page.locator("#log")).toContainText("[0]", { timeout: 10000 });
-      await expect(page.locator("#log")).toContainText("Stream complete");
-    }
+    const items = page.locator("#countdownList li");
+    await expect(items).toHaveCount(4, { timeout: 10000 });
+    await expect(items.last()).toContainText("value=0", { timeout: 10000 });
+    await expect(page.locator("#log")).toContainText("Countdown complete", { timeout: 10000 });
   });
 
-  test("should disconnect cleanly", async ({ page }) => {
-    // Connect
-    await page.click("#connectBtn");
-    await expect(page.locator("#status")).toHaveText("Connected", { timeout: 10000 });
+  test("disconnects cleanly", async ({ page }) => {
+    await connectToService(page);
 
-    // Disconnect
     await page.click("#disconnectBtn");
-
-    // Check status
     await expect(page.locator("#status")).toHaveText("Disconnected");
     await expect(page.locator("#log")).toContainText("Disconnected");
-
-    // Services should be hidden
-    await expect(page.locator("#services-container")).not.toBeVisible();
   });
 });

@@ -324,10 +324,10 @@ fn run_browser_test(
     headed: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let browser_ws_dir = workspace_root.join("demos/browser-ws");
-    let wasm_client_dir = workspace_root.join("crates/rapace-wasm-client");
+    let wasm_client_dir = workspace_root.join("demos/browser-tests-client");
 
     // Step 1: Build wasm client with wasm-pack
-    println!("=== Building wasm client with wasm-pack ===");
+    println!("=== Building BrowserDemo wasm harness ===");
     if cmd!(sh, "wasm-pack --version").quiet().run().is_err() {
         eprintln!("wasm-pack not found. Install with:");
         eprintln!("  cargo install wasm-pack");
@@ -368,20 +368,21 @@ fn run_browser_test(
         cmd!(sh, "npx playwright install chromium").run()?;
     }
 
-    // Step 3: Build and start the dashboard (which provides ExplorerService)
-    println!("\n=== Starting dashboard server ===");
+    // Step 3: Build and start the BrowserDemo WebSocket server
+    println!("\n=== Starting BrowserDemo WebSocket server ===");
     sh.change_dir(workspace_root);
-    cmd!(sh, "cargo build --package rapace-dashboard --release").run()?;
+    cmd!(sh, "cargo build --package rapace-browser-tests-server --release").run()?;
 
-    let dashboard_path = workspace_root.join("target/release/rapace-dashboard");
-    let mut ws_server = std::process::Command::new(&dashboard_path)
+    let server_path = workspace_root.join("target/release/rapace-browser-tests-server");
+    let mut ws_server = std::process::Command::new(&server_path)
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
+        .env("RAPACE_BROWSER_WS_PORT", "4788")
         .spawn()?;
 
     // Wait for server to start (spawns thread to drain remaining output)
     wait_for_server_ready(&mut ws_server, "ready")?;
-    println!("Dashboard server started on ws://127.0.0.1:4268");
+    println!("Browser demo server started on ws://127.0.0.1:4788");
 
     // Step 4: Start static file server
     println!("\n=== Starting static file server ===");

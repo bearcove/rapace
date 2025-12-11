@@ -378,6 +378,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b05b61dc5112cbb17e4b6cd61790d9845d13888356391624cbe7e41efeac1e75"
 
 [[package]]
+name = "console_error_panic_hook"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a06aeb73f470f66dcdbf7223caeebb85984942f22f1adb2a088cf9668146bbbc"
+dependencies = [
+ "cfg-if",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "core-foundation-sys"
 version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1579,6 +1589,7 @@ dependencies = [
  "facet",
  "facet-core",
  "facet-postcard",
+ "futures",
  "parking_lot",
  "rapace-core",
  "rapace-macros",
@@ -1590,6 +1601,41 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tracing",
+]
+
+[[package]]
+name = "rapace-browser-tests-client"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "futures",
+ "js-sys",
+ "rapace",
+ "rapace-browser-tests-shared",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
+name = "rapace-browser-tests-server"
+version = "0.1.0"
+dependencies = [
+ "rapace",
+ "rapace-browser-tests-shared",
+ "tokio",
+ "tokio-stream",
+ "tokio-tungstenite",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "rapace-browser-tests-shared"
+version = "0.1.0"
+dependencies = [
+ "facet",
+ "rapace",
 ]
 
 [[package]]

@@ -908,7 +908,7 @@ fn generate_streaming_dispatch_arm_server_streaming(
             let mut stream = self.service.#name(#call_args).await;
 
             // Iterate over the stream and send frames
-            use #rapace_crate::tokio_stream::StreamExt;
+            use #rapace_crate::futures::stream::StreamExt;
             #rapace_crate::tracing::debug!(channel_id, "streaming dispatch: starting to iterate stream");
 
             loop {
