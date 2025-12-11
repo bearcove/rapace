@@ -64,6 +64,32 @@ fn main() -> ExitCode {
     }
 }
 
+/// Pre-build all helper binaries used by cross-process tests.
+///
+/// This avoids rebuilding them during test execution, which can cause
+/// timing issues and redundant compilation.
+fn prebuild_helpers(
+    sh: &Shell,
+    _workspace_root: &std::path::Path,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let helpers = vec![
+        ("rapace-diagnostics-over-rapace", "diagnostics-plugin-helper"),
+        ("rapace-http-over-rapace", "http-plugin-helper"),
+        ("rapace-template-engine", "template-engine-helper"),
+        ("rapace-tracing-over-rapace", "tracing-plugin-helper"),
+    ];
+
+    for (package, binary) in helpers {
+        println!("  Building {} ({})", binary, package);
+        cmd!(sh, "cargo build --bin {binary} -p {package}")
+            .run()
+            .map_err(|e| format!("Failed to build {}: {}", binary, e))?;
+    }
+
+    println!("  All helper binaries built successfully");
+    Ok(())
+}
+
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     let sh = Shell::new()?;
@@ -79,7 +105,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     match cli.command {
         Commands::Test => {
-            println!("=== Running workspace tests ===");
+            println!("=== Pre-building helper binaries ===");
+            prebuild_helpers(&sh, &workspace_root)?;
+
+            println!("\n=== Running workspace tests ===");
 
             // Try nextest first, fall back to cargo test
             if cmd!(sh, "cargo nextest --version").quiet().run().is_ok() {
