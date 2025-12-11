@@ -36,6 +36,7 @@
 use std::sync::Arc;
 
 use rapace_core::{Frame, FrameFlags, MsgDescHot, Transport, TransportError, INLINE_PAYLOAD_SIZE};
+#[cfg(target_arch = "wasm32")]
 use rapace_transport_websocket::WebSocketTransport;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
@@ -201,13 +202,15 @@ pub struct StreamItem {
 /// - Service discovery (list_services, get_service)
 /// - Dynamic unary method invocation (call_unary)
 /// - Dynamic streaming method invocation (call_streaming)
+#[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 pub struct ExplorerClient {
-    transport: Arc<WebSocketTransport>,
+    transport: Arc<WebSocketTransport<web_sys::WebSocket>>,
     next_msg_id: u64,
     next_channel_id: u32,
 }
 
+#[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 impl ExplorerClient {
     /// Connect to a rapace ExplorerService WebSocket server.
@@ -493,9 +496,10 @@ impl ExplorerClient {
 // ============================================================================
 
 /// Async iterator for streaming RPC results.
+#[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 pub struct StreamingCall {
-    transport: Arc<WebSocketTransport>,
+    transport: Arc<WebSocketTransport<web_sys::WebSocket>>,
     channel_id: u32,
     msg_id: u64,
     service: String,
@@ -505,6 +509,7 @@ pub struct StreamingCall {
     finished: bool,
 }
 
+#[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 impl StreamingCall {
     /// Get the next value from the stream.
