@@ -28,9 +28,11 @@
 //! ```no_run
 //! use std::process::Command;
 //!
-//! let child = ur_taking_me_with_you::spawn_dying_with_parent(
-//!     Command::new("my-plugin").arg("--foo")
-//! ).expect("failed to spawn");
+//! let mut cmd = Command::new("my-plugin");
+//! cmd.arg("--foo");
+//!
+//! let child = ur_taking_me_with_you::spawn_dying_with_parent(cmd)
+//!     .expect("failed to spawn");
 //! ```
 
 #[cfg(target_os = "linux")]
@@ -60,10 +62,8 @@ use std::process::{Child, Command};
 /// # Example
 ///
 /// ```no_run
-/// fn main() {
-///     ur_taking_me_with_you::die_with_parent();
-///     // ... rest of plugin code
-/// }
+/// ur_taking_me_with_you::die_with_parent();
+/// // ... rest of plugin code
 /// ```
 pub fn die_with_parent() {
     #[cfg(target_os = "linux")]
