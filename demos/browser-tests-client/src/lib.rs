@@ -11,13 +11,9 @@ use futures::StreamExt;
 use rapace::rapace_core::{RpcError, TransportError};
 use rapace::RpcSession;
 use rapace::WebSocketTransport;
+use rapace::Transport;
 use rapace_browser_tests_shared::{
-    BrowserDemoClient,
-    CountEvent,
-    NumbersRequest,
-    NumbersSummary,
-    PhraseRequest,
-    PhraseResponse,
+    BrowserDemoClient, CountEvent, NumbersRequest, NumbersSummary, PhraseRequest, PhraseResponse,
 };
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
@@ -83,11 +79,7 @@ impl BrowserDemoHarness {
 
     /// Call the unary transform_phrase RPC.
     #[wasm_bindgen(js_name = transformPhrase)]
-    pub async fn transform_phrase(
-        &self,
-        phrase: String,
-        shout: bool,
-    ) -> Result<JsValue, JsValue> {
+    pub async fn transform_phrase(&self, phrase: String, shout: bool) -> Result<JsValue, JsValue> {
         let request = PhraseRequest { phrase, shout };
         let response = self
             .client

@@ -4,13 +4,7 @@ use std::time::Duration;
 use rapace::Streaming;
 use rapace::WebSocketTransport;
 use rapace_browser_tests_shared::{
-    browser_demo_methods,
-    BrowserDemo,
-    BrowserDemoServer,
-    CountEvent,
-    NumbersRequest,
-    NumbersSummary,
-    PhraseRequest,
+    BrowserDemo, BrowserDemoServer, CountEvent, NumbersRequest, NumbersSummary, PhraseRequest,
     PhraseResponse,
 };
 use tokio::net::TcpListener;
@@ -31,7 +25,12 @@ impl BrowserDemo for BrowserDemoImpl {
         let min = input.values.iter().copied().min().unwrap_or(0);
         let max = input.values.iter().copied().max().unwrap_or(0);
 
-        NumbersSummary { sum, mean, min, max }
+        NumbersSummary {
+            sum,
+            mean,
+            min,
+            max,
+        }
     }
 
     async fn transform_phrase(&self, request: PhraseRequest) -> PhraseResponse {
@@ -81,12 +80,12 @@ fn to_title_case(word: &str) -> String {
     let mut chars = word.chars();
     match chars.next() {
         Some(first) => {
-            let rest: String = chars.as_str().chars().flat_map(|c| c.to_lowercase()).collect();
-            format!(
-                "{}{}",
-                first.to_uppercase().collect::<String>(),
-                rest
-            )
+            let rest: String = chars
+                .as_str()
+                .chars()
+                .flat_map(|c| c.to_lowercase())
+                .collect();
+            format!("{}{}", first.to_uppercase().collect::<String>(), rest)
         }
         None => String::new(),
     }
@@ -110,7 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!(
         "rapace-browser-tests-server ready on ws://{} (methods: {})",
         addr,
-        browser_demo_methods::METHOD_ID_SUMMARIZE_NUMBERS
+        rapace_browser_tests_shared::BROWSER_DEMO_METHOD_ID_SUMMARIZE_NUMBERS
     );
 
     loop {

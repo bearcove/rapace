@@ -371,7 +371,11 @@ fn run_browser_test(
     // Step 3: Build and start the BrowserDemo WebSocket server
     println!("\n=== Starting BrowserDemo WebSocket server ===");
     sh.change_dir(workspace_root);
-    cmd!(sh, "cargo build --package rapace-browser-tests-server --release").run()?;
+    cmd!(
+        sh,
+        "cargo build --package rapace-browser-tests-server --release"
+    )
+    .run()?;
 
     let server_path = workspace_root.join("target/release/rapace-browser-tests-server");
     let mut ws_server = std::process::Command::new(&server_path)

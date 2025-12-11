@@ -51,6 +51,3 @@ pub trait BrowserDemo {
     /// Stream a countdown starting from `start` down to zero.
     async fn countdown(&self, start: u32) -> Streaming<CountEvent>;
 }
-
-pub use self::browser_demo::{BrowserDemoClient, BrowserDemoServer};
-pub use self::browser_demo_methods as browser_demo_methods;
