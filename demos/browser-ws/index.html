@@ -290,7 +290,12 @@
                     const jsArray = window.Array.from(values);
                     log(`summarize_numbers(${JSON.stringify(values)})`);
                     const summary = await client.summarizeNumbers(jsArray);
-                    const summaryText = `sum=${summary.sum}, mean=${summary.mean.toFixed(2)}, min=${summary.min}, max=${summary.max}`;
+                    log(`Summary raw: ${JSON.stringify(summary)}`);
+                    const summaryData = summary ? JSON.parse(JSON.stringify(summary)) : null;
+                    if (!summaryData) {
+                        throw new Error("summarize_numbers returned empty result");
+                    }
+                    const summaryText = `sum=${summaryData.sum}, mean=${Number(summaryData.mean).toFixed(2)}, min=${summaryData.min}, max=${summaryData.max}`;
                     document.getElementById("numbersResult").textContent = summaryText;
                     log(`Summary result: ${summaryText}`, "log-success");
                 } catch (e) {
@@ -305,7 +310,12 @@
                     const shout = document.getElementById("shoutToggle").checked;
                     log(`transform_phrase(phrase="${phrase}", shout=${shout})`);
                     const response = await client.transformPhrase(phrase, shout);
-                    const text = `title="${response.title}", original_len=${response.original_len}`;
+                    log(`Phrase raw: ${JSON.stringify(response)}`);
+                    const responseData = response ? JSON.parse(JSON.stringify(response)) : null;
+                    if (!responseData) {
+                        throw new Error("transform_phrase returned empty result");
+                    }
+                    const text = `title="${responseData.title}", original_len=${responseData.original_len}`;
                     document.getElementById("phraseResult").textContent = text;
                     log(`Phrase response: ${text}`, "log-success");
                 } catch (e) {

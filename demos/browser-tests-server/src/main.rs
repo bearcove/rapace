@@ -16,6 +16,7 @@ struct BrowserDemoImpl;
 
 impl BrowserDemo for BrowserDemoImpl {
     async fn summarize_numbers(&self, input: NumbersRequest) -> NumbersSummary {
+        println!("summarize_numbers request: {:?}", input.values);
         let sum: i64 = input.values.iter().map(|&v| v as i64).sum();
         let mean = if input.values.is_empty() {
             0.0
@@ -34,6 +35,7 @@ impl BrowserDemo for BrowserDemoImpl {
     }
 
     async fn transform_phrase(&self, request: PhraseRequest) -> PhraseResponse {
+        println!("transform_phrase request: {}", request.phrase);
         let title = request
             .phrase
             .split_whitespace()

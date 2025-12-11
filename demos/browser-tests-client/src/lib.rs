@@ -73,6 +73,7 @@ impl BrowserDemoHarness {
             .summarize_numbers(request)
             .await
             .map_err(rpc_err)?;
+        console::error_1(&JsValue::from_str("rust summarize_numbers done"));
 
         Ok(numbers_summary_to_js(&summary))
     }
@@ -86,6 +87,7 @@ impl BrowserDemoHarness {
             .transform_phrase(request)
             .await
             .map_err(rpc_err)?;
+        console::error_1(&JsValue::from_str("rust transform_phrase done"));
 
         Ok(phrase_response_to_js(&response))
     }
