@@ -1,19 +1,19 @@
 [package]
-name = "rapace-registry"
+name = "rapace-plugin"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Service registry with schema support for rapace RPC"
 
-[package.metadata.docs.rs]
-rustdoc-args = ["--html-in-header", "arborium-header.html"]
+[package.metadata]
 
 [package.metadata."docs.rs"]
 rustdoc-args = ["--html-in-header", "arborium-header.html"]
 
 [dependencies]
-facet-core.workspace = true
+rapace = { workspace = true, features = ["shm"] }
+tokio = { workspace = true, features = ["time"] }
+tracing = { workspace = true }
 
 [dev-dependencies]
-facet.workspace = true
+rapace-testkit = { workspace = true }
