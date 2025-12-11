@@ -56,7 +56,7 @@ jobs:
           node-version: '20'
 
       - name: Install Playwright
-        working-directory: demos/browser-ws
+        working-directory: demos/browser-tests-client
         run: |
           npm install
           npx playwright install chromium --with-deps
