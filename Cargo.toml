@@ -49,8 +49,6 @@ rapace-transport-shm = { path = "crates/rapace-transport-shm", version = "0.1.1"
 rapace-transport-stream = { path = "crates/rapace-transport-stream", version = "0.1.1" }
 rapace-transport-websocket = { path = "crates/rapace-transport-websocket", version = "0.1.1" }
 rapace-testkit = { path = "crates/rapace-testkit", version = "0.1.1" }
-rapace-explorer = { path = "crates/rapace-explorer", version = "0.1.1" }
-ur-taking-me-with-you = { path = "crates/ur-taking-me-with-you", version = "0.1.0" }
 
 # External dependencies
 async-stream = "0.3"
@@ -58,9 +56,7 @@ libc = "0.2"
 bitflags = "2"
 tokio = { version = "1", features = ["sync", "rt", "macros", "time"] }
 tokio-stream = "0.1"
-paste = "1"
 futures = "0.3"
-pin-project-lite = "0.2"
 parking_lot = "0.12"
 
 # facet ecosystem
@@ -74,10 +70,6 @@ tokio-tungstenite = "0.26"
 # Tracing
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
-# Testing/fuzzing
-bolero = "0.11"
-proptest = "1"
 
 # Allocator API
 allocator-api2 = "0.2"

@@ -9,7 +9,7 @@
 
 use std::io;
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
-use std::os::unix::process::CommandExt;
+
 use std::process::{Child, Command};
 
 use crate::DEATH_PIPE_ENV;
@@ -80,15 +80,6 @@ pub fn spawn_dying_with_parent(mut command: Command) -> io::Result<Child> {
 
     // Pass the read FD to the child via environment variable
     command.env(DEATH_PIPE_ENV, read_fd.to_string());
-
-    // Close the read end in parent after fork (child has it)
-    unsafe {
-        command.pre_exec(move || {
-            // Close read end in child - it's already been inherited
-            // Actually no, we want to keep it open! The env var tells the child which FD to use.
-            Ok(())
-        });
-    }
 
     let child = command.spawn()?;
 

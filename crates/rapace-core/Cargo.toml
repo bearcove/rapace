@@ -16,11 +16,9 @@ rustdoc-args = ["--html-in-header", "arborium-header.html"]
 async-stream.workspace = true
 bitflags.workspace = true
 facet.workspace = true
-facet-core.workspace = true
 futures.workspace = true
 parking_lot.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
-proptest = "1"

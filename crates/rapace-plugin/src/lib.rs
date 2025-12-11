@@ -235,21 +235,17 @@ impl Default for DispatcherBuilder {
 
 /// Parse CLI arguments to extract SHM path
 fn parse_args() -> Result<PathBuf, PluginError> {
-    let mut args = std::env::args().skip(1);
-
-    // Try --shm-path=value format first
-    for arg in args.by_ref() {
+    for arg in std::env::args().skip(1) {
         if let Some(value) = arg.strip_prefix("--shm-path=") {
             return Ok(PathBuf::from(value));
+        } else if !arg.starts_with("--") {
+            // First positional argument
+            return Ok(PathBuf::from(arg));
         }
     }
-
-    // Fall back to first positional argument
-    std::env::args().nth(1).map(PathBuf::from).ok_or_else(|| {
-        PluginError::Args(
-            "Missing SHM path (use --shm-path=PATH or provide as first argument)".to_string(),
-        )
-    })
+    Err(PluginError::Args(
+        "Missing SHM path (use --shm-path=PATH or provide as first argument)".to_string(),
+    ))
 }
 
 /// Wait for the host to create the SHM file
