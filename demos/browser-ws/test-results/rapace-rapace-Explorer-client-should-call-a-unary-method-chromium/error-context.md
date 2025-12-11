@@ -26,5 +26,5 @@
   - generic [ref=e19]:
     - heading "Log" [level=2] [ref=e20]
     - button "Clear" [ref=e21] [cursor=pointer]
-    - generic [ref=e22]: "[11:19:30 PM] Page loaded. Enter WebSocket URL and click \"Connect\" to start. [11:19:31 PM] Initializing WASM module... [11:19:31 PM] Connecting to ws://127.0.0.1:4268... [11:19:31 PM] Connected! [11:19:31 PM] Discovering services... [11:19:31 PM] Found 3 service(s)"
+    - generic [ref=e22]: "[8:36:20 AM] Page loaded. Enter WebSocket URL and click \"Connect\" to start. [8:36:20 AM] Initializing WASM module... [8:36:20 AM] Connecting to ws://127.0.0.1:4268... [8:36:20 AM] Connected! [8:36:20 AM] Discovering services... [8:36:20 AM] Found 3 service(s)"
 ```

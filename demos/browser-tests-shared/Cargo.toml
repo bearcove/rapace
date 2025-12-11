@@ -1,0 +1,11 @@
+[package]
+name = "rapace-browser-tests-shared"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Shared rapace service definitions for browser tests"
+
+[dependencies]
+rapace = { workspace = true, default-features = false }
+facet = { workspace = true }
