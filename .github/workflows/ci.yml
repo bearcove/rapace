@@ -167,6 +167,13 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
+      - name: Pre-build helper binaries
+        run: |
+          cargo build --bin diagnostics-plugin-helper -p rapace-diagnostics-over-rapace
+          cargo build --bin http-plugin-helper -p rapace-http-over-rapace
+          cargo build --bin template-engine-helper -p rapace-template-engine
+          cargo build --bin tracing-plugin-helper -p rapace-tracing-over-rapace
+
       - name: Generate coverage
         run: cargo llvm-cov --all-features --lcov --output-path lcov.info
 

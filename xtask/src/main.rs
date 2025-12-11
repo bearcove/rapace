@@ -184,7 +184,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             run_dashboard(&sh, &workspace_root)?;
         }
         Commands::Clippy => {
-            println!("=== Running clippy ===");
+            println!("=== Pre-building helper binaries ===");
+            prebuild_helpers(&sh, &workspace_root)?;
+
+            println!("\n=== Running clippy ===");
             cmd!(sh, "cargo clippy --workspace --all-features -- -D warnings").run()?;
 
             println!("\n=== Clippy on fuzz crate ===");
