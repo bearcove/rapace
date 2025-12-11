@@ -20,12 +20,12 @@ use crate::DEATH_PIPE_ENV;
 /// `spawn_dying_with_parent`, this will start a background thread that
 /// monitors the pipe and exits when the parent dies.
 pub fn die_with_parent() {
-    if let Ok(fd_str) = std::env::var(DEATH_PIPE_ENV) {
-        if let Ok(fd) = fd_str.parse::<RawFd>() {
-            // Take ownership of the FD
-            let owned_fd = unsafe { OwnedFd::from_raw_fd(fd) };
-            start_watchdog(owned_fd);
-        }
+    if let Ok(fd_str) = std::env::var(DEATH_PIPE_ENV)
+        && let Ok(fd) = fd_str.parse::<RawFd>()
+    {
+        // Take ownership of the FD
+        let owned_fd = unsafe { OwnedFd::from_raw_fd(fd) };
+        start_watchdog(owned_fd);
     }
 }
 
