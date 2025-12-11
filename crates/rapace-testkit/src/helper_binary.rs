@@ -68,12 +68,14 @@ pub fn find_helper_binary(binary_name: &str) -> Result<PathBuf, String> {
     let enforce = enforce_prebuilt_helpers();
 
     // Get the current executable's directory
-    let current_exe = std::env::current_exe()
-        .map_err(|e| format!("failed to get current executable: {}", e))?;
+    let current_exe =
+        std::env::current_exe().map_err(|e| format!("failed to get current executable: {}", e))?;
 
     // The test executable is in target/{debug|release}/deps/ (via nextest) or target/{debug|release}/ (via cargo test)
     // We need to find the profile directory (target/debug or target/release) containing the binary
-    let mut search_dir = current_exe.parent().ok_or_else(|| "could not find parent directory".to_string())?;
+    let mut search_dir = current_exe
+        .parent()
+        .ok_or_else(|| "could not find parent directory".to_string())?;
 
     // Try up to 3 levels up to find the profile directory containing helper binaries
     for _ in 0..3 {
