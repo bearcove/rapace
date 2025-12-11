@@ -121,7 +121,7 @@ pub fn parse_trait(tokens: &TokenStream2) -> Result<ParsedTrait> {
     // Require the trait body to start immediately after the name.
     let body = BraceGroupContaining::<TokenStream>::parse(&mut iter).map_err(|err| {
         let next_span = iter.clone().next().map_or(ident.span(), |tt| tt.span());
-        let message = if matches!(err.kind, unsynn::ErrorKind::UnexpectedToken { .. }) {
+        let message = if matches!(err.kind, unsynn::ErrorKind::UnexpectedToken) {
             "rapace::service traits cannot declare generics or supertraits yet"
         } else {
             "failed to parse service trait body"
@@ -135,7 +135,7 @@ pub fn parse_trait(tokens: &TokenStream2) -> Result<ParsedTrait> {
     let methods = parse_methods(body.content)?;
 
     Ok(ParsedTrait {
-        vis_tokens: vis_tokens.into(),
+        vis_tokens,
         ident,
         doc_lines,
         methods,
@@ -243,7 +243,7 @@ fn parse_method_params(tokens: TokenStream, error_span: Span) -> Result<Vec<Meth
             .into_iter()
             .map(|entry| MethodArg {
                 name: entry.value.name,
-                ty: entry.value.ty.to_token_stream().into(),
+                ty: entry.value.ty.to_token_stream(),
             })
             .collect()
     };
@@ -262,7 +262,7 @@ fn parse_return_type(iter: &mut TokenIter) -> Result<TokenStream2> {
 
     RArrow::parse(iter).map_err(Error::from)?;
     let ty_tokens = VerbatimUntil::<Semicolon>::parse(iter).map_err(Error::from)?;
-    Ok(ty_tokens.to_token_stream().into())
+    Ok(ty_tokens.to_token_stream())
 }
 
 pub fn join_doc_lines(lines: &[String]) -> String {

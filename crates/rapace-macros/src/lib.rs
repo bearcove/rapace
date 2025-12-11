@@ -680,9 +680,7 @@ fn split_top_level(tokens: TokenStream2, delimiter: char) -> Vec<TokenStream2> {
                 current.extend(std::iter::once(tt));
             }
             TokenTree::Punct(p) if p.as_char() == '>' => {
-                if angle_depth > 0 {
-                    angle_depth -= 1;
-                }
+                angle_depth = angle_depth.saturating_sub(1);
                 current.extend(std::iter::once(tt));
             }
             TokenTree::Punct(p) if p.as_char() == delimiter && angle_depth == 0 => {
