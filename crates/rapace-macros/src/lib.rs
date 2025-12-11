@@ -164,10 +164,17 @@ fn generate_service(
     });
 
     // Generate streaming dispatch arms
+    let mut streaming_method_matches = Vec::new();
     let streaming_dispatch_arms = methods.iter().map(|m| {
         let method_id = compute_method_id(&trait_name_str, &m.name.to_string());
         generate_streaming_dispatch_arm(m, method_id, &rapace_crate)
     });
+    for m in methods.iter() {
+        if matches!(m.kind, MethodKind::ServerStreaming { .. }) {
+            let method_id = compute_method_id(&trait_name_str, &m.name.to_string());
+            streaming_method_matches.push(quote! { #method_id => true, });
+        }
+    }
 
     // Generate method ID constants
     let method_id_consts = methods.iter().map(|m| {
@@ -848,6 +855,7 @@ fn generate_streaming_dispatch_arm(
                         })?;
 
                     let mut desc = #rapace_crate::rapace_core::MsgDescHot::new();
+                    desc.channel_id = channel_id;
                     desc.flags = #rapace_crate::rapace_core::FrameFlags::DATA | #rapace_crate::rapace_core::FrameFlags::EOS;
 
                     let frame = if response_bytes.len() <= #rapace_crate::rapace_core::INLINE_PAYLOAD_SIZE {
