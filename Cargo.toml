@@ -14,6 +14,7 @@ members = [
     "crates/rapace-transport-websocket",
     "crates/rapace-testkit",
     "crates/rapace-explorer",
+    "crates/ur-taking-me-with-you",
     "demos/dashboard",
     "demos/browser-tests-proto",
     "demos/browser-tests-server",
@@ -40,7 +41,6 @@ rapace = { path = "crates/rapace", version = "0.1.1" }
 rapace-core = { path = "crates/rapace-core", version = "0.1.1" }
 rapace-http = { path = "crates/rapace-http", version = "0.1.1" }
 rapace-macros = { path = "crates/rapace-macros", version = "0.1.1" }
-rapace-plugin = { path = "crates/rapace-plugin", version = "0.1.1" }
 rapace-registry = { path = "crates/rapace-registry", version = "0.1.1" }
 rapace-tracing = { path = "crates/rapace-tracing", version = "0.1.1" }
 rapace-transport-mem = { path = "crates/rapace-transport-mem", version = "0.1.1" }
@@ -49,6 +49,7 @@ rapace-transport-stream = { path = "crates/rapace-transport-stream", version = "
 rapace-transport-websocket = { path = "crates/rapace-transport-websocket", version = "0.1.1" }
 rapace-testkit = { path = "crates/rapace-testkit", version = "0.1.1" }
 rapace-explorer = { path = "crates/rapace-explorer", version = "0.1.1" }
+ur-taking-me-with-you = { path = "crates/ur-taking-me-with-you", version = "0.1.0" }
 
 # External dependencies
 async-stream = "0.3"

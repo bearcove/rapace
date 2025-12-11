@@ -13,14 +13,22 @@
 //!
 //! For simple plugins that expose a single service:
 //!
-//! ```rust,no_run
-//! use rapace_plugin::run;
-//! # use rapace::{Frame, RpcError};
+//! ```rust,ignore
+//! use rapace_plugin::{run, ServiceDispatch};
+//! use rapace::{Frame, RpcError};
+//! use std::future::Future;
+//! use std::pin::Pin;
+//!
 //! # struct MyServiceServer;
 //! # impl MyServiceServer {
 //! #     fn new(impl_: ()) -> Self { Self }
-//! #     async fn dispatch(&self, method_id: u32, payload: &[u8]) -> Result<Frame, RpcError> {
+//! #     async fn dispatch_impl(&self, method_id: u32, payload: &[u8]) -> Result<Frame, RpcError> {
 //! #         unimplemented!()
+//! #     }
+//! # }
+//! # impl ServiceDispatch for MyServiceServer {
+//! #     fn dispatch(&self, method_id: u32, payload: &[u8]) -> Pin<Box<dyn Future<Output = Result<Frame, RpcError>> + Send + 'static>> {
+//! #         Box::pin(Self::dispatch_impl(self, method_id, payload))
 //! #     }
 //! # }
 //!
@@ -36,21 +44,34 @@
 //!
 //! For plugins that expose multiple services:
 //!
-//! ```rust,no_run
-//! use rapace_plugin::{run_multi, DispatcherBuilder};
-//! # use rapace::{Frame, RpcError};
+//! ```rust,ignore
+//! use rapace_plugin::{run_multi, DispatcherBuilder, ServiceDispatch};
+//! use rapace::{Frame, RpcError};
+//! use std::future::Future;
+//! use std::pin::Pin;
+//!
 //! # struct MyServiceServer;
 //! # struct AnotherServiceServer;
 //! # impl MyServiceServer {
 //! #     fn new(impl_: ()) -> Self { Self }
-//! #     async fn dispatch(&self, method_id: u32, payload: &[u8]) -> Result<Frame, RpcError> {
+//! #     async fn dispatch_impl(&self, method_id: u32, payload: &[u8]) -> Result<Frame, RpcError> {
 //! #         unimplemented!()
 //! #     }
 //! # }
 //! # impl AnotherServiceServer {
 //! #     fn new(impl_: ()) -> Self { Self }
-//! #     async fn dispatch(&self, method_id: u32, payload: &[u8]) -> Result<Frame, RpcError> {
+//! #     async fn dispatch_impl(&self, method_id: u32, payload: &[u8]) -> Result<Frame, RpcError> {
 //! #         unimplemented!()
+//! #     }
+//! # }
+//! # impl ServiceDispatch for MyServiceServer {
+//! #     fn dispatch(&self, method_id: u32, payload: &[u8]) -> Pin<Box<dyn Future<Output = Result<Frame, RpcError>> + Send + 'static>> {
+//! #         Box::pin(Self::dispatch_impl(self, method_id, payload))
+//! #     }
+//! # }
+//! # impl ServiceDispatch for AnotherServiceServer {
+//! #     fn dispatch(&self, method_id: u32, payload: &[u8]) -> Pin<Box<dyn Future<Output = Result<Frame, RpcError>> + Send + 'static>> {
+//! #         Box::pin(Self::dispatch_impl(self, method_id, payload))
 //! #     }
 //! # }
 //!
@@ -282,14 +303,22 @@ async fn setup_plugin(
 ///
 /// # Example
 ///
-/// ```rust,no_run
-/// use rapace_plugin::run;
-/// # use rapace::{Frame, RpcError};
+/// ```rust,ignore
+/// use rapace_plugin::{run, ServiceDispatch};
+/// use rapace::{Frame, RpcError};
+/// use std::future::Future;
+/// use std::pin::Pin;
+///
 /// # struct MyServiceServer;
 /// # impl MyServiceServer {
 /// #     fn new(impl_: ()) -> Self { Self }
-/// #     async fn dispatch(&self, method_id: u32, payload: &[u8]) -> Result<Frame, RpcError> {
+/// #     async fn dispatch_impl(&self, method_id: u32, payload: &[u8]) -> Result<Frame, RpcError> {
 /// #         unimplemented!()
+/// #     }
+/// # }
+/// # impl ServiceDispatch for MyServiceServer {
+/// #     fn dispatch(&self, method_id: u32, payload: &[u8]) -> Pin<Box<dyn Future<Output = Result<Frame, RpcError>> + Send + 'static>> {
+/// #         Box::pin(Self::dispatch_impl(self, method_id, payload))
 /// #     }
 /// # }
 ///
@@ -342,21 +371,34 @@ where
 ///
 /// # Example
 ///
-/// ```rust,no_run
-/// use rapace_plugin::{run_multi, DispatcherBuilder};
-/// # use rapace::{Frame, RpcError};
+/// ```rust,ignore
+/// use rapace_plugin::{run_multi, DispatcherBuilder, ServiceDispatch};
+/// use rapace::{Frame, RpcError};
+/// use std::future::Future;
+/// use std::pin::Pin;
+///
 /// # struct MyServiceServer;
 /// # struct AnotherServiceServer;
 /// # impl MyServiceServer {
 /// #     fn new(impl_: ()) -> Self { Self }
-/// #     async fn dispatch(&self, method_id: u32, payload: &[u8]) -> Result<Frame, RpcError> {
+/// #     async fn dispatch_impl(&self, method_id: u32, payload: &[u8]) -> Result<Frame, RpcError> {
 /// #         unimplemented!()
 /// #     }
 /// # }
 /// # impl AnotherServiceServer {
 /// #     fn new(impl_: ()) -> Self { Self }
-/// #     async fn dispatch(&self, method_id: u32, payload: &[u8]) -> Result<Frame, RpcError> {
+/// #     async fn dispatch_impl(&self, method_id: u32, payload: &[u8]) -> Result<Frame, RpcError> {
 /// #         unimplemented!()
+/// #     }
+/// # }
+/// # impl ServiceDispatch for MyServiceServer {
+/// #     fn dispatch(&self, method_id: u32, payload: &[u8]) -> Pin<Box<dyn Future<Output = Result<Frame, RpcError>> + Send + 'static>> {
+/// #         Box::pin(Self::dispatch_impl(self, method_id, payload))
+/// #     }
+/// # }
+/// # impl ServiceDispatch for AnotherServiceServer {
+/// #     fn dispatch(&self, method_id: u32, payload: &[u8]) -> Pin<Box<dyn Future<Output = Result<Frame, RpcError>> + Send + 'static>> {
+/// #         Box::pin(Self::dispatch_impl(self, method_id, payload))
 /// #     }
 /// # }
 ///
