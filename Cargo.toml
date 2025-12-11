@@ -15,7 +15,7 @@ members = [
     "crates/rapace-testkit",
     "crates/rapace-explorer",
     "demos/dashboard",
-    "demos/browser-tests-shared",
+    "demos/browser-tests-proto",
     "demos/browser-tests-server",
     "demos/browser-tests-client",
     "demos/http-over-rapace",

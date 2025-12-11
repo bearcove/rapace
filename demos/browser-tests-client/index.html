@@ -201,6 +201,10 @@
             let harness = null;
             let wasmReady = null;
 
+            function safeStringify(value) {
+                return JSON.stringify(value, (_, v) => (typeof v === "bigint" ? Number(v) : v));
+            }
+
             function log(msg, className = "log-info") {
                 const logEl = document.getElementById("log");
                 const timestamp = new Date().toLocaleTimeString();
@@ -288,18 +292,21 @@
                     }
 
                     const jsArray = window.Array.from(values);
-                    log(`summarize_numbers(${JSON.stringify(values)})`);
+                    log(`summarize_numbers(${safeStringify(values)})`);
                     const summary = await client.summarizeNumbers(jsArray);
-                    log(`Summary raw: ${JSON.stringify(summary)}`);
-                    const summaryData = summary ? JSON.parse(JSON.stringify(summary)) : null;
-                    if (!summaryData) {
-                        throw new Error("summarize_numbers returned empty result");
-                    }
-                    const summaryText = `sum=${summaryData.sum}, mean=${Number(summaryData.mean).toFixed(2)}, min=${summaryData.min}, max=${summaryData.max}`;
+                    log(`Summary raw: ${safeStringify(summary)}`);
+                    const safeSummary = summary ?? {};
+                    const coerce = (value) => (typeof value === "bigint" ? Number(value) : Number(value ?? 0));
+                    const sum = coerce(safeSummary.sum);
+                    const mean = coerce(safeSummary.mean);
+                    const min = coerce(safeSummary.min);
+                    const max = coerce(safeSummary.max);
+                    const summaryText = `sum=${sum}, mean=${mean.toFixed(2)}, min=${min}, max=${max}`;
                     document.getElementById("numbersResult").textContent = summaryText;
                     log(`Summary result: ${summaryText}`, "log-success");
                 } catch (e) {
                     log(`summarize_numbers failed: ${e}`, "log-error");
+                    console.error(e);
                 }
             };
 
@@ -310,16 +317,14 @@
                     const shout = document.getElementById("shoutToggle").checked;
                     log(`transform_phrase(phrase="${phrase}", shout=${shout})`);
                     const response = await client.transformPhrase(phrase, shout);
-                    log(`Phrase raw: ${JSON.stringify(response)}`);
-                    const responseData = response ? JSON.parse(JSON.stringify(response)) : null;
-                    if (!responseData) {
-                        throw new Error("transform_phrase returned empty result");
-                    }
-                    const text = `title="${responseData.title}", original_len=${responseData.original_len}`;
+                    log(`Phrase raw: ${safeStringify(response)}`);
+                    const responseData = response ?? {};
+                    const text = `title="${responseData.title ?? ""}", original_len=${responseData.original_len ?? 0}`;
                     document.getElementById("phraseResult").textContent = text;
                     log(`Phrase response: ${text}`, "log-success");
                 } catch (e) {
                     log(`transform_phrase failed: ${e}`, "log-error");
+                    console.error(e);
                 }
             };
 

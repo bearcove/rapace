@@ -1,5 +1,5 @@
 [package]
-name = "rapace-browser-tests-shared"
+name = "rapace-browser-tests-proto"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -1,3 +1,5 @@
+#![cfg(target_arch = "wasm32")]
+
 //! WASM harness that exposes the macro-generated `BrowserDemoClient` to JavaScript.
 //!
 //! The Playwright suite loads this module, connects to the WebSocket server, and
@@ -10,9 +12,9 @@ use std::sync::Arc;
 use futures::StreamExt;
 use rapace::rapace_core::{RpcError, TransportError};
 use rapace::RpcSession;
-use rapace::WebSocketTransport;
 use rapace::Transport;
-use rapace_browser_tests_shared::{
+use rapace::WebSocketTransport;
+use rapace_browser_tests_proto::{
     BrowserDemoClient, CountEvent, NumbersRequest, NumbersSummary, PhraseRequest, PhraseResponse,
 };
 use wasm_bindgen::prelude::*;
@@ -73,7 +75,6 @@ impl BrowserDemoHarness {
             .summarize_numbers(request)
             .await
             .map_err(rpc_err)?;
-        console::error_1(&JsValue::from_str("rust summarize_numbers done"));
 
         Ok(numbers_summary_to_js(&summary))
     }
@@ -87,7 +88,6 @@ impl BrowserDemoHarness {
             .transform_phrase(request)
             .await
             .map_err(rpc_err)?;
-        console::error_1(&JsValue::from_str("rust transform_phrase done"));
 
         Ok(phrase_response_to_js(&response))
     }

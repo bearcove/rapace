@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use rapace::Streaming;
 use rapace::WebSocketTransport;
-use rapace_browser_tests_shared::{
+use rapace_browser_tests_proto::{
     BrowserDemo, BrowserDemoServer, CountEvent, NumbersRequest, NumbersSummary, PhraseRequest,
     PhraseResponse,
 };
@@ -111,7 +111,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!(
         "rapace-browser-tests-server ready on ws://{} (methods: {})",
         addr,
-        rapace_browser_tests_shared::BROWSER_DEMO_METHOD_ID_SUMMARIZE_NUMBERS
+        rapace_browser_tests_proto::BROWSER_DEMO_METHOD_ID_SUMMARIZE_NUMBERS
     );
 
     loop {

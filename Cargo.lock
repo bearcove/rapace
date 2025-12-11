@@ -1617,10 +1617,18 @@ dependencies = [
  "futures",
  "js-sys",
  "rapace",
- "rapace-browser-tests-shared",
+ "rapace-browser-tests-proto",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+]
+
+[[package]]
+name = "rapace-browser-tests-proto"
+version = "0.1.0"
+dependencies = [
+ "facet",
+ "rapace",
 ]
 
 [[package]]
@@ -1628,20 +1636,12 @@ name = "rapace-browser-tests-server"
 version = "0.1.0"
 dependencies = [
  "rapace",
- "rapace-browser-tests-shared",
+ "rapace-browser-tests-proto",
  "tokio",
  "tokio-stream",
  "tokio-tungstenite",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "rapace-browser-tests-shared"
-version = "0.1.0"
-dependencies = [
- "facet",
- "rapace",
 ]
 
 [[package]]
