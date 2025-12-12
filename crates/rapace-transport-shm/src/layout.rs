@@ -444,7 +444,7 @@ impl DataSegment {
     /// Index must be < slot_count and the caller must own the slot.
     #[inline]
     pub unsafe fn data_ptr_public(&self, index: u32) -> *mut u8 {
-        self.data_ptr(index)
+        unsafe { self.data_ptr(index) }
     }
 
     /// Allocate a slot.
@@ -469,8 +469,8 @@ impl DataSegment {
 
             if result.is_ok() {
                 // Successfully allocated. Increment generation.
-                let gen = meta.generation.fetch_add(1, Ordering::AcqRel) + 1;
-                return Ok((i, gen));
+                let r#gen = meta.generation.fetch_add(1, Ordering::AcqRel) + 1;
+                return Ok((i, r#gen));
             }
         }
 

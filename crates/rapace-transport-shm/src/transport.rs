@@ -245,14 +245,14 @@ impl Transport for ShmTransport {
         // Free any previous frame's slot.
         {
             let mut last = self.last_frame.lock();
-            if let Some(prev) = last.take() {
-                if let Some((slot_idx, generation)) = prev.slot_info {
-                    // Ignore errors on free (slot may have been freed already).
-                    if data_segment.free(slot_idx, generation).is_ok() {
-                        if let Some(ref metrics) = self.metrics {
-                            metrics.record_slot_free();
-                        }
-                    }
+            if let Some(prev) = last.take()
+                && let Some((slot_idx, generation)) = prev.slot_info
+            {
+                // Ignore errors on free (slot may have been freed already).
+                if data_segment.free(slot_idx, generation).is_ok()
+                    && let Some(ref metrics) = self.metrics
+                {
+                    metrics.record_slot_free();
                 }
             }
         }
@@ -361,11 +361,11 @@ impl Transport for ShmTransport {
 
         // Free any held slot.
         let mut last = self.last_frame.lock();
-        if let Some(prev) = last.take() {
-            if let Some((slot_idx, generation)) = prev.slot_info {
-                let data_segment = self.session.data_segment();
-                let _ = data_segment.free(slot_idx, generation);
-            }
+        if let Some(prev) = last.take()
+            && let Some((slot_idx, generation)) = prev.slot_info
+        {
+            let data_segment = self.session.data_segment();
+            let _ = data_segment.free(slot_idx, generation);
         }
 
         Ok(())
