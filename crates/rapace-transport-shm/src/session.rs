@@ -2,16 +2,90 @@
 //!
 //! A session represents a shared memory segment between two peers.
 
+use std::path::{Path, PathBuf};
 use std::ptr::NonNull;
 use std::sync::Arc;
 
 use rapace_core::MsgDescHot;
 
 use crate::layout::{
-    calculate_segment_size, DataSegment, DataSegmentHeader, DescRing, DescRingHeader, LayoutError,
-    SegmentHeader, SegmentOffsets, SlotMeta, DEFAULT_RING_CAPACITY, DEFAULT_SLOT_COUNT,
-    DEFAULT_SLOT_SIZE,
+    DataSegment, DataSegmentHeader, DescRing, DescRingHeader, LayoutError, SegmentHeader,
+    SegmentOffsets, SlotMeta, DEFAULT_RING_CAPACITY, DEFAULT_SLOT_COUNT, DEFAULT_SLOT_SIZE,
 };
+
+const DEFAULT_MAX_SEGMENT_SIZE_BYTES: usize = 512 * 1024 * 1024; // 512MB
+
+#[cfg(test)]
+fn munmap_key(base: usize, size: usize) -> u128 {
+    ((base as u128) << 64) | (size as u128)
+}
+
+#[cfg(test)]
+fn munmap_counts() -> &'static std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<u128, usize>>> {
+    static COUNTS: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<u128, usize>>> =
+        std::sync::OnceLock::new();
+    &COUNTS
+}
+
+#[cfg(test)]
+fn munmap_count_for(key: u128) -> usize {
+    let lock = munmap_counts().get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+    lock.lock().unwrap().get(&key).copied().unwrap_or(0)
+}
+
+fn max_segment_size_bytes() -> usize {
+    std::env::var("RAPACE_SHM_MAX_BYTES")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(DEFAULT_MAX_SEGMENT_SIZE_BYTES)
+}
+
+#[derive(Debug, Clone)]
+enum ShmMappingKind {
+    Anonymous,
+    File { path: PathBuf },
+}
+
+#[derive(Debug)]
+struct ShmMapping {
+    base: NonNull<u8>,
+    size: usize,
+    kind: ShmMappingKind,
+}
+
+impl ShmMapping {
+    #[inline]
+    fn base_addr(&self) -> usize {
+        self.base.as_ptr() as usize
+    }
+}
+
+impl Drop for ShmMapping {
+    fn drop(&mut self) {
+        unsafe {
+            if let Err(e) = munmap_region(self.base.as_ptr(), self.size) {
+                match &self.kind {
+                    ShmMappingKind::Anonymous => {
+                        tracing::error!(error = %e, size = self.size, "munmap failed for anonymous SHM mapping");
+                    }
+                    ShmMappingKind::File { path } => {
+                        tracing::error!(error = %e, size = self.size, path = %path.display(), "munmap failed for file-backed SHM mapping");
+                    }
+                }
+            } else {
+                match &self.kind {
+                    ShmMappingKind::Anonymous => {
+                        tracing::debug!(size = self.size, "unmapped anonymous SHM mapping");
+                    }
+                    ShmMappingKind::File { path } => {
+                        tracing::debug!(size = self.size, path = %path.display(), "unmapped file-backed SHM mapping");
+                    }
+                }
+            }
+        }
+    }
+}
 
 /// Configuration for creating an SHM session.
 #[derive(Debug, Clone)]
@@ -52,10 +126,8 @@ pub enum PeerRole {
 pub struct ShmSession {
     /// Our role in this session.
     role: PeerRole,
-    /// Pointer to the mapped region.
-    base: NonNull<u8>,
-    /// Size of the mapped region.
-    size: usize,
+    /// Refcounted owner of the underlying mapping.
+    mapping: Arc<ShmMapping>,
     /// Calculated offsets.
     offsets: SegmentOffsets,
     /// Configuration used.
@@ -80,6 +152,15 @@ impl ShmSession {
     }
 
     /// Create a connected pair with custom configuration.
+    #[tracing::instrument(
+        level = "debug",
+        skip(config),
+        fields(
+            ring_capacity = config.ring_capacity,
+            slot_size = config.slot_size,
+            slot_count = config.slot_count
+        )
+    )]
     pub fn create_pair_with_config(
         config: ShmSessionConfig,
     ) -> Result<(Arc<Self>, Arc<Self>), SessionError> {
@@ -96,23 +177,27 @@ impl ShmSession {
             return Err(SessionError::InvalidConfig("slot_count must be > 0"));
         }
 
-        let size =
-            calculate_segment_size(config.ring_capacity, config.slot_size, config.slot_count);
-        let offsets = SegmentOffsets::calculate(config.ring_capacity, config.slot_count);
+        let size = calculate_segment_size_checked(
+            config.ring_capacity,
+            config.slot_size,
+            config.slot_count,
+        )?;
+        let offsets = calculate_offsets_checked(config.ring_capacity, config.slot_count)?;
 
         // Create anonymous mmap.
-        let base = unsafe { create_anonymous_mmap(size)? };
+        let mapping = unsafe { create_anonymous_mapping(size)? };
+
+        tracing::info!(size, "created SHM session pair mapping");
 
         // Initialize the segment.
         unsafe {
-            initialize_segment(base.as_ptr(), &config, &offsets)?;
+            initialize_segment(mapping.base.as_ptr(), &config, &offsets)?;
         }
 
         // Create session A.
         let session_a = Arc::new(Self {
             role: PeerRole::A,
-            base,
-            size,
+            mapping: mapping.clone(),
             offsets,
             config: config.clone(),
             local_send_head: std::sync::atomic::AtomicU64::new(0),
@@ -121,8 +206,7 @@ impl ShmSession {
         // Create session B (shares the same memory).
         let session_b = Arc::new(Self {
             role: PeerRole::B,
-            base,
-            size,
+            mapping,
             offsets,
             config,
             local_send_head: std::sync::atomic::AtomicU64::new(0),
@@ -140,7 +224,7 @@ impl ShmSession {
     /// Get the segment header.
     #[inline]
     pub fn header(&self) -> &SegmentHeader {
-        unsafe { &*(self.base.as_ptr().add(self.offsets.header) as *const SegmentHeader) }
+        unsafe { &*(self.mapping.base.as_ptr().add(self.offsets.header) as *const SegmentHeader) }
     }
 
     /// Get our send ring (we write, peer reads).
@@ -158,8 +242,8 @@ impl ShmSession {
 
         unsafe {
             DescRing::from_raw(
-                self.base.as_ptr().add(header_offset) as *mut DescRingHeader,
-                self.base.as_ptr().add(descs_offset) as *mut MsgDescHot,
+                self.mapping.base.as_ptr().add(header_offset) as *mut DescRingHeader,
+                self.mapping.base.as_ptr().add(descs_offset) as *mut MsgDescHot,
             )
         }
     }
@@ -179,8 +263,8 @@ impl ShmSession {
 
         unsafe {
             DescRing::from_raw(
-                self.base.as_ptr().add(header_offset) as *mut DescRingHeader,
-                self.base.as_ptr().add(descs_offset) as *mut MsgDescHot,
+                self.mapping.base.as_ptr().add(header_offset) as *mut DescRingHeader,
+                self.mapping.base.as_ptr().add(descs_offset) as *mut MsgDescHot,
             )
         }
     }
@@ -189,9 +273,9 @@ impl ShmSession {
     pub fn data_segment(&self) -> DataSegment {
         unsafe {
             DataSegment::from_raw(
-                self.base.as_ptr().add(self.offsets.data_header) as *mut DataSegmentHeader,
-                self.base.as_ptr().add(self.offsets.slot_meta) as *mut SlotMeta,
-                self.base.as_ptr().add(self.offsets.slot_data),
+                self.mapping.base.as_ptr().add(self.offsets.data_header) as *mut DataSegmentHeader,
+                self.mapping.base.as_ptr().add(self.offsets.slot_meta) as *mut SlotMeta,
+                self.mapping.base.as_ptr().add(self.offsets.slot_data),
             )
         }
     }
@@ -207,13 +291,13 @@ impl ShmSession {
     /// Used for checking if a pointer is within this SHM segment.
     #[inline]
     pub fn base_addr(&self) -> usize {
-        self.base.as_ptr() as usize
+        self.mapping.base_addr()
     }
 
     /// Get the size of the SHM region.
     #[inline]
     pub fn size(&self) -> usize {
-        self.size
+        self.mapping.size
     }
 
     /// Check if a pointer range is within this SHM segment.
@@ -222,7 +306,7 @@ impl ShmSession {
         let start = ptr as usize;
         let end = start.saturating_add(len);
         let base = self.base_addr();
-        let segment_end = base.saturating_add(self.size);
+        let segment_end = base.saturating_add(self.size());
         start >= base && end <= segment_end
     }
 
@@ -350,10 +434,21 @@ impl ShmSession {
     /// let session = ShmSession::create_file("/tmp/rapace.shm", ShmSessionConfig::default())?;
     /// // Share the path with the other process...
     /// ```
+    #[tracing::instrument(
+        level = "debug",
+        skip(path, config),
+        fields(
+            path = %path.as_ref().display(),
+            ring_capacity = config.ring_capacity,
+            slot_size = config.slot_size,
+            slot_count = config.slot_count
+        )
+    )]
     pub fn create_file(
-        path: impl AsRef<std::path::Path>,
+        path: impl AsRef<Path>,
         config: ShmSessionConfig,
     ) -> Result<Arc<Self>, SessionError> {
+        let path = path.as_ref();
         // Validate config.
         if !config.ring_capacity.is_power_of_two() {
             return Err(SessionError::InvalidConfig(
@@ -367,22 +462,26 @@ impl ShmSession {
             return Err(SessionError::InvalidConfig("slot_count must be > 0"));
         }
 
-        let size =
-            calculate_segment_size(config.ring_capacity, config.slot_size, config.slot_count);
-        let offsets = SegmentOffsets::calculate(config.ring_capacity, config.slot_count);
+        let size = calculate_segment_size_checked(
+            config.ring_capacity,
+            config.slot_size,
+            config.slot_count,
+        )?;
+        let offsets = calculate_offsets_checked(config.ring_capacity, config.slot_count)?;
 
         // Create and map the file.
-        let base = unsafe { create_file_mmap(path.as_ref(), size, true)? };
+        let mapping = unsafe { create_file_mapping(path, size, true)? };
+
+        tracing::info!(size, path = %path.display(), "created file-backed SHM session mapping");
 
         // Initialize the segment.
         unsafe {
-            initialize_segment(base.as_ptr(), &config, &offsets)?;
+            initialize_segment(mapping.base.as_ptr(), &config, &offsets)?;
         }
 
         Ok(Arc::new(Self {
             role: PeerRole::A,
-            base,
-            size,
+            mapping,
             offsets,
             config,
             local_send_head: std::sync::atomic::AtomicU64::new(0),
@@ -404,10 +503,21 @@ impl ShmSession {
     /// ```ignore
     /// let session = ShmSession::open_file("/tmp/rapace.shm", ShmSessionConfig::default())?;
     /// ```
+    #[tracing::instrument(
+        level = "debug",
+        skip(path, config),
+        fields(
+            path = %path.as_ref().display(),
+            ring_capacity = config.ring_capacity,
+            slot_size = config.slot_size,
+            slot_count = config.slot_count
+        )
+    )]
     pub fn open_file(
-        path: impl AsRef<std::path::Path>,
+        path: impl AsRef<Path>,
         config: ShmSessionConfig,
     ) -> Result<Arc<Self>, SessionError> {
+        let path = path.as_ref();
         // Validate config.
         if !config.ring_capacity.is_power_of_two() {
             return Err(SessionError::InvalidConfig(
@@ -421,37 +531,30 @@ impl ShmSession {
             return Err(SessionError::InvalidConfig("slot_count must be > 0"));
         }
 
-        let size =
-            calculate_segment_size(config.ring_capacity, config.slot_size, config.slot_count);
-        let offsets = SegmentOffsets::calculate(config.ring_capacity, config.slot_count);
+        let size = calculate_segment_size_checked(
+            config.ring_capacity,
+            config.slot_size,
+            config.slot_count,
+        )?;
+        let offsets = calculate_offsets_checked(config.ring_capacity, config.slot_count)?;
 
         // Open and map the file.
-        let base = unsafe { create_file_mmap(path.as_ref(), size, false)? };
+        let mapping = unsafe { create_file_mapping(path, size, false)? };
+
+        tracing::info!(size, path = %path.display(), "opened file-backed SHM session mapping");
 
         // Validate the segment header.
-        let header = unsafe { &*(base.as_ptr().add(offsets.header) as *const SegmentHeader) };
+        let header =
+            unsafe { &*(mapping.base.as_ptr().add(offsets.header) as *const SegmentHeader) };
         header.validate()?;
 
         Ok(Arc::new(Self {
             role: PeerRole::B,
-            base,
-            size,
+            mapping,
             offsets,
             config,
             local_send_head: std::sync::atomic::AtomicU64::new(0),
         }))
-    }
-}
-
-impl Drop for ShmSession {
-    fn drop(&mut self) {
-        // Only unmap if we're the last reference.
-        // Since we use Arc, the memory will only be unmapped when both sessions are dropped.
-        // For create_pair(), both sessions share the same NonNull, so we need reference counting
-        // at the mmap level. For now, we'll leak the memory to avoid double-unmap.
-        //
-        // TODO: Use a proper refcounted mmap wrapper for production.
-        // For testing purposes, leaking is acceptable.
     }
 }
 
@@ -526,20 +629,40 @@ unsafe fn create_anonymous_mmap(size: usize) -> Result<NonNull<u8>, SessionError
         .ok_or_else(|| SessionError::System(std::io::Error::other("mmap returned null")))
 }
 
+unsafe fn create_anonymous_mapping(size: usize) -> Result<Arc<ShmMapping>, SessionError> {
+    tracing::debug!(size, "creating anonymous SHM mapping");
+    let base = unsafe { create_anonymous_mmap(size)? };
+    Ok(Arc::new(ShmMapping {
+        base,
+        size,
+        kind: ShmMappingKind::Anonymous,
+    }))
+}
+
 /// Create or open a file-backed mmap region.
 ///
 /// # Safety
 ///
 /// Returns a NonNull pointer to a newly mapped region of `size` bytes.
 /// If `create` is true, the file is created/truncated. Otherwise, it must exist.
-unsafe fn create_file_mmap(
-    path: &std::path::Path,
+unsafe fn create_file_mapping(
+    path: &Path,
     size: usize,
     create: bool,
-) -> Result<NonNull<u8>, SessionError> {
+) -> Result<Arc<ShmMapping>, SessionError> {
     use libc::{mmap, MAP_FAILED, MAP_SHARED, PROT_READ, PROT_WRITE};
     use std::fs::OpenOptions;
     use std::os::unix::io::AsRawFd;
+
+    let path_buf = path.to_path_buf();
+    tracing::debug!(size, create, path = %path_buf.display(), "creating file-backed SHM mapping");
+
+    if path_buf.starts_with("/dev/shm") {
+        tracing::warn!(
+            path = %path_buf.display(),
+            "SHM path is under /dev/shm (tmpfs); memory usage may be accounted as RAM"
+        );
+    }
 
     // Open/create the file.
     let file = if create {
@@ -554,7 +677,14 @@ unsafe fn create_file_mmap(
         file.set_len(size as u64)?;
         file
     } else {
-        OpenOptions::new().read(true).write(true).open(path)?
+        let file = OpenOptions::new().read(true).write(true).open(path)?;
+        let meta = file.metadata()?;
+        if meta.len() < size as u64 {
+            return Err(SessionError::InvalidConfig(
+                "SHM file is smaller than expected for provided config",
+            ));
+        }
+        file
     };
 
     let fd = file.as_raw_fd();
@@ -578,8 +708,14 @@ unsafe fn create_file_mmap(
         return Err(SessionError::System(std::io::Error::last_os_error()));
     }
 
-    NonNull::new(ptr as *mut u8)
-        .ok_or_else(|| SessionError::System(std::io::Error::other("mmap returned null")))
+    let base = NonNull::new(ptr as *mut u8)
+        .ok_or_else(|| SessionError::System(std::io::Error::other("mmap returned null")))?;
+
+    Ok(Arc::new(ShmMapping {
+        base,
+        size,
+        kind: ShmMappingKind::File { path: path_buf },
+    }))
 }
 
 /// Initialize the SHM segment.
@@ -616,6 +752,124 @@ unsafe fn initialize_segment(
         meta.init();
     }
 
+    Ok(())
+}
+
+fn calculate_segment_size_checked(
+    ring_capacity: u32,
+    slot_size: u32,
+    slot_count: u32,
+) -> Result<usize, SessionError> {
+    let header_size = core::mem::size_of::<SegmentHeader>();
+    let ring_header_size = core::mem::size_of::<DescRingHeader>();
+    let desc_size = core::mem::size_of::<MsgDescHot>();
+    let data_header_size = core::mem::size_of::<DataSegmentHeader>();
+    let slot_meta_size = core::mem::size_of::<SlotMeta>();
+
+    let ring_descs_size = (ring_capacity as usize)
+        .checked_mul(desc_size)
+        .ok_or(SessionError::InvalidConfig("SHM size overflow (ring descs)"))?;
+    let ring_size = ring_header_size
+        .checked_add(ring_descs_size)
+        .ok_or(SessionError::InvalidConfig("SHM size overflow (ring)"))?;
+
+    let slot_meta_total = slot_meta_size
+        .checked_mul(slot_count as usize)
+        .ok_or(SessionError::InvalidConfig("SHM size overflow (slot meta)"))?;
+    let slot_data_total = (slot_size as usize)
+        .checked_mul(slot_count as usize)
+        .ok_or(SessionError::InvalidConfig("SHM size overflow (slot data)"))?;
+
+    let mut total = header_size;
+    total = total
+        .checked_add(ring_size)
+        .and_then(|v| v.checked_add(ring_size))
+        .and_then(|v| v.checked_add(data_header_size))
+        .and_then(|v| v.checked_add(slot_meta_total))
+        .and_then(|v| v.checked_add(slot_data_total))
+        .ok_or(SessionError::InvalidConfig("SHM size overflow (total)"))?;
+
+    let max = max_segment_size_bytes();
+    if total > max {
+        tracing::warn!(
+            total_bytes = total,
+            max_bytes = max,
+            "SHM segment size exceeds configured maximum"
+        );
+        return Err(SessionError::InvalidConfig(
+            "SHM segment size exceeds RAPACE_SHM_MAX_BYTES",
+        ));
+    }
+
+    Ok(total)
+}
+
+fn calculate_offsets_checked(ring_capacity: u32, slot_count: u32) -> Result<SegmentOffsets, SessionError> {
+    let header_size = core::mem::size_of::<SegmentHeader>();
+    let ring_header_size = core::mem::size_of::<DescRingHeader>();
+    let desc_size = core::mem::size_of::<MsgDescHot>();
+    let data_header_size = core::mem::size_of::<DataSegmentHeader>();
+    let slot_meta_size = core::mem::size_of::<SlotMeta>();
+
+    let ring_descs_size = (ring_capacity as usize)
+        .checked_mul(desc_size)
+        .ok_or(SessionError::InvalidConfig("SHM offset overflow (ring descs)"))?;
+    let slot_meta_total = slot_meta_size
+        .checked_mul(slot_count as usize)
+        .ok_or(SessionError::InvalidConfig("SHM offset overflow (slot meta)"))?;
+
+    let header = 0usize;
+    let ring_a_to_b_header = header
+        .checked_add(header_size)
+        .ok_or(SessionError::InvalidConfig("SHM offset overflow (ring A->B header)"))?;
+    let ring_a_to_b_descs = ring_a_to_b_header
+        .checked_add(ring_header_size)
+        .ok_or(SessionError::InvalidConfig("SHM offset overflow (ring A->B descs)"))?;
+    let ring_b_to_a_header = ring_a_to_b_descs
+        .checked_add(ring_descs_size)
+        .ok_or(SessionError::InvalidConfig("SHM offset overflow (ring B->A header)"))?;
+    let ring_b_to_a_descs = ring_b_to_a_header
+        .checked_add(ring_header_size)
+        .ok_or(SessionError::InvalidConfig("SHM offset overflow (ring B->A descs)"))?;
+    let data_header = ring_b_to_a_descs
+        .checked_add(ring_descs_size)
+        .ok_or(SessionError::InvalidConfig("SHM offset overflow (data header)"))?;
+    let slot_meta = data_header
+        .checked_add(data_header_size)
+        .ok_or(SessionError::InvalidConfig("SHM offset overflow (slot meta)"))?;
+    let slot_data = slot_meta
+        .checked_add(slot_meta_total)
+        .ok_or(SessionError::InvalidConfig("SHM offset overflow (slot data)"))?;
+
+    Ok(SegmentOffsets {
+        header,
+        ring_a_to_b_header,
+        ring_a_to_b_descs,
+        ring_b_to_a_header,
+        ring_b_to_a_descs,
+        data_header,
+        slot_meta,
+        slot_data,
+    })
+}
+
+unsafe fn munmap_region(ptr: *mut u8, size: usize) -> Result<(), std::io::Error> {
+    use libc::{c_void, munmap};
+    if size == 0 {
+        return Ok(());
+    }
+    let rc = unsafe { munmap(ptr as *mut c_void, size) };
+    if rc != 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    #[cfg(test)]
+    {
+        let key = munmap_key(ptr as usize, size);
+        let lock =
+            munmap_counts().get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+        let mut guard = lock.lock().unwrap();
+        *guard.entry(key).or_insert(0) += 1;
+    }
     Ok(())
 }
 
@@ -739,5 +993,36 @@ mod tests {
         // Outside SHM should return None.
         let outside: *const u8 = 0x12345678 as *const u8;
         assert!(a.find_slot_location(outside, 100).is_none());
+    }
+
+    #[test]
+    fn test_create_pair_unmaps_once() {
+        let (key, start) = {
+            let (a, b) = ShmSession::create_pair().unwrap();
+            let key = munmap_key(a.base_addr(), a.size());
+            let start = munmap_count_for(key);
+            drop(a);
+            drop(b);
+            (key, start)
+        };
+        {
+            let end = munmap_count_for(key);
+            assert_eq!(end, start + 1);
+        }
+    }
+
+    #[test]
+    fn test_file_mapping_unmaps() {
+        let path = format!("/tmp/rapace-test-shm-drop-{}.shm", std::process::id());
+        let (key, start) = {
+            let session = ShmSession::create_file(path.as_str(), ShmSessionConfig::default()).unwrap();
+            let key = munmap_key(session.base_addr(), session.size());
+            let start = munmap_count_for(key);
+            drop(session);
+            (key, start)
+        };
+        let end = munmap_count_for(key);
+        assert_eq!(end, start + 1);
+        let _ = std::fs::remove_file(path);
     }
 }

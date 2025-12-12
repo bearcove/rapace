@@ -75,16 +75,26 @@
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 use parking_lot::Mutex;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::{
-    ErrorCode, Frame, FrameFlags, MsgDescHot, RpcError, Transport, TransportError,
-    INLINE_PAYLOAD_SIZE,
+    ErrorCode, Frame, FrameFlags, INLINE_PAYLOAD_SIZE, MsgDescHot, RpcError, Transport,
+    TransportError,
 };
+
+const DEFAULT_MAX_PENDING: usize = 8192;
+
+fn max_pending() -> usize {
+    std::env::var("RAPACE_MAX_PENDING")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(DEFAULT_MAX_PENDING)
+}
 
 /// A chunk received on a tunnel channel.
 ///
@@ -461,8 +471,62 @@ impl<T: Transport + Send + Sync + 'static> RpcSession<T> {
         method_id: u32,
         payload: Vec<u8>,
     ) -> Result<ReceivedFrame, RpcError> {
+        struct PendingGuard<'a, T: Transport> {
+            session: &'a RpcSession<T>,
+            channel_id: u32,
+            active: bool,
+        }
+
+        impl<'a, T: Transport> PendingGuard<'a, T> {
+            fn disarm(&mut self) {
+                self.active = false;
+            }
+        }
+
+        impl<T: Transport> Drop for PendingGuard<'_, T> {
+            fn drop(&mut self) {
+                if !self.active {
+                    return;
+                }
+                if self
+                    .session
+                    .pending
+                    .lock()
+                    .remove(&self.channel_id)
+                    .is_some()
+                {
+                    tracing::debug!(
+                        channel_id = self.channel_id,
+                        "call cancelled/dropped: removed pending waiter"
+                    );
+                }
+            }
+        }
+
+        // Safeguard: bound pending waiter growth (otherwise dropped/cancelled calls can leak)
+        {
+            let pending_len = self.pending.lock().len();
+            let max = max_pending();
+            if pending_len >= max {
+                tracing::warn!(
+                    pending_len,
+                    max_pending = max,
+                    "too many pending RPC calls; refusing new call"
+                );
+                return Err(RpcError::Status {
+                    code: ErrorCode::ResourceExhausted,
+                    message: "too many pending RPC calls".into(),
+                });
+            }
+        }
+
         // Register waiter before sending
         let rx = self.register_pending(channel_id);
+        let mut guard = PendingGuard {
+            session: self,
+            channel_id,
+            active: true,
+        };
 
         // Build and send request frame
         let mut desc = MsgDescHot::new();
@@ -483,10 +547,13 @@ impl<T: Transport + Send + Sync + 'static> RpcSession<T> {
             .map_err(RpcError::Transport)?;
 
         // Wait for response
-        rx.await.map_err(|_| RpcError::Status {
+        let received = rx.await.map_err(|_| RpcError::Status {
             code: ErrorCode::Internal,
             message: "response channel closed".into(),
-        })
+        })?;
+
+        guard.disarm();
+        Ok(received)
     }
 
     /// Send a response frame.
@@ -616,6 +683,82 @@ impl<T: Transport + Send + Sync + 'static> RpcSession<T> {
                 });
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod pending_cleanup_tests {
+    use super::*;
+    use crate::{EncodeCtx, EncodeError, TransportError};
+    use std::future::Future;
+    use tokio::sync::mpsc;
+
+    struct DummyEncoder {
+        payload: Vec<u8>,
+    }
+
+    impl EncodeCtx for DummyEncoder {
+        fn encode_bytes(&mut self, bytes: &[u8]) -> Result<(), EncodeError> {
+            self.payload.extend_from_slice(bytes);
+            Ok(())
+        }
+
+        fn finish(self: Box<Self>) -> Result<Frame, EncodeError> {
+            Ok(Frame::with_payload(MsgDescHot::new(), self.payload))
+        }
+    }
+
+    struct SinkTransport {
+        tx: mpsc::Sender<Frame>,
+    }
+
+    impl Transport for SinkTransport {
+        fn send_frame(
+            &self,
+            frame: &Frame,
+        ) -> impl Future<Output = Result<(), TransportError>> + Send {
+            let tx = self.tx.clone();
+            let frame = frame.clone();
+            async move { tx.send(frame).await.map_err(|_| TransportError::Closed) }
+        }
+
+        fn recv_frame(
+            &self,
+        ) -> impl Future<Output = Result<crate::FrameView<'_>, TransportError>> + Send {
+            async move { Err(TransportError::Closed) }
+        }
+
+        fn encoder(&self) -> Box<dyn EncodeCtx + '_> {
+            Box::new(DummyEncoder {
+                payload: Vec::new(),
+            })
+        }
+
+        fn close(&self) -> impl Future<Output = Result<(), TransportError>> + Send {
+            async move { Ok(()) }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_call_cancellation_cleans_pending() {
+        let (tx, _rx) = mpsc::channel(8);
+        let client_transport = SinkTransport { tx };
+        let client = Arc::new(RpcSession::with_channel_start(
+            Arc::new(client_transport),
+            2,
+        ));
+
+        let client2 = client.clone();
+        let task = tokio::spawn(async move {
+            let channel_id = client2.next_channel_id();
+            let _ = client2.call(channel_id, 123, vec![1, 2, 3]).await;
+        });
+
+        tokio::task::yield_now().await;
+        task.abort();
+        let _ = task.await;
+
+        assert_eq!(client.pending.lock().len(), 0);
     }
 }
 

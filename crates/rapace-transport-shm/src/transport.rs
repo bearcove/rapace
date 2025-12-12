@@ -175,6 +175,13 @@ impl Transport for ShmTransport {
                     if let Some(ref metrics) = self.metrics {
                         metrics.record_alloc_failure();
                     }
+                    tracing::debug!(
+                        error = %e,
+                        slot_count = data_segment.slot_count(),
+                        slot_size = data_segment.slot_size(),
+                        payload_len = payload.len(),
+                        "SHM slot allocation failed"
+                    );
                     return Err(slot_error_to_transport(e, "alloc"));
                 }
             };
@@ -214,6 +221,7 @@ impl Transport for ShmTransport {
                 if let Some(ref metrics) = self.metrics {
                     metrics.record_ring_full();
                 }
+                tracing::debug!(error = %e, "SHM ring enqueue failed");
                 return Err(ring_error_to_transport(e));
             }
         }
@@ -317,7 +325,7 @@ impl Transport for ShmTransport {
 
             // No descriptor available. Check peer liveness before yielding.
             if !self.session.is_peer_alive(PEER_TIMEOUT_NANOS) {
-                eprintln!("[rapace-transport-shm] Peer appears to have died (no heartbeat for 3s)");
+                tracing::warn!("SHM peer appears to have died (no heartbeat for 3s)");
                 return Err(TransportError::Closed);
             }
 
