@@ -43,7 +43,8 @@
     --font-sans: 'Public Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     --font-mono: 'Iosevka', 'SF Mono', Consolas, monospace;
     --sidebar-width: 220px;
-    --content-max: 720px;
+    --content-max: 900px;
+    --toc-width: 220px;
 }
 
 * {
@@ -276,11 +277,75 @@ body {
     max-width: var(--content-max);
 }
 
+/* Page layout: main content + right-hand TOC */
+.page-layout {
+    display: flex;
+    gap: 2.5rem;
+}
+
+.page-main {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.page-toc {
+    flex: 0 0 var(--toc-width);
+    max-height: calc(100vh - 80px);
+    position: sticky;
+    top: 68px; /* nav + a bit of padding */
+    align-self: flex-start;
+    padding-top: 0.25rem;
+    padding-left: 1.5rem;
+    border-left: 1px solid var(--border);
+    font-size: 0.8rem;
+    color: var(--fg-muted);
+}
+
+.page-toc h2 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.75rem;
+    color: var(--fg-muted);
+}
+
+.page-toc ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+.page-toc > nav > ul > li {
+    margin-bottom: 0.5rem;
+}
+
+.page-toc a {
+    color: var(--fg-muted);
+    text-decoration: none;
+}
+
+.page-toc a:hover {
+    color: var(--fg);
+    text-decoration: underline;
+}
+
+.page-toc ul ul {
+    margin-top: 0.25rem;
+    padding-left: 0.75rem;
+}
+
 article h1 {
     font-size: 2rem;
     margin-bottom: 1.5rem;
     font-weight: 700;
     color: var(--fg);
+}
+
+/* Ensure anchored headings scroll below the sticky nav/TOC */
+article h1[id],
+article h2[id],
+article h3[id],
+article h4[id] {
+    scroll-margin-top: 6rem;
 }
 
 article h2 {
@@ -506,6 +571,14 @@ footer a:hover {
     .content {
         padding: 1.5rem;
         max-width: 100%;
+    }
+
+    .page-layout {
+        display: block;
+    }
+
+    .page-toc {
+        display: none;
     }
 
     .hero {
