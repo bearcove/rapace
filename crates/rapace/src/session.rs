@@ -336,6 +336,7 @@ impl<T: Transport + Send + Sync> Session<T> {
             // Check if this channel can receive and update state
             let mut drop_frame = false;
             let mut should_tombstone = false;
+            let mut should_tombstone_cancelled = false;
             {
                 let mut channels = self.channels.lock();
                 if !channels.contains_key(&channel_id) && channels.len() >= max_tracked_channels() {
@@ -363,6 +364,7 @@ impl<T: Transport + Send + Sync> Session<T> {
                         }
 
                         if state.lifecycle == ChannelLifecycle::Closed || state.cancelled {
+                            should_tombstone_cancelled = state.cancelled;
                             channels.remove(&channel_id);
                             should_tombstone = true;
                         }
@@ -371,7 +373,11 @@ impl<T: Transport + Send + Sync> Session<T> {
             }
 
             if should_tombstone {
-                self.tombstone(channel_id);
+                if should_tombstone_cancelled {
+                    self.tombstone_cancelled(channel_id);
+                } else {
+                    self.tombstone(channel_id);
+                }
             }
 
             if drop_frame {
@@ -408,10 +414,11 @@ impl<T: Transport + Send + Sync> Session<T> {
 
         {
             let mut channels = self.channels.lock();
-            let state = channels.entry(channel_id).or_default();
-            state.cancelled = true;
-            state.lifecycle = ChannelLifecycle::Closed;
-            channels.remove(&channel_id);
+            if let Some(state) = channels.get_mut(&channel_id) {
+                state.cancelled = true;
+                state.lifecycle = ChannelLifecycle::Closed;
+            }
+            let _ = channels.remove(&channel_id);
         }
         self.tombstone_cancelled(channel_id);
     }
@@ -541,6 +548,19 @@ mod tests {
         Frame::with_inline_payload(desc, &[0u8; 8]).expect("ping payload should fit inline")
     }
 
+    fn cancel_frame(channel_id: u32) -> Frame {
+        let payload = ControlPayload::CancelChannel {
+            channel_id,
+            reason: rapace_core::CancelReason::ClientCancel,
+        };
+        let bytes = facet_postcard::to_vec(&payload).expect("cancel payload should serialize");
+        let mut desc = MsgDescHot::new();
+        desc.channel_id = 0;
+        desc.method_id = control_method::CANCEL_CHANNEL;
+        desc.flags = FrameFlags::CONTROL;
+        Frame::with_inline_payload(desc, &bytes).expect("cancel payload should fit inline")
+    }
+
     #[tokio::test]
     async fn test_closed_channel_is_pruned_and_tombstoned() {
         let (a, b) = InProcTransport::pair();
@@ -569,6 +589,32 @@ mod tests {
         assert!(session.tombstones.lock().contains(2));
 
         // Send a late DATA frame on closed channel 2, then a PING.
+        let mut late_desc = MsgDescHot::new();
+        late_desc.channel_id = 2;
+        late_desc.flags = FrameFlags::DATA;
+        let late = Frame::with_inline_payload(late_desc, &[1, 2, 3]).unwrap();
+        b.send_frame(&late).await.unwrap();
+        b.send_frame(&ping_frame()).await.unwrap();
+
+        // recv_frame should skip the late frame and return the ping.
+        let got = session.recv_frame().await.unwrap();
+        assert_eq!(got.desc.channel_id, 0);
+        assert_eq!(got.desc.method_id, control_method::PING);
+    }
+
+    #[tokio::test]
+    async fn test_cancelled_channel_is_tombstoned_and_drops_late_frames() {
+        let (a, b) = InProcTransport::pair();
+        let session = Session::new(Arc::new(a));
+
+        b.send_frame(&cancel_frame(2)).await.unwrap();
+        let got = session.recv_frame().await.unwrap();
+        assert_eq!(got.desc.channel_id, 0);
+        assert_eq!(got.desc.method_id, control_method::CANCEL_CHANNEL);
+
+        assert!(session.is_cancelled(2));
+
+        // Send a late DATA frame on cancelled channel 2, then a PING.
         let mut late_desc = MsgDescHot::new();
         late_desc.channel_id = 2;
         late_desc.flags = FrameFlags::DATA;

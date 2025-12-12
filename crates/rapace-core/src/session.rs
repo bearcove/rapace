@@ -769,12 +769,19 @@ mod pending_cleanup_tests {
         ));
 
         let client2 = client.clone();
+        let channel_id = client.next_channel_id();
         let task = tokio::spawn(async move {
-            let channel_id = client2.next_channel_id();
             let _ = client2.call(channel_id, 123, vec![1, 2, 3]).await;
         });
 
-        tokio::task::yield_now().await;
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(1);
+        while !client.pending.lock().contains_key(&channel_id) {
+            if tokio::time::Instant::now() >= deadline {
+                panic!("call did not register pending waiter in time");
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+        }
+
         task.abort();
         let _ = task.await;
 

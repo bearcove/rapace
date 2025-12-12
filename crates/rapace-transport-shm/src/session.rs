@@ -11,6 +11,7 @@ use rapace_core::MsgDescHot;
 use crate::layout::{
     DEFAULT_RING_CAPACITY, DEFAULT_SLOT_COUNT, DEFAULT_SLOT_SIZE, DataSegment, DataSegmentHeader,
     DescRing, DescRingHeader, LayoutError, SegmentHeader, SegmentOffsets, SlotMeta,
+    calculate_segment_size_checked as layout_calculate_segment_size_checked,
 };
 
 const DEFAULT_MAX_SEGMENT_SIZE_BYTES: usize = 512 * 1024 * 1024; // 512MB
@@ -21,7 +22,7 @@ fn munmap_key(base: usize, size: usize) -> u128 {
 }
 
 #[cfg(test)]
-fn munmap_counts()
+fn munmap_count_map()
 -> &'static std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<u128, usize>>> {
     static COUNTS: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<u128, usize>>> =
         std::sync::OnceLock::new();
@@ -31,7 +32,7 @@ fn munmap_counts()
 #[cfg(test)]
 fn munmap_count_for(key: u128) -> usize {
     let lock =
-        munmap_counts().get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+        munmap_count_map().get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()));
     lock.lock().unwrap().get(&key).copied().unwrap_or(0)
 }
 
@@ -184,12 +185,13 @@ impl ShmSession {
             return Err(SessionError::InvalidConfig("slot_count must be > 0"));
         }
 
-        let size = calculate_segment_size_checked(
+        let size = calculate_segment_size_checked_with_max(
             config.ring_capacity,
             config.slot_size,
             config.slot_count,
         )?;
-        let offsets = calculate_offsets_checked(config.ring_capacity, config.slot_count)?;
+        let offsets = SegmentOffsets::calculate_checked(config.ring_capacity, config.slot_count)
+            .map_err(SessionError::InvalidConfig)?;
 
         // Create anonymous mmap.
         let mapping = unsafe { create_anonymous_mapping(size)? };
@@ -469,12 +471,13 @@ impl ShmSession {
             return Err(SessionError::InvalidConfig("slot_count must be > 0"));
         }
 
-        let size = calculate_segment_size_checked(
+        let size = calculate_segment_size_checked_with_max(
             config.ring_capacity,
             config.slot_size,
             config.slot_count,
         )?;
-        let offsets = calculate_offsets_checked(config.ring_capacity, config.slot_count)?;
+        let offsets = SegmentOffsets::calculate_checked(config.ring_capacity, config.slot_count)
+            .map_err(SessionError::InvalidConfig)?;
 
         // Create and map the file.
         let mapping = unsafe { create_file_mapping(path, size, true)? };
@@ -538,12 +541,13 @@ impl ShmSession {
             return Err(SessionError::InvalidConfig("slot_count must be > 0"));
         }
 
-        let size = calculate_segment_size_checked(
+        let size = calculate_segment_size_checked_with_max(
             config.ring_capacity,
             config.slot_size,
             config.slot_count,
         )?;
-        let offsets = calculate_offsets_checked(config.ring_capacity, config.slot_count)?;
+        let offsets = SegmentOffsets::calculate_checked(config.ring_capacity, config.slot_count)
+            .map_err(SessionError::InvalidConfig)?;
 
         // Open and map the file.
         let mapping = unsafe { create_file_mapping(path, size, false)? };
@@ -761,42 +765,13 @@ unsafe fn initialize_segment(
     Ok(())
 }
 
-fn calculate_segment_size_checked(
+fn calculate_segment_size_checked_with_max(
     ring_capacity: u32,
     slot_size: u32,
     slot_count: u32,
 ) -> Result<usize, SessionError> {
-    let header_size = core::mem::size_of::<SegmentHeader>();
-    let ring_header_size = core::mem::size_of::<DescRingHeader>();
-    let desc_size = core::mem::size_of::<MsgDescHot>();
-    let data_header_size = core::mem::size_of::<DataSegmentHeader>();
-    let slot_meta_size = core::mem::size_of::<SlotMeta>();
-
-    let ring_descs_size =
-        (ring_capacity as usize)
-            .checked_mul(desc_size)
-            .ok_or(SessionError::InvalidConfig(
-                "SHM size overflow (ring descs)",
-            ))?;
-    let ring_size = ring_header_size
-        .checked_add(ring_descs_size)
-        .ok_or(SessionError::InvalidConfig("SHM size overflow (ring)"))?;
-
-    let slot_meta_total = slot_meta_size
-        .checked_mul(slot_count as usize)
-        .ok_or(SessionError::InvalidConfig("SHM size overflow (slot meta)"))?;
-    let slot_data_total = (slot_size as usize)
-        .checked_mul(slot_count as usize)
-        .ok_or(SessionError::InvalidConfig("SHM size overflow (slot data)"))?;
-
-    let mut total = header_size;
-    total = total
-        .checked_add(ring_size)
-        .and_then(|v| v.checked_add(ring_size))
-        .and_then(|v| v.checked_add(data_header_size))
-        .and_then(|v| v.checked_add(slot_meta_total))
-        .and_then(|v| v.checked_add(slot_data_total))
-        .ok_or(SessionError::InvalidConfig("SHM size overflow (total)"))?;
+    let total = layout_calculate_segment_size_checked(ring_capacity, slot_size, slot_count)
+        .map_err(SessionError::InvalidConfig)?;
 
     let max = max_segment_size_bytes();
     if total > max {
@@ -813,83 +788,6 @@ fn calculate_segment_size_checked(
     Ok(total)
 }
 
-fn calculate_offsets_checked(
-    ring_capacity: u32,
-    slot_count: u32,
-) -> Result<SegmentOffsets, SessionError> {
-    let header_size = core::mem::size_of::<SegmentHeader>();
-    let ring_header_size = core::mem::size_of::<DescRingHeader>();
-    let desc_size = core::mem::size_of::<MsgDescHot>();
-    let data_header_size = core::mem::size_of::<DataSegmentHeader>();
-    let slot_meta_size = core::mem::size_of::<SlotMeta>();
-
-    let ring_descs_size =
-        (ring_capacity as usize)
-            .checked_mul(desc_size)
-            .ok_or(SessionError::InvalidConfig(
-                "SHM offset overflow (ring descs)",
-            ))?;
-    let slot_meta_total =
-        slot_meta_size
-            .checked_mul(slot_count as usize)
-            .ok_or(SessionError::InvalidConfig(
-                "SHM offset overflow (slot meta)",
-            ))?;
-
-    let header = 0usize;
-    let ring_a_to_b_header = header
-        .checked_add(header_size)
-        .ok_or(SessionError::InvalidConfig(
-            "SHM offset overflow (ring A->B header)",
-        ))?;
-    let ring_a_to_b_descs =
-        ring_a_to_b_header
-            .checked_add(ring_header_size)
-            .ok_or(SessionError::InvalidConfig(
-                "SHM offset overflow (ring A->B descs)",
-            ))?;
-    let ring_b_to_a_header =
-        ring_a_to_b_descs
-            .checked_add(ring_descs_size)
-            .ok_or(SessionError::InvalidConfig(
-                "SHM offset overflow (ring B->A header)",
-            ))?;
-    let ring_b_to_a_descs =
-        ring_b_to_a_header
-            .checked_add(ring_header_size)
-            .ok_or(SessionError::InvalidConfig(
-                "SHM offset overflow (ring B->A descs)",
-            ))?;
-    let data_header =
-        ring_b_to_a_descs
-            .checked_add(ring_descs_size)
-            .ok_or(SessionError::InvalidConfig(
-                "SHM offset overflow (data header)",
-            ))?;
-    let slot_meta =
-        data_header
-            .checked_add(data_header_size)
-            .ok_or(SessionError::InvalidConfig(
-                "SHM offset overflow (slot meta)",
-            ))?;
-    let slot_data = slot_meta
-        .checked_add(slot_meta_total)
-        .ok_or(SessionError::InvalidConfig(
-            "SHM offset overflow (slot data)",
-        ))?;
-
-    Ok(SegmentOffsets {
-        header,
-        ring_a_to_b_header,
-        ring_a_to_b_descs,
-        ring_b_to_a_header,
-        ring_b_to_a_descs,
-        data_header,
-        slot_meta,
-        slot_data,
-    })
-}
-
 unsafe fn munmap_region(ptr: *mut u8, size: usize) -> Result<(), std::io::Error> {
     use libc::{c_void, munmap};
     if size == 0 {
@@ -902,8 +800,8 @@ unsafe fn munmap_region(ptr: *mut u8, size: usize) -> Result<(), std::io::Error>
     #[cfg(test)]
     {
         let key = munmap_key(ptr as usize, size);
-        let lock =
-            munmap_counts().get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+        let lock = munmap_count_map()
+            .get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()));
         let mut guard = lock.lock().unwrap();
         *guard.entry(key).or_insert(0) += 1;
     }
