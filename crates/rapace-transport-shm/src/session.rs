@@ -694,10 +694,19 @@ unsafe fn create_file_mapping(
     } else {
         let file = OpenOptions::new().read(true).write(true).open(path)?;
         let meta = file.metadata()?;
-        if meta.len() != size as u64 {
+        let actual_len = meta.len();
+        let expected_len = size as u64;
+        if actual_len < expected_len {
             return Err(SessionError::InvalidConfig(
-                "SHM file size does not match expected size for provided config",
+                "SHM file is smaller than expected for provided config",
             ));
+        } else if actual_len > expected_len {
+            tracing::warn!(
+                path = %path.display(),
+                actual = actual_len,
+                expected = expected_len,
+                "SHM file is larger than expected; extra bytes will be ignored"
+            );
         }
         file
     };

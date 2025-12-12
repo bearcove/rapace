@@ -246,12 +246,14 @@ impl<T: Transport + Send + Sync> Session<T> {
 
         // Control channel is exempt from credit checks and state tracking
         if channel_id != 0 && frame.desc.flags.contains(FrameFlags::DATA) {
-            let mut channels = self.channels.lock();
-            if self.tombstones.lock().contains(channel_id) {
+            if self.is_tombstoned(channel_id) {
+                let mut channels = self.channels.lock();
                 channels.remove(&channel_id);
                 tracing::trace!(channel_id, "dropping send on tombstoned channel");
                 return Ok(());
             }
+
+            let mut channels = self.channels.lock();
 
             if !channels.contains_key(&channel_id) && channels.len() >= max_tracked_channels() {
                 tracing::warn!(
@@ -297,6 +299,11 @@ impl<T: Transport + Send + Sync> Session<T> {
             let cancelled = state.cancelled;
             if should_remove {
                 channels.remove(&channel_id);
+            }
+
+            drop(channels);
+
+            if should_remove {
                 if cancelled {
                     self.tombstone_cancelled(channel_id);
                 } else {
@@ -332,19 +339,20 @@ impl<T: Transport + Send + Sync> Session<T> {
             let channel_id = frame.desc.channel_id;
             let has_eos = frame.desc.flags.contains(FrameFlags::EOS);
 
+            if channel_id != 0 && self.is_tombstoned(channel_id) {
+                let mut channels = self.channels.lock();
+                channels.remove(&channel_id);
+                tracing::trace!(channel_id, "dropping recv on tombstoned channel");
+                continue;
+            }
+
             // Check if this channel can receive and update state
             let mut drop_frame = false;
             let mut should_tombstone = false;
             let mut should_tombstone_cancelled = false;
             {
                 let mut channels = self.channels.lock();
-                if channel_id != 0 && self.tombstones.lock().contains(channel_id) {
-                    channels.remove(&channel_id);
-                    tracing::trace!(channel_id, "dropping recv on tombstoned channel");
-                    drop_frame = true;
-                } else if !channels.contains_key(&channel_id)
-                    && channels.len() >= max_tracked_channels()
-                {
+                if !channels.contains_key(&channel_id) && channels.len() >= max_tracked_channels() {
                     tracing::warn!(
                         channel_id,
                         tracked_channels = channels.len(),
@@ -417,8 +425,10 @@ impl<T: Transport + Send + Sync> Session<T> {
             return;
         }
 
-        let mut channels = self.channels.lock();
-        let _ = channels.remove(&channel_id);
+        {
+            let mut channels = self.channels.lock();
+            let _ = channels.remove(&channel_id);
+        }
         self.tombstone_cancelled(channel_id);
     }
 
