@@ -1,0 +1,33 @@
+content "content"
+output "public"
+link_check {
+}
+stable_assets {
+}
+code_execution {
+    enabled #true
+    fail_on_error #true
+    timeout_secs 30
+    cache_dir ".cache/code-execution"
+
+    dependencies {
+        serde "1.0"
+        tokio "1.0" features=["full"]
+        rapace "0.1" path="../"
+        rapace-core "0.1" path="../crates/rapace-core"
+        rapace-transport-mem "0.1" path="../crates/rapace-transport-mem"
+        rapace-transport-shm "0.1" path="../crates/rapace-transport-shm"
+        rapace-transport-stream "0.1" path="../crates/rapace-transport-stream"
+        rapace-transport-websocket "0.1" path="../crates/rapace-transport-websocket"
+        rapace-testkit "0.1" path="../crates/rapace-testkit"
+    }
+
+    rust {
+        command "cargo"
+        args "run" "--quiet" "--release"
+        extension "rs"
+        prepare_code #true
+        auto_imports "use std::collections::HashMap;"
+        show_output #true
+    }
+}
