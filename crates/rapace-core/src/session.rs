@@ -686,11 +686,35 @@ impl<T: Transport + Send + Sync + 'static> RpcSession<T> {
     }
 }
 
+/// Helper to parse an error from a response payload.
+pub fn parse_error_payload(payload: &[u8]) -> RpcError {
+    if payload.len() < 8 {
+        return RpcError::Status {
+            code: ErrorCode::Internal,
+            message: "malformed error response".into(),
+        };
+    }
+
+    let error_code = u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
+    let message_len = u32::from_le_bytes([payload[4], payload[5], payload[6], payload[7]]) as usize;
+
+    if payload.len() < 8 + message_len {
+        return RpcError::Status {
+            code: ErrorCode::Internal,
+            message: "malformed error response".into(),
+        };
+    }
+
+    let code = ErrorCode::from_u32(error_code).unwrap_or(ErrorCode::Internal);
+    let message = String::from_utf8_lossy(&payload[8..8 + message_len]).into_owned();
+
+    RpcError::Status { code, message }
+}
+
 #[cfg(test)]
 mod pending_cleanup_tests {
     use super::*;
     use crate::{EncodeCtx, EncodeError, TransportError};
-    use std::future::Future;
     use tokio::sync::mpsc;
 
     struct DummyEncoder {
@@ -713,19 +737,15 @@ mod pending_cleanup_tests {
     }
 
     impl Transport for SinkTransport {
-        fn send_frame(
-            &self,
-            frame: &Frame,
-        ) -> impl Future<Output = Result<(), TransportError>> + Send {
-            let tx = self.tx.clone();
-            let frame = frame.clone();
-            async move { tx.send(frame).await.map_err(|_| TransportError::Closed) }
+        async fn send_frame(&self, frame: &Frame) -> Result<(), TransportError> {
+            self.tx
+                .send(frame.clone())
+                .await
+                .map_err(|_| TransportError::Closed)
         }
 
-        fn recv_frame(
-            &self,
-        ) -> impl Future<Output = Result<crate::FrameView<'_>, TransportError>> + Send {
-            async move { Err(TransportError::Closed) }
+        async fn recv_frame(&self) -> Result<crate::FrameView<'_>, TransportError> {
+            Err(TransportError::Closed)
         }
 
         fn encoder(&self) -> Box<dyn EncodeCtx + '_> {
@@ -734,8 +754,8 @@ mod pending_cleanup_tests {
             })
         }
 
-        fn close(&self) -> impl Future<Output = Result<(), TransportError>> + Send {
-            async move { Ok(()) }
+        async fn close(&self) -> Result<(), TransportError> {
+            Ok(())
         }
     }
 
@@ -760,31 +780,6 @@ mod pending_cleanup_tests {
 
         assert_eq!(client.pending.lock().len(), 0);
     }
-}
-
-/// Helper to parse an error from a response payload.
-pub fn parse_error_payload(payload: &[u8]) -> RpcError {
-    if payload.len() < 8 {
-        return RpcError::Status {
-            code: ErrorCode::Internal,
-            message: "malformed error response".into(),
-        };
-    }
-
-    let error_code = u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
-    let message_len = u32::from_le_bytes([payload[4], payload[5], payload[6], payload[7]]) as usize;
-
-    if payload.len() < 8 + message_len {
-        return RpcError::Status {
-            code: ErrorCode::Internal,
-            message: "malformed error response".into(),
-        };
-    }
-
-    let code = ErrorCode::from_u32(error_code).unwrap_or(ErrorCode::Internal);
-    let message = String::from_utf8_lossy(&payload[8..8 + message_len]).into_owned();
-
-    RpcError::Status { code, message }
 }
 
 // Note: RpcSession tests live in rapace-testkit to avoid circular dev-dependencies

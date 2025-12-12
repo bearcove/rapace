@@ -51,7 +51,7 @@ enum ShmMappingKind {
 
 #[derive(Debug)]
 struct ShmMapping {
-    base: NonNull<u8>,
+    base_addr: usize,
     size: usize,
     kind: ShmMappingKind,
 }
@@ -59,14 +59,19 @@ struct ShmMapping {
 impl ShmMapping {
     #[inline]
     fn base_addr(&self) -> usize {
-        self.base.as_ptr() as usize
+        self.base_addr
+    }
+
+    #[inline]
+    fn base_ptr(&self) -> *mut u8 {
+        self.base_addr as *mut u8
     }
 }
 
 impl Drop for ShmMapping {
     fn drop(&mut self) {
         unsafe {
-            if let Err(e) = munmap_region(self.base.as_ptr(), self.size) {
+            if let Err(e) = munmap_region(self.base_ptr(), self.size) {
                 match &self.kind {
                     ShmMappingKind::Anonymous => {
                         tracing::error!(error = %e, size = self.size, "munmap failed for anonymous SHM mapping");
@@ -193,7 +198,7 @@ impl ShmSession {
 
         // Initialize the segment.
         unsafe {
-            initialize_segment(mapping.base.as_ptr(), &config, &offsets)?;
+            initialize_segment(mapping.base_ptr(), &config, &offsets)?;
         }
 
         // Create session A.
@@ -226,7 +231,7 @@ impl ShmSession {
     /// Get the segment header.
     #[inline]
     pub fn header(&self) -> &SegmentHeader {
-        unsafe { &*(self.mapping.base.as_ptr().add(self.offsets.header) as *const SegmentHeader) }
+        unsafe { &*(self.mapping.base_ptr().add(self.offsets.header) as *const SegmentHeader) }
     }
 
     /// Get our send ring (we write, peer reads).
@@ -244,8 +249,8 @@ impl ShmSession {
 
         unsafe {
             DescRing::from_raw(
-                self.mapping.base.as_ptr().add(header_offset) as *mut DescRingHeader,
-                self.mapping.base.as_ptr().add(descs_offset) as *mut MsgDescHot,
+                self.mapping.base_ptr().add(header_offset) as *mut DescRingHeader,
+                self.mapping.base_ptr().add(descs_offset) as *mut MsgDescHot,
             )
         }
     }
@@ -265,8 +270,8 @@ impl ShmSession {
 
         unsafe {
             DescRing::from_raw(
-                self.mapping.base.as_ptr().add(header_offset) as *mut DescRingHeader,
-                self.mapping.base.as_ptr().add(descs_offset) as *mut MsgDescHot,
+                self.mapping.base_ptr().add(header_offset) as *mut DescRingHeader,
+                self.mapping.base_ptr().add(descs_offset) as *mut MsgDescHot,
             )
         }
     }
@@ -275,9 +280,9 @@ impl ShmSession {
     pub fn data_segment(&self) -> DataSegment {
         unsafe {
             DataSegment::from_raw(
-                self.mapping.base.as_ptr().add(self.offsets.data_header) as *mut DataSegmentHeader,
-                self.mapping.base.as_ptr().add(self.offsets.slot_meta) as *mut SlotMeta,
-                self.mapping.base.as_ptr().add(self.offsets.slot_data),
+                self.mapping.base_ptr().add(self.offsets.data_header) as *mut DataSegmentHeader,
+                self.mapping.base_ptr().add(self.offsets.slot_meta) as *mut SlotMeta,
+                self.mapping.base_ptr().add(self.offsets.slot_data),
             )
         }
     }
@@ -478,7 +483,7 @@ impl ShmSession {
 
         // Initialize the segment.
         unsafe {
-            initialize_segment(mapping.base.as_ptr(), &config, &offsets)?;
+            initialize_segment(mapping.base_ptr(), &config, &offsets)?;
         }
 
         Ok(Arc::new(Self {
@@ -546,8 +551,7 @@ impl ShmSession {
         tracing::info!(size, path = %path.display(), "opened file-backed SHM session mapping");
 
         // Validate the segment header.
-        let header =
-            unsafe { &*(mapping.base.as_ptr().add(offsets.header) as *const SegmentHeader) };
+        let header = unsafe { &*(mapping.base_ptr().add(offsets.header) as *const SegmentHeader) };
         header.validate()?;
 
         Ok(Arc::new(Self {
@@ -635,7 +639,7 @@ unsafe fn create_anonymous_mapping(size: usize) -> Result<Arc<ShmMapping>, Sessi
     tracing::debug!(size, "creating anonymous SHM mapping");
     let base = unsafe { create_anonymous_mmap(size)? };
     Ok(Arc::new(ShmMapping {
-        base,
+        base_addr: base.as_ptr() as usize,
         size,
         kind: ShmMappingKind::Anonymous,
     }))
@@ -714,7 +718,7 @@ unsafe fn create_file_mapping(
         .ok_or_else(|| SessionError::System(std::io::Error::other("mmap returned null")))?;
 
     Ok(Arc::new(ShmMapping {
-        base,
+        base_addr: base.as_ptr() as usize,
         size,
         kind: ShmMappingKind::File { path: path_buf },
     }))
