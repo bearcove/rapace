@@ -9,8 +9,8 @@ use std::sync::Arc;
 use rapace_core::MsgDescHot;
 
 use crate::layout::{
-    DataSegment, DataSegmentHeader, DescRing, DescRingHeader, LayoutError, SegmentHeader,
-    SegmentOffsets, SlotMeta, DEFAULT_RING_CAPACITY, DEFAULT_SLOT_COUNT, DEFAULT_SLOT_SIZE,
+    DEFAULT_RING_CAPACITY, DEFAULT_SLOT_COUNT, DEFAULT_SLOT_SIZE, DataSegment, DataSegmentHeader,
+    DescRing, DescRingHeader, LayoutError, SegmentHeader, SegmentOffsets, SlotMeta,
 };
 
 const DEFAULT_MAX_SEGMENT_SIZE_BYTES: usize = 512 * 1024 * 1024; // 512MB
@@ -21,7 +21,8 @@ fn munmap_key(base: usize, size: usize) -> u128 {
 }
 
 #[cfg(test)]
-fn munmap_counts() -> &'static std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<u128, usize>>> {
+fn munmap_counts()
+-> &'static std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<u128, usize>>> {
     static COUNTS: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<u128, usize>>> =
         std::sync::OnceLock::new();
     &COUNTS
@@ -29,7 +30,8 @@ fn munmap_counts() -> &'static std::sync::OnceLock<std::sync::Mutex<std::collect
 
 #[cfg(test)]
 fn munmap_count_for(key: u128) -> usize {
-    let lock = munmap_counts().get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+    let lock =
+        munmap_counts().get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()));
     lock.lock().unwrap().get(&key).copied().unwrap_or(0)
 }
 
@@ -608,7 +610,7 @@ impl From<std::io::Error> for SessionError {
 /// Returns a NonNull pointer to a newly mapped region of `size` bytes.
 /// The region is initialized to zero.
 unsafe fn create_anonymous_mmap(size: usize) -> Result<NonNull<u8>, SessionError> {
-    use libc::{mmap, MAP_ANONYMOUS, MAP_FAILED, MAP_SHARED, PROT_READ, PROT_WRITE};
+    use libc::{MAP_ANONYMOUS, MAP_FAILED, MAP_SHARED, PROT_READ, PROT_WRITE, mmap};
 
     let ptr = unsafe {
         mmap(
@@ -650,7 +652,7 @@ unsafe fn create_file_mapping(
     size: usize,
     create: bool,
 ) -> Result<Arc<ShmMapping>, SessionError> {
-    use libc::{mmap, MAP_FAILED, MAP_SHARED, PROT_READ, PROT_WRITE};
+    use libc::{MAP_FAILED, MAP_SHARED, PROT_READ, PROT_WRITE, mmap};
     use std::fs::OpenOptions;
     use std::os::unix::io::AsRawFd;
 
@@ -766,9 +768,12 @@ fn calculate_segment_size_checked(
     let data_header_size = core::mem::size_of::<DataSegmentHeader>();
     let slot_meta_size = core::mem::size_of::<SlotMeta>();
 
-    let ring_descs_size = (ring_capacity as usize)
-        .checked_mul(desc_size)
-        .ok_or(SessionError::InvalidConfig("SHM size overflow (ring descs)"))?;
+    let ring_descs_size =
+        (ring_capacity as usize)
+            .checked_mul(desc_size)
+            .ok_or(SessionError::InvalidConfig(
+                "SHM size overflow (ring descs)",
+            ))?;
     let ring_size = ring_header_size
         .checked_add(ring_descs_size)
         .ok_or(SessionError::InvalidConfig("SHM size overflow (ring)"))?;
@@ -804,42 +809,70 @@ fn calculate_segment_size_checked(
     Ok(total)
 }
 
-fn calculate_offsets_checked(ring_capacity: u32, slot_count: u32) -> Result<SegmentOffsets, SessionError> {
+fn calculate_offsets_checked(
+    ring_capacity: u32,
+    slot_count: u32,
+) -> Result<SegmentOffsets, SessionError> {
     let header_size = core::mem::size_of::<SegmentHeader>();
     let ring_header_size = core::mem::size_of::<DescRingHeader>();
     let desc_size = core::mem::size_of::<MsgDescHot>();
     let data_header_size = core::mem::size_of::<DataSegmentHeader>();
     let slot_meta_size = core::mem::size_of::<SlotMeta>();
 
-    let ring_descs_size = (ring_capacity as usize)
-        .checked_mul(desc_size)
-        .ok_or(SessionError::InvalidConfig("SHM offset overflow (ring descs)"))?;
-    let slot_meta_total = slot_meta_size
-        .checked_mul(slot_count as usize)
-        .ok_or(SessionError::InvalidConfig("SHM offset overflow (slot meta)"))?;
+    let ring_descs_size =
+        (ring_capacity as usize)
+            .checked_mul(desc_size)
+            .ok_or(SessionError::InvalidConfig(
+                "SHM offset overflow (ring descs)",
+            ))?;
+    let slot_meta_total =
+        slot_meta_size
+            .checked_mul(slot_count as usize)
+            .ok_or(SessionError::InvalidConfig(
+                "SHM offset overflow (slot meta)",
+            ))?;
 
     let header = 0usize;
     let ring_a_to_b_header = header
         .checked_add(header_size)
-        .ok_or(SessionError::InvalidConfig("SHM offset overflow (ring A->B header)"))?;
-    let ring_a_to_b_descs = ring_a_to_b_header
-        .checked_add(ring_header_size)
-        .ok_or(SessionError::InvalidConfig("SHM offset overflow (ring A->B descs)"))?;
-    let ring_b_to_a_header = ring_a_to_b_descs
-        .checked_add(ring_descs_size)
-        .ok_or(SessionError::InvalidConfig("SHM offset overflow (ring B->A header)"))?;
-    let ring_b_to_a_descs = ring_b_to_a_header
-        .checked_add(ring_header_size)
-        .ok_or(SessionError::InvalidConfig("SHM offset overflow (ring B->A descs)"))?;
-    let data_header = ring_b_to_a_descs
-        .checked_add(ring_descs_size)
-        .ok_or(SessionError::InvalidConfig("SHM offset overflow (data header)"))?;
-    let slot_meta = data_header
-        .checked_add(data_header_size)
-        .ok_or(SessionError::InvalidConfig("SHM offset overflow (slot meta)"))?;
+        .ok_or(SessionError::InvalidConfig(
+            "SHM offset overflow (ring A->B header)",
+        ))?;
+    let ring_a_to_b_descs =
+        ring_a_to_b_header
+            .checked_add(ring_header_size)
+            .ok_or(SessionError::InvalidConfig(
+                "SHM offset overflow (ring A->B descs)",
+            ))?;
+    let ring_b_to_a_header =
+        ring_a_to_b_descs
+            .checked_add(ring_descs_size)
+            .ok_or(SessionError::InvalidConfig(
+                "SHM offset overflow (ring B->A header)",
+            ))?;
+    let ring_b_to_a_descs =
+        ring_b_to_a_header
+            .checked_add(ring_header_size)
+            .ok_or(SessionError::InvalidConfig(
+                "SHM offset overflow (ring B->A descs)",
+            ))?;
+    let data_header =
+        ring_b_to_a_descs
+            .checked_add(ring_descs_size)
+            .ok_or(SessionError::InvalidConfig(
+                "SHM offset overflow (data header)",
+            ))?;
+    let slot_meta =
+        data_header
+            .checked_add(data_header_size)
+            .ok_or(SessionError::InvalidConfig(
+                "SHM offset overflow (slot meta)",
+            ))?;
     let slot_data = slot_meta
         .checked_add(slot_meta_total)
-        .ok_or(SessionError::InvalidConfig("SHM offset overflow (slot data)"))?;
+        .ok_or(SessionError::InvalidConfig(
+            "SHM offset overflow (slot data)",
+        ))?;
 
     Ok(SegmentOffsets {
         header,
@@ -947,7 +980,7 @@ mod tests {
         let data = a.data_segment();
 
         // Allocate a slot.
-        let (slot_idx, gen) = data.alloc().unwrap();
+        let (slot_idx, generation) = data.alloc().unwrap();
 
         // Copy data into it.
         let test_data = b"hello, shm!";
@@ -956,14 +989,14 @@ mod tests {
         }
 
         // Mark in-flight.
-        data.mark_in_flight(slot_idx, gen).unwrap();
+        data.mark_in_flight(slot_idx, generation).unwrap();
 
         // Read it back.
         let read_data = unsafe { data.read_slot(slot_idx, 0, test_data.len() as u32).unwrap() };
         assert_eq!(read_data, test_data);
 
         // Free it.
-        data.free(slot_idx, gen).unwrap();
+        data.free(slot_idx, generation).unwrap();
     }
 
     #[test]
@@ -1015,7 +1048,8 @@ mod tests {
     fn test_file_mapping_unmaps() {
         let path = format!("/tmp/rapace-test-shm-drop-{}.shm", std::process::id());
         let (key, start) = {
-            let session = ShmSession::create_file(path.as_str(), ShmSessionConfig::default()).unwrap();
+            let session =
+                ShmSession::create_file(path.as_str(), ShmSessionConfig::default()).unwrap();
             let key = munmap_key(session.base_addr(), session.size());
             let start = munmap_count_for(key);
             drop(session);

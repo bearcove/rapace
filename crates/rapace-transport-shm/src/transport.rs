@@ -1,12 +1,12 @@
 //! SHM transport implementation.
 
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use parking_lot::Mutex;
 use rapace_core::{
-    DecodeError, EncodeCtx, EncodeError, Frame, FrameView, MsgDescHot, Transport, TransportError,
-    ValidationError, INLINE_PAYLOAD_SIZE, INLINE_PAYLOAD_SLOT,
+    DecodeError, EncodeCtx, EncodeError, Frame, FrameView, INLINE_PAYLOAD_SIZE,
+    INLINE_PAYLOAD_SLOT, MsgDescHot, Transport, TransportError, ValidationError,
 };
 
 use crate::layout::{RingError, SlotError};
@@ -164,7 +164,7 @@ impl Transport for ShmTransport {
             }
         } else {
             // Need to allocate a slot.
-            let (slot_idx, gen) = match data_segment.alloc() {
+            let (slot_idx, generation) = match data_segment.alloc() {
                 Ok(result) => {
                     if let Some(ref metrics) = self.metrics {
                         metrics.record_alloc_success();
@@ -200,11 +200,11 @@ impl Transport for ShmTransport {
 
             // Mark in-flight.
             data_segment
-                .mark_in_flight(slot_idx, gen)
+                .mark_in_flight(slot_idx, generation)
                 .map_err(|e| slot_error_to_transport(e, "mark_in_flight"))?;
 
             desc.payload_slot = slot_idx;
-            desc.payload_generation = gen;
+            desc.payload_generation = generation;
             desc.payload_offset = 0;
             desc.payload_len = payload.len() as u32;
         }
@@ -246,9 +246,9 @@ impl Transport for ShmTransport {
         {
             let mut last = self.last_frame.lock();
             if let Some(prev) = last.take() {
-                if let Some((slot_idx, gen)) = prev.slot_info {
+                if let Some((slot_idx, generation)) = prev.slot_info {
                     // Ignore errors on free (slot may have been freed already).
-                    if data_segment.free(slot_idx, gen).is_ok() {
+                    if data_segment.free(slot_idx, generation).is_ok() {
                         if let Some(ref metrics) = self.metrics {
                             metrics.record_slot_free();
                         }
@@ -362,9 +362,9 @@ impl Transport for ShmTransport {
         // Free any held slot.
         let mut last = self.last_frame.lock();
         if let Some(prev) = last.take() {
-            if let Some((slot_idx, gen)) = prev.slot_info {
+            if let Some((slot_idx, generation)) = prev.slot_info {
                 let data_segment = self.session.data_segment();
-                let _ = data_segment.free(slot_idx, gen);
+                let _ = data_segment.free(slot_idx, generation);
             }
         }
 
@@ -454,11 +454,7 @@ impl ShmMetrics {
         let zero = self.zero_copy_count() as f64;
         let copy = self.copy_count() as f64;
         let total = zero + copy;
-        if total == 0.0 {
-            0.0
-        } else {
-            zero / total
-        }
+        if total == 0.0 { 0.0 } else { zero / total }
     }
 
     // Slot allocation metrics
