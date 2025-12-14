@@ -427,6 +427,108 @@ impl HubAllocator {
     pub fn slot_available_futex(&self, class: usize) -> &std::sync::atomic::AtomicU32 {
         &self.class_header(class).slot_available
     }
+
+    /// Get slot status for all size classes (for diagnostics).
+    ///
+    /// Returns a summary of slot states across all classes.
+    pub fn slot_status(&self) -> HubSlotStatus {
+        let mut status = HubSlotStatus::default();
+
+        for class in 0..NUM_SIZE_CLASSES {
+            let header = self.class_header(class);
+            let extent_slot_shift = header.extent_slot_shift;
+            let extent_count = header.extent_count as usize;
+            let slot_size = header.slot_size;
+
+            let mut class_status = SizeClassStatus {
+                slot_size,
+                total: 0,
+                free: 0,
+                allocated: 0,
+                in_flight: 0,
+            };
+
+            for extent_id in 0..extent_count {
+                let extent_offset = header.extent_offsets[extent_id].load(Ordering::Acquire);
+                if extent_offset == 0 {
+                    continue;
+                }
+
+                // SAFETY: extent_offset is valid (we're iterating known extents)
+                let extent_header = unsafe { self.extent_header(extent_offset) };
+                let slot_count = extent_header.slot_count;
+                class_status.total += slot_count;
+
+                for slot_in_extent in 0..slot_count {
+                    let global_index =
+                        encode_global_index(extent_id as u32, slot_in_extent, extent_slot_shift);
+
+                    // SAFETY: we're iterating valid indices
+                    let meta = unsafe { self.slot_meta(class, global_index) };
+                    let state = meta.state.load(Ordering::Acquire);
+
+                    match SlotState::from_u32(state) {
+                        Some(SlotState::Free) => class_status.free += 1,
+                        Some(SlotState::Allocated) => class_status.allocated += 1,
+                        Some(SlotState::InFlight) => class_status.in_flight += 1,
+                        None => {} // Unknown state
+                    }
+                }
+            }
+
+            status.classes[class] = class_status;
+            status.total += class_status.total;
+            status.free += class_status.free;
+            status.allocated += class_status.allocated;
+            status.in_flight += class_status.in_flight;
+        }
+
+        status
+    }
+}
+
+/// Status of a single size class.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SizeClassStatus {
+    /// Slot size in bytes.
+    pub slot_size: u32,
+    /// Total slots in this class.
+    pub total: u32,
+    /// Free slots.
+    pub free: u32,
+    /// Allocated (being written).
+    pub allocated: u32,
+    /// In-flight (enqueued, waiting for receiver).
+    pub in_flight: u32,
+}
+
+/// Status of all slots in the hub allocator.
+#[derive(Debug, Clone, Default)]
+pub struct HubSlotStatus {
+    /// Per-class status.
+    pub classes: [SizeClassStatus; NUM_SIZE_CLASSES],
+    /// Total slots across all classes.
+    pub total: u32,
+    /// Total free slots.
+    pub free: u32,
+    /// Total allocated slots.
+    pub allocated: u32,
+    /// Total in-flight slots.
+    pub in_flight: u32,
+}
+
+impl std::fmt::Display for HubSlotStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "HubAllocator slots: {} total, {} free, {} allocated, {} in_flight",
+            self.total, self.free, self.allocated, self.in_flight)?;
+        for (i, class) in self.classes.iter().enumerate() {
+            if class.total > 0 {
+                writeln!(f, "  class[{}] ({:>7}B): {:>3} total, {:>3} free, {:>3} alloc, {:>3} in_flight",
+                    i, class.slot_size, class.total, class.free, class.allocated, class.in_flight)?;
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Initialize all slots in an extent and link them into the free list.

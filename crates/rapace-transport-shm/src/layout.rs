@@ -334,6 +334,55 @@ impl DescRing {
     pub fn capacity(&self) -> u32 {
         self.header().capacity
     }
+
+    /// Get the ring status (for diagnostics).
+    ///
+    /// Returns a snapshot of the ring's head/tail pointers and derived metrics.
+    pub fn ring_status(&self) -> RingStatus {
+        let header = self.header();
+        let visible_head = header.visible_head.load(Ordering::Acquire);
+        let tail = header.tail.load(Ordering::Acquire);
+        let capacity = header.capacity;
+        let len = visible_head.saturating_sub(tail) as u32;
+
+        RingStatus {
+            visible_head,
+            tail,
+            capacity,
+            len,
+        }
+    }
+}
+
+/// Status snapshot of a descriptor ring.
+#[derive(Debug, Clone, Copy)]
+pub struct RingStatus {
+    /// Producer's published head (items 0..visible_head have been enqueued).
+    pub visible_head: u64,
+    /// Consumer's tail (items 0..tail have been dequeued).
+    pub tail: u64,
+    /// Ring capacity.
+    pub capacity: u32,
+    /// Current length (visible_head - tail).
+    pub len: u32,
+}
+
+impl std::fmt::Display for RingStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "head={} tail={} len={}/{} ({}%)",
+            self.visible_head,
+            self.tail,
+            self.len,
+            self.capacity,
+            if self.capacity > 0 {
+                self.len * 100 / self.capacity
+            } else {
+                0
+            }
+        )
+    }
 }
 
 // =============================================================================

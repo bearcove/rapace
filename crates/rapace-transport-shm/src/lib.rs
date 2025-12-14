@@ -59,15 +59,15 @@ mod transport;
 pub use alloc::ShmAllocator;
 pub use layout::{
     DEFAULT_RING_CAPACITY, DEFAULT_SLOT_COUNT, DEFAULT_SLOT_SIZE, DataSegment, DataSegmentHeader,
-    DescRing, DescRingHeader, LayoutError, RingError, SegmentHeader, SegmentOffsets, SlotError,
-    SlotMeta, SlotState, calculate_segment_size,
+    DescRing, DescRingHeader, LayoutError, RingError, RingStatus, SegmentHeader, SegmentOffsets,
+    SlotError, SlotMeta, SlotState, calculate_segment_size,
 };
 pub use session::{ShmSession, ShmSessionConfig};
 pub use transport::{ShmMetrics, ShmTransport};
 
 // Hub architecture re-exports
 pub use doorbell::{Doorbell, close_peer_fd};
-pub use hub_alloc::HubAllocator;
+pub use hub_alloc::{HubAllocator, HubSlotStatus, SizeClassStatus};
 pub use hub_layout::{
     ExtentHeader, HubHeader, HubOffsets, HubSlotError, HubSlotMeta, PeerEntry, SizeClassHeader,
     HUB_SIZE_CLASSES, decode_slot_ref, encode_slot_ref,

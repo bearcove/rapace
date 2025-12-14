@@ -12,13 +12,13 @@ use std::time::Duration;
 
 use parking_lot::Mutex;
 use rapace_core::{EncodeCtx, EncodeError, Frame, FrameView, MsgDescHot, Transport, TransportError};
+use tokio::sync::Mutex as AsyncMutex;
 
 use crate::doorbell::Doorbell;
 use crate::futex;
 use crate::hub_alloc::HubAllocator;
 use crate::hub_layout::{decode_slot_ref, encode_slot_ref, HubSlotError};
 use crate::hub_session::{HubHost, HubPeer};
-use crate::layout::RingError;
 
 /// Maximum payload size that can be inlined in a descriptor.
 pub const INLINE_PAYLOAD_SIZE: usize = 16;
@@ -42,7 +42,9 @@ pub struct HubPeerTransport {
     /// Doorbell for signaling/waiting.
     doorbell: Doorbell,
     /// Local send head (producer-private).
-    local_send_head: AtomicU64,
+    ///
+    /// IMPORTANT: this ring is single-producer; we must serialize senders.
+    local_send_head: AsyncMutex<u64>,
     /// Most recently received frame (for FrameView lifetime).
     last_frame: Mutex<Option<PeerReceivedFrame>>,
     /// Name for debugging.
@@ -55,7 +57,7 @@ impl HubPeerTransport {
         Self {
             peer,
             doorbell,
-            local_send_head: AtomicU64::new(0),
+            local_send_head: AsyncMutex::new(0),
             last_frame: Mutex::new(None),
             name: name.into(),
         }
@@ -113,20 +115,22 @@ impl HubPeerTransport {
 
         // Enqueue to send ring
         let send_ring = self.peer.send_ring();
-        let mut local_head = self.local_send_head.load(Ordering::Relaxed);
 
         loop {
-            match send_ring.enqueue(&mut local_head, &desc) {
-                Ok(()) => {
-                    self.local_send_head.store(local_head, Ordering::Relaxed);
+            {
+                let mut local_head = self.local_send_head.lock().await;
+                if send_ring.enqueue(&mut *local_head, &desc).is_ok() {
                     break;
                 }
-                Err(RingError::Full) => {
-                    // Wait for space
-                    let current = self.peer.send_data_futex().load(Ordering::Acquire);
-                    let _ = futex::futex_wait(self.peer.send_data_futex(), current, Some(std::time::Duration::from_millis(100)));
-                }
             }
+
+            // Use async futex wait to avoid blocking the executor
+            // This moves the blocking wait to spawn_blocking thread pool
+            let _ = futex::futex_wait_async_ptr(
+                self.peer.send_data_futex(),
+                Some(std::time::Duration::from_millis(100)),
+            )
+            .await;
         }
 
         // Signal host
@@ -184,6 +188,16 @@ impl HubPeerTransport {
     pub fn name(&self) -> &str {
         &self.name
     }
+
+    /// Get the number of bytes pending in the doorbell (for diagnostics).
+    pub fn doorbell_pending_bytes(&self) -> usize {
+        self.doorbell.pending_bytes()
+    }
+
+    /// Get the underlying peer (for diagnostics).
+    pub fn peer(&self) -> &Arc<HubPeer> {
+        &self.peer
+    }
 }
 
 // ============================================================================
@@ -208,7 +222,9 @@ pub struct HubHostPeerTransport {
     /// Doorbell for signaling/waiting.
     doorbell: Doorbell,
     /// Local send head for peer's recv ring.
-    local_send_head: AtomicU64,
+    ///
+    /// IMPORTANT: this ring is single-producer; we must serialize senders.
+    local_send_head: AsyncMutex<u64>,
     /// Most recently received frame (for FrameView lifetime).
     last_frame: Mutex<Option<ReceivedFrame>>,
     /// Whether the transport is closed.
@@ -224,7 +240,7 @@ impl HubHostPeerTransport {
             host,
             peer_id,
             doorbell,
-            local_send_head: AtomicU64::new(0),
+            local_send_head: AsyncMutex::new(0),
             last_frame: Mutex::new(None),
             closed: std::sync::atomic::AtomicBool::new(false),
             name: None,
@@ -237,7 +253,7 @@ impl HubHostPeerTransport {
             host,
             peer_id,
             doorbell,
-            local_send_head: AtomicU64::new(0),
+            local_send_head: AsyncMutex::new(0),
             last_frame: Mutex::new(None),
             closed: std::sync::atomic::AtomicBool::new(false),
             name: Some(name.into()),
@@ -258,6 +274,11 @@ impl HubHostPeerTransport {
     #[inline]
     pub fn is_closed(&self) -> bool {
         self.closed.load(Ordering::Acquire)
+    }
+
+    /// Get the number of bytes pending in the doorbell (for diagnostics).
+    pub fn doorbell_pending_bytes(&self) -> usize {
+        self.doorbell.pending_bytes()
     }
 }
 
@@ -303,26 +324,23 @@ impl Transport for HubHostPeerTransport {
 
         // Enqueue to peer's recv ring (host sends TO peer's recv)
         let recv_ring = self.host.peer_recv_ring(self.peer_id);
-        let mut local_head = self.local_send_head.load(Ordering::Relaxed);
 
         const FUTEX_TIMEOUT: Duration = Duration::from_millis(100);
 
         loop {
-            match recv_ring.enqueue(&mut local_head, &desc) {
-                Ok(()) => {
-                    self.local_send_head.store(local_head, Ordering::Relaxed);
+            {
+                let mut local_head = self.local_send_head.lock().await;
+                if recv_ring.enqueue(&mut *local_head, &desc).is_ok() {
                     break;
                 }
-                Err(RingError::Full) => {
-                    if self.is_closed() {
-                        return Err(TransportError::Closed);
-                    }
-                    // Wait for space
-                    let futex = self.host.peer_recv_data_futex(self.peer_id);
-                    let current = futex.load(Ordering::Acquire);
-                    let _ = futex::futex_wait(futex, current, Some(FUTEX_TIMEOUT));
-                }
             }
+
+            if self.is_closed() {
+                return Err(TransportError::Closed);
+            }
+            // Use async futex wait to avoid blocking the executor
+            let futex = self.host.peer_recv_data_futex(self.peer_id);
+            let _ = futex::futex_wait_async_ptr(futex, Some(FUTEX_TIMEOUT)).await;
         }
 
         // Signal peer
@@ -447,19 +465,21 @@ impl Transport for HubPeerTransport {
         }
 
         let send_ring = self.peer.send_ring();
-        let mut local_head = self.local_send_head.load(Ordering::Relaxed);
 
         loop {
-            match send_ring.enqueue(&mut local_head, &desc) {
-                Ok(()) => {
-                    self.local_send_head.store(local_head, Ordering::Relaxed);
+            {
+                let mut local_head = self.local_send_head.lock().await;
+                if send_ring.enqueue(&mut *local_head, &desc).is_ok() {
                     break;
                 }
-                Err(RingError::Full) => {
-                    let current = self.peer.send_data_futex().load(Ordering::Acquire);
-                    let _ = futex::futex_wait(self.peer.send_data_futex(), current, Some(Duration::from_millis(100)));
-                }
             }
+
+            // Use async futex wait to avoid blocking the executor
+            let _ = futex::futex_wait_async_ptr(
+                self.peer.send_data_futex(),
+                Some(Duration::from_millis(100)),
+            )
+            .await;
         }
 
         self.doorbell.signal();
@@ -599,7 +619,9 @@ pub struct HostPeerHandle {
     /// Local recv head for this peer's send ring.
     local_recv_head: AtomicU64,
     /// Local send head for this peer's recv ring.
-    local_send_head: AtomicU64,
+    ///
+    /// IMPORTANT: this ring is single-producer; we must serialize senders.
+    local_send_head: AsyncMutex<u64>,
 }
 
 impl HostPeerHandle {
@@ -609,7 +631,7 @@ impl HostPeerHandle {
             peer_id,
             doorbell,
             local_recv_head: AtomicU64::new(0),
-            local_send_head: AtomicU64::new(0),
+            local_send_head: AsyncMutex::new(0),
         }
     }
 }
@@ -687,20 +709,18 @@ impl HubHostTransport {
 
         // Enqueue to peer's recv ring
         let recv_ring = self.host.peer_recv_ring(peer_id);
-        let mut local_head = peer_handle.local_send_head.load(Ordering::Relaxed);
 
         loop {
-            match recv_ring.enqueue(&mut local_head, &desc) {
-                Ok(()) => {
-                    peer_handle.local_send_head.store(local_head, Ordering::Relaxed);
+            {
+                let mut local_head = peer_handle.local_send_head.lock().await;
+                if recv_ring.enqueue(&mut *local_head, &desc).is_ok() {
                     break;
                 }
-                Err(RingError::Full) => {
-                    let futex = self.host.peer_recv_data_futex(peer_id);
-                    let current = futex.load(Ordering::Acquire);
-                    let _ = futex::futex_wait(futex, current, Some(std::time::Duration::from_millis(100)));
-                }
             }
+
+            // Use async futex wait to avoid blocking the executor
+            let futex = self.host.peer_recv_data_futex(peer_id);
+            let _ = futex::futex_wait_async_ptr(futex, Some(std::time::Duration::from_millis(100))).await;
         }
 
         // Signal peer
