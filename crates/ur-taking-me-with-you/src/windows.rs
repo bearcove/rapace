@@ -62,7 +62,10 @@ pub fn die_with_parent() {
 
     let current_process = unsafe { windows_sys::Win32::System::Threading::GetCurrentProcess() };
     if let Err(e) = assign_and_leak_job(job, current_process) {
-        eprintln!("ur-taking-me-with-you: Failed to assign process to job: {}", e);
+        eprintln!(
+            "ur-taking-me-with-you: Failed to assign process to job: {}",
+            e
+        );
     }
 }
 

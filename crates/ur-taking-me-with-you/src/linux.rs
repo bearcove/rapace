@@ -17,7 +17,10 @@ fn set_pdeathsig() -> io::Result<()> {
 /// Configure the current process to receive SIGKILL when parent dies.
 pub fn die_with_parent() {
     if let Err(e) = set_pdeathsig() {
-        eprintln!("ur-taking-me-with-you: prctl(PR_SET_PDEATHSIG) failed: {}", e);
+        eprintln!(
+            "ur-taking-me-with-you: prctl(PR_SET_PDEATHSIG) failed: {}",
+            e
+        );
     }
 }
 

@@ -24,8 +24,8 @@
 use std::io::{self, ErrorKind};
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
 
-use tokio::io::unix::AsyncFd;
 use tokio::io::Interest;
+use tokio::io::unix::AsyncFd;
 
 /// A doorbell for cross-process wakeup.
 ///
@@ -60,7 +60,11 @@ fn drain_fd(fd: RawFd, would_block_is_error: bool) -> io::Result<bool> {
             if drained {
                 return Ok(true);
             }
-            return if would_block_is_error { Err(err) } else { Ok(false) };
+            return if would_block_is_error {
+                Err(err)
+            } else {
+                Ok(false)
+            };
         }
 
         Err(err)?;
@@ -112,7 +116,10 @@ impl Doorbell {
 
         // Wrap in AsyncFd
         let async_fd = AsyncFd::new(owned)?;
-        tracing::debug!(fd = fd, "Doorbell::from_raw_fd: registered with AsyncFd (tokio epoll)");
+        tracing::debug!(
+            fd = fd,
+            "Doorbell::from_raw_fd: registered with AsyncFd (tokio epoll)"
+        );
 
         Ok(Self { async_fd })
     }
@@ -159,7 +166,10 @@ impl Doorbell {
         // If a signal was sent before we started waiting, it's already in the buffer.
         // The epoll might not notify us for data that arrived before registration.
         if self.try_drain() {
-            tracing::trace!(fd = fd, "doorbell wait: found pending data, returning immediately");
+            tracing::trace!(
+                fd = fd,
+                "doorbell wait: found pending data, returning immediately"
+            );
             return Ok(());
         }
 

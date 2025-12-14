@@ -69,8 +69,8 @@ pub use transport::{ShmMetrics, ShmTransport};
 pub use doorbell::{Doorbell, close_peer_fd};
 pub use hub_alloc::{HubAllocator, HubSlotStatus, SizeClassStatus};
 pub use hub_layout::{
-    ExtentHeader, HubHeader, HubOffsets, HubSlotError, HubSlotMeta, PeerEntry, SizeClassHeader,
-    HUB_SIZE_CLASSES, decode_slot_ref, encode_slot_ref,
+    ExtentHeader, HUB_SIZE_CLASSES, HubHeader, HubOffsets, HubSlotError, HubSlotMeta, PeerEntry,
+    SizeClassHeader, decode_slot_ref, encode_slot_ref,
 };
 pub use hub_session::{HubConfig, HubHost, HubPeer, PeerInfo};
 pub use hub_transport::{

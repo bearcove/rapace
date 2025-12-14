@@ -15,7 +15,11 @@ use std::time::Duration;
 /// - `Ok(false)` if the value changed (spurious wakeup or value mismatch)
 /// - `Err` on syscall error
 #[cfg(target_os = "linux")]
-pub fn futex_wait(futex: &AtomicU32, expected: u32, timeout: Option<Duration>) -> std::io::Result<bool> {
+pub fn futex_wait(
+    futex: &AtomicU32,
+    expected: u32,
+    timeout: Option<Duration>,
+) -> std::io::Result<bool> {
     use std::ptr;
 
     let futex_ptr = futex as *const AtomicU32 as *const u32;
@@ -49,9 +53,9 @@ pub fn futex_wait(futex: &AtomicU32, expected: u32, timeout: Option<Duration>) -
     } else {
         let err = std::io::Error::last_os_error();
         match err.raw_os_error() {
-            Some(libc::EAGAIN) => Ok(false), // Value changed
+            Some(libc::EAGAIN) => Ok(false),    // Value changed
             Some(libc::ETIMEDOUT) => Ok(false), // Timeout
-            Some(libc::EINTR) => Ok(false), // Interrupted
+            Some(libc::EINTR) => Ok(false),     // Interrupted
             _ => Err(err),
         }
     }
@@ -143,7 +147,11 @@ pub async fn futex_wait_async_ptr(
 
 // Fallback for non-Linux platforms (just yields)
 #[cfg(not(target_os = "linux"))]
-pub fn futex_wait(_futex: &AtomicU32, _expected: u32, _timeout: Option<Duration>) -> std::io::Result<bool> {
+pub fn futex_wait(
+    _futex: &AtomicU32,
+    _expected: u32,
+    _timeout: Option<Duration>,
+) -> std::io::Result<bool> {
     std::thread::yield_now();
     Ok(false)
 }

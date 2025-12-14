@@ -21,9 +21,9 @@
 use std::sync::atomic::Ordering;
 
 use crate::hub_layout::{
-    decode_global_index, encode_global_index, pack_free_head, unpack_free_head,
-    ExtentHeader, HubSlotMeta, HubSlotError, SizeClassHeader, SlotState,
-    FREE_LIST_END, HUB_SIZE_CLASSES, NO_OWNER, NUM_SIZE_CLASSES,
+    ExtentHeader, FREE_LIST_END, HUB_SIZE_CLASSES, HubSlotError, HubSlotMeta, NO_OWNER,
+    NUM_SIZE_CLASSES, SizeClassHeader, SlotState, decode_global_index, encode_global_index,
+    pack_free_head, unpack_free_head,
 };
 
 /// A view into the hub's allocator state.
@@ -68,14 +68,6 @@ impl HubAllocator {
         unsafe { &*self.size_classes[class] }
     }
 
-    /// Get a mutable size class header.
-    #[inline]
-    fn class_header_mut(&self, class: usize) -> &mut SizeClassHeader {
-        debug_assert!(class < NUM_SIZE_CLASSES);
-        // SAFETY: Caller guaranteed valid pointers in from_raw.
-        unsafe { &mut *self.size_classes[class] }
-    }
-
     /// Get the extent header at a given offset.
     ///
     /// # Safety
@@ -99,13 +91,17 @@ impl HubAllocator {
 
         let extent_offset = header.extent_offsets[extent_id as usize].load(Ordering::Acquire);
         if extent_offset == 0 {
-            panic!("Invalid extent offset for class {} extent {}", class, extent_id);
+            panic!(
+                "Invalid extent offset for class {} extent {}",
+                class, extent_id
+            );
         }
 
         let extent_header = unsafe { self.extent_header(extent_offset) };
         let meta_offset = extent_header.meta_offset as usize;
         let meta_base = unsafe { self.base_addr.add(extent_offset as usize + meta_offset) };
-        let meta_ptr = unsafe { meta_base.add(slot_in_extent as usize * std::mem::size_of::<HubSlotMeta>()) };
+        let meta_ptr =
+            unsafe { meta_base.add(slot_in_extent as usize * std::mem::size_of::<HubSlotMeta>()) };
 
         unsafe { &*(meta_ptr as *const HubSlotMeta) }
     }
@@ -434,7 +430,7 @@ impl HubAllocator {
     pub fn slot_status(&self) -> HubSlotStatus {
         let mut status = HubSlotStatus::default();
 
-        for class in 0..NUM_SIZE_CLASSES {
+        for (class, class_out) in status.classes.iter_mut().enumerate() {
             let header = self.class_header(class);
             let extent_slot_shift = header.extent_slot_shift;
             let extent_count = header.extent_count as usize;
@@ -476,7 +472,7 @@ impl HubAllocator {
                 }
             }
 
-            status.classes[class] = class_status;
+            *class_out = class_status;
             status.total += class_status.total;
             status.free += class_status.free;
             status.allocated += class_status.allocated;
@@ -519,12 +515,18 @@ pub struct HubSlotStatus {
 
 impl std::fmt::Display for HubSlotStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "HubAllocator slots: {} total, {} free, {} allocated, {} in_flight",
-            self.total, self.free, self.allocated, self.in_flight)?;
+        writeln!(
+            f,
+            "HubAllocator slots: {} total, {} free, {} allocated, {} in_flight",
+            self.total, self.free, self.allocated, self.in_flight
+        )?;
         for (i, class) in self.classes.iter().enumerate() {
             if class.total > 0 {
-                writeln!(f, "  class[{}] ({:>7}B): {:>3} total, {:>3} free, {:>3} alloc, {:>3} in_flight",
-                    i, class.slot_size, class.total, class.free, class.allocated, class.in_flight)?;
+                writeln!(
+                    f,
+                    "  class[{}] ({:>7}B): {:>3} total, {:>3} free, {:>3} alloc, {:>3} in_flight",
+                    i, class.slot_size, class.total, class.free, class.allocated, class.in_flight
+                )?;
             }
         }
         Ok(())

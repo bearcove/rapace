@@ -6,18 +6,20 @@
 //! - `HubHostPeerTransport`: Per-peer transport for host side (implements Transport trait)
 //! - `HubHostTransport`: For host, manages communication with all peers
 
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use parking_lot::Mutex;
-use rapace_core::{EncodeCtx, EncodeError, Frame, FrameView, MsgDescHot, Transport, TransportError};
+use rapace_core::{
+    EncodeCtx, EncodeError, Frame, FrameView, MsgDescHot, Transport, TransportError,
+};
 use tokio::sync::Mutex as AsyncMutex;
 
 use crate::doorbell::Doorbell;
 use crate::futex;
 use crate::hub_alloc::HubAllocator;
-use crate::hub_layout::{decode_slot_ref, encode_slot_ref, HubSlotError};
+use crate::hub_layout::{HubSlotError, decode_slot_ref, encode_slot_ref};
 use crate::hub_session::{HubHost, HubPeer};
 
 /// Maximum payload size that can be inlined in a descriptor.
@@ -77,7 +79,11 @@ impl HubPeerTransport {
     ///
     /// If the payload is small enough, it's inlined in the descriptor.
     /// Otherwise, a slot is allocated from the appropriate size class.
-    pub async fn send_frame(&self, desc: &MsgDescHot, payload: &[u8]) -> Result<(), HubTransportError> {
+    pub async fn send_frame(
+        &self,
+        desc: &MsgDescHot,
+        payload: &[u8],
+    ) -> Result<(), HubTransportError> {
         self.peer.update_heartbeat();
 
         let mut desc = *desc;
@@ -119,7 +125,7 @@ impl HubPeerTransport {
         loop {
             {
                 let mut local_head = self.local_send_head.lock().await;
-                if send_ring.enqueue(&mut *local_head, &desc).is_ok() {
+                if send_ring.enqueue(&mut local_head, &desc).is_ok() {
                     break;
                 }
             }
@@ -248,7 +254,12 @@ impl HubHostPeerTransport {
     }
 
     /// Create a new per-peer transport with a name for debugging.
-    pub fn with_name(host: Arc<HubHost>, peer_id: u16, doorbell: Doorbell, name: impl Into<String>) -> Self {
+    pub fn with_name(
+        host: Arc<HubHost>,
+        peer_id: u16,
+        doorbell: Doorbell,
+        name: impl Into<String>,
+    ) -> Self {
         Self {
             host,
             peer_id,
@@ -330,7 +341,7 @@ impl Transport for HubHostPeerTransport {
         loop {
             {
                 let mut local_head = self.local_send_head.lock().await;
-                if recv_ring.enqueue(&mut *local_head, &desc).is_ok() {
+                if recv_ring.enqueue(&mut local_head, &desc).is_ok() {
                     break;
                 }
             }
@@ -368,16 +379,17 @@ impl Transport for HubHostPeerTransport {
                     desc.inline_payload[..desc.payload_len as usize].to_vec()
                 } else {
                     let (class, global_index) = decode_slot_ref(desc.payload_slot);
-                    let slot_ptr = unsafe {
-                        self.allocator().slot_data_ptr(class as usize, global_index)
-                    };
+                    let slot_ptr =
+                        unsafe { self.allocator().slot_data_ptr(class as usize, global_index) };
                     let slot_ptr = unsafe { slot_ptr.add(desc.payload_offset as usize) };
-                    let payload_data = unsafe {
-                        std::slice::from_raw_parts(slot_ptr, desc.payload_len as usize)
-                    }.to_vec();
+                    let payload_data =
+                        unsafe { std::slice::from_raw_parts(slot_ptr, desc.payload_len as usize) }
+                            .to_vec();
 
                     // Free the slot
-                    let _ = self.allocator().free(class, global_index, desc.payload_generation);
+                    let _ = self
+                        .allocator()
+                        .free(class, global_index, desc.payload_generation);
 
                     payload_data
                 };
@@ -399,7 +411,8 @@ impl Transport for HubHostPeerTransport {
                 let payload_len = frame_ref.payload.len();
 
                 let desc: &MsgDescHot = unsafe { &*desc_ptr };
-                let payload: &[u8] = unsafe { std::slice::from_raw_parts(payload_ptr, payload_len) };
+                let payload: &[u8] =
+                    unsafe { std::slice::from_raw_parts(payload_ptr, payload_len) };
 
                 return Ok(FrameView::new(desc, payload));
             }
@@ -410,14 +423,19 @@ impl Transport for HubHostPeerTransport {
 
             // Wait for data via doorbell
             if let Err(e) = self.doorbell.wait().await {
-                tracing::warn!(peer_id = self.peer_id, error = %e, "doorbell wait failed");
+                tracing::warn!(
+                    peer_id = self.peer_id,
+                    peer_name = self.name.as_deref(),
+                    error = %e,
+                    "doorbell wait failed"
+                );
             }
             self.doorbell.drain();
         }
     }
 
     fn encoder(&self) -> Box<dyn EncodeCtx + '_> {
-        Box::new(HubEncoder::new(self.host.clone()))
+        Box::new(HubEncoder::new())
     }
 
     async fn close(&self) -> Result<(), TransportError> {
@@ -469,7 +487,7 @@ impl Transport for HubPeerTransport {
         loop {
             {
                 let mut local_head = self.local_send_head.lock().await;
-                if send_ring.enqueue(&mut *local_head, &desc).is_ok() {
+                if send_ring.enqueue(&mut local_head, &desc).is_ok() {
                     break;
                 }
             }
@@ -503,16 +521,17 @@ impl Transport for HubPeerTransport {
                     desc.inline_payload[..desc.payload_len as usize].to_vec()
                 } else {
                     let (class, global_index) = decode_slot_ref(desc.payload_slot);
-                    let slot_ptr = unsafe {
-                        self.allocator().slot_data_ptr(class as usize, global_index)
-                    };
+                    let slot_ptr =
+                        unsafe { self.allocator().slot_data_ptr(class as usize, global_index) };
                     let slot_ptr = unsafe { slot_ptr.add(desc.payload_offset as usize) };
-                    let payload_data = unsafe {
-                        std::slice::from_raw_parts(slot_ptr, desc.payload_len as usize)
-                    }.to_vec();
+                    let payload_data =
+                        unsafe { std::slice::from_raw_parts(slot_ptr, desc.payload_len as usize) }
+                            .to_vec();
 
                     // Free the slot
-                    let _ = self.allocator().free(class, global_index, desc.payload_generation);
+                    let _ = self
+                        .allocator()
+                        .free(class, global_index, desc.payload_generation);
 
                     payload_data
                 };
@@ -534,7 +553,8 @@ impl Transport for HubPeerTransport {
                 let payload_len = frame_ref.payload.len();
 
                 let desc: &MsgDescHot = unsafe { &*desc_ptr };
-                let payload: &[u8] = unsafe { std::slice::from_raw_parts(payload_ptr, payload_len) };
+                let payload: &[u8] =
+                    unsafe { std::slice::from_raw_parts(payload_ptr, payload_len) };
 
                 return Ok(FrameView::new(desc, payload));
             }
@@ -548,7 +568,7 @@ impl Transport for HubPeerTransport {
     }
 
     fn encoder(&self) -> Box<dyn EncodeCtx + '_> {
-        Box::new(HubEncoder::new_peer(self.peer.clone()))
+        Box::new(HubEncoder::new())
     }
 
     async fn close(&self) -> Result<(), TransportError> {
@@ -562,26 +582,13 @@ impl Transport for HubPeerTransport {
 
 /// Encoder for Hub transport.
 pub struct HubEncoder {
-    host: Option<Arc<HubHost>>,
-    peer: Option<Arc<HubPeer>>,
     desc: MsgDescHot,
     payload: Vec<u8>,
 }
 
 impl HubEncoder {
-    fn new(host: Arc<HubHost>) -> Self {
+    fn new() -> Self {
         Self {
-            host: Some(host),
-            peer: None,
-            desc: MsgDescHot::new(),
-            payload: Vec::new(),
-        }
-    }
-
-    fn new_peer(peer: Arc<HubPeer>) -> Self {
-        Self {
-            host: None,
-            peer: Some(peer),
             desc: MsgDescHot::new(),
             payload: Vec::new(),
         }
@@ -616,8 +623,6 @@ pub struct HostPeerHandle {
     pub peer_id: u16,
     /// Doorbell for this peer.
     pub doorbell: Doorbell,
-    /// Local recv head for this peer's send ring.
-    local_recv_head: AtomicU64,
     /// Local send head for this peer's recv ring.
     ///
     /// IMPORTANT: this ring is single-producer; we must serialize senders.
@@ -630,7 +635,6 @@ impl HostPeerHandle {
         Self {
             peer_id,
             doorbell,
-            local_recv_head: AtomicU64::new(0),
             local_send_head: AsyncMutex::new(0),
         }
     }
@@ -713,14 +717,15 @@ impl HubHostTransport {
         loop {
             {
                 let mut local_head = peer_handle.local_send_head.lock().await;
-                if recv_ring.enqueue(&mut *local_head, &desc).is_ok() {
+                if recv_ring.enqueue(&mut local_head, &desc).is_ok() {
                     break;
                 }
             }
 
             // Use async futex wait to avoid blocking the executor
             let futex = self.host.peer_recv_data_futex(peer_id);
-            let _ = futex::futex_wait_async_ptr(futex, Some(std::time::Duration::from_millis(100))).await;
+            let _ = futex::futex_wait_async_ptr(futex, Some(std::time::Duration::from_millis(100)))
+                .await;
         }
 
         // Signal peer
@@ -744,9 +749,8 @@ impl HubHostTransport {
                         desc.inline_payload[..desc.payload_len as usize].to_vec()
                     } else {
                         let (class, global_index) = decode_slot_ref(desc.payload_slot);
-                        let slot_ptr = unsafe {
-                            self.allocator().slot_data_ptr(class as usize, global_index)
-                        };
+                        let slot_ptr =
+                            unsafe { self.allocator().slot_data_ptr(class as usize, global_index) };
                         let slot_ptr = unsafe { slot_ptr.add(desc.payload_offset as usize) };
                         let payload = unsafe {
                             std::slice::from_raw_parts(slot_ptr, desc.payload_len as usize)
@@ -798,9 +802,9 @@ impl HubHostTransport {
                             .to_vec();
 
                     // Free the slot
-                    if let Err(e) = self
-                        .allocator()
-                        .free(class, global_index, desc.payload_generation)
+                    if let Err(e) =
+                        self.allocator()
+                            .free(class, global_index, desc.payload_generation)
                     {
                         tracing::warn!("Failed to free slot: {:?}", e);
                     }
@@ -915,7 +919,10 @@ mod tests {
         desc2.channel_id = 2;
 
         let payload2 = b"hello from host";
-        host_transport.send_to_peer(peer_id, &desc2, payload2).await.unwrap();
+        host_transport
+            .send_to_peer(peer_id, &desc2, payload2)
+            .await
+            .unwrap();
 
         // Receive on peer
         let (recv_desc2, recv_payload2) = peer_transport.recv_frame().await.unwrap();
