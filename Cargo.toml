@@ -9,6 +9,7 @@ members = [
     "crates/rapace-introspection",
     "crates/rapace-registry",
     "crates/rapace-tracing",
+    "crates/rapace-transport",
     "crates/rapace-transport-mem",
     "crates/rapace-transport-shm",
     "crates/rapace-transport-stream",
@@ -45,6 +46,7 @@ rapace-http = { path = "crates/rapace-http", version = "0.4.0" }
 rapace-macros = { path = "crates/rapace-macros", version = "0.4.0" }
 rapace-registry = { path = "crates/rapace-registry", version = "0.4.0" }
 rapace-tracing = { path = "crates/rapace-tracing", version = "0.4.0" }
+rapace-transport = { path = "crates/rapace-transport", version = "0.4.0" }
 rapace-transport-mem = { path = "crates/rapace-transport-mem", version = "0.4.0" }
 rapace-transport-shm = { path = "crates/rapace-transport-shm", version = "0.4.0" }
 rapace-transport-stream = { path = "crates/rapace-transport-stream", version = "0.4.0" }

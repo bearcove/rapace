@@ -1,0 +1,23 @@
+[package]
+name = "rapace-transport"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Unified transport facade for rapace (mem, stream, shm, websocket)"
+
+[features]
+default = ["mem", "stream"]
+mem = []
+stream = []
+shm = []
+websocket = []
+
+[dependencies]
+rapace-core.workspace = true
+
+[package.metadata.docs.rs]
+rustdoc-args = ["--html-in-header", "arborium-header.html"]
+
+[package.metadata."docs.rs"]
+rustdoc-args = ["--html-in-header", "arborium-header.html"]

@@ -137,7 +137,7 @@ pub type BoxedDispatcher = Box<
 /// Only `RpcSession::run()` calls `transport.recv_frame()`. No other code should
 /// touch `recv_frame` directly. This prevents the race condition where multiple
 /// callers compete for incoming frames.
-pub struct RpcSession<T: TransportHandle<SendPayload = Vec<u8>>> {
+pub struct RpcSession<T: TransportHandle> {
     transport: T,
 
     /// Pending response waiters: channel_id -> oneshot sender.
@@ -162,7 +162,7 @@ pub struct RpcSession<T: TransportHandle<SendPayload = Vec<u8>>> {
     next_channel_id: AtomicU32,
 }
 
-impl<T: TransportHandle<SendPayload = Vec<u8>>> RpcSession<T> {
+impl<T: TransportHandle> RpcSession<T> {
     /// Create a new RPC session wrapping the given transport handle.
     ///
     /// The `start_channel_id` parameter allows different sessions to use different
