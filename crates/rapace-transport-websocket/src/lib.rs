@@ -8,8 +8,8 @@
 //! - `axum`: Support for `axum::extract::ws::WebSocket`
 
 use rapace_core::{
-    DecodeError, EncodeCtx, EncodeError, Frame, FrameView, INLINE_PAYLOAD_SIZE,
-    INLINE_PAYLOAD_SLOT, MsgDescHot, Transport, TransportError,
+    DecodeError, EncodeCtx, EncodeError, Frame, INLINE_PAYLOAD_SIZE, INLINE_PAYLOAD_SLOT,
+    MsgDescHot, RecvFrame, Transport, TransportError,
 };
 
 mod shared {
@@ -18,13 +18,6 @@ mod shared {
     /// Size of MsgDescHot in bytes (must be 64).
     pub const DESC_SIZE: usize = 64;
     const _: () = assert!(std::mem::size_of::<MsgDescHot>() == DESC_SIZE);
-
-    /// Internal storage for a received frame.
-    #[derive(Default)]
-    pub struct ReceivedFrame {
-        pub desc: MsgDescHot,
-        pub payload: Vec<u8>,
-    }
 
     /// Convert MsgDescHot to raw bytes.
     pub fn desc_to_bytes(desc: &MsgDescHot) -> [u8; DESC_SIZE] {
@@ -128,11 +121,10 @@ pub trait WsMessage: Sized + Send {
 
 #[cfg(not(target_arch = "wasm32"))]
 mod native {
-    use super::shared::{DESC_SIZE, ReceivedFrame, to_bytes, to_desc};
+    use super::shared::{DESC_SIZE, to_bytes, to_desc};
     use super::*;
     use futures::stream::{SplitSink, SplitStream};
     use futures::{Sink, SinkExt, Stream, StreamExt};
-    use parking_lot::Mutex as SyncMutex;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
     use tokio::sync::Mutex as AsyncMutex;
@@ -183,8 +175,6 @@ mod native {
         sink: AsyncMutex<SplitSink<WS, M>>,
         /// Read half of the WebSocket (async mutex for holding across awaits).
         stream: AsyncMutex<SplitStream<WS>>,
-        /// Buffer for the last received frame (for FrameView lifetime).
-        last_frame: SyncMutex<Option<ReceivedFrame>>,
         /// Whether the transport is closed.
         closed: AtomicBool,
     }
@@ -206,7 +196,6 @@ mod native {
                 inner: Arc::new(WebSocketInner {
                     sink: AsyncMutex::new(sink),
                     stream: AsyncMutex::new(stream),
-                    last_frame: SyncMutex::new(None),
                     closed: AtomicBool::new(false),
                 }),
             }
@@ -230,6 +219,10 @@ mod native {
         <WS as Sink<M>>::Error: std::error::Error + Send + Sync + 'static,
         M: WsMessage,
     {
+        /// Payload type for received frames.
+        /// For now we use `Vec<u8>`; Phase 2 will introduce pooled buffers.
+        type RecvPayload = Vec<u8>;
+
         async fn send_frame(&self, frame: &Frame) -> Result<(), TransportError> {
             if self.is_closed() {
                 return Err(TransportError::Closed);
@@ -251,7 +244,7 @@ mod native {
             Ok(())
         }
 
-        async fn recv_frame(&self) -> Result<FrameView<'_>, TransportError> {
+        async fn recv_frame(&self) -> Result<RecvFrame<Self::RecvPayload>, TransportError> {
             if self.is_closed() {
                 return Err(TransportError::Closed);
             }
@@ -294,9 +287,6 @@ mod native {
                     let payload = data[DESC_SIZE..].to_vec();
                     let payload_len = payload.len();
 
-                    // Drop stream lock before storing frame
-                    drop(stream);
-
                     // Update desc.payload_len to match actual received payload
                     desc.payload_len = payload_len as u32;
 
@@ -304,38 +294,12 @@ mod native {
                     if payload_len <= INLINE_PAYLOAD_SIZE {
                         desc.payload_slot = INLINE_PAYLOAD_SLOT;
                         desc.inline_payload[..payload_len].copy_from_slice(&payload);
+                        return Ok(RecvFrame::inline(desc));
                     } else {
                         // Mark as external payload
                         desc.payload_slot = 0;
+                        return Ok(RecvFrame::with_payload(desc, payload));
                     }
-
-                    // Store frame for FrameView lifetime
-                    {
-                        let mut last = self.inner.last_frame.lock();
-                        *last = Some(ReceivedFrame { desc, payload });
-                    }
-
-                    // Create FrameView from stored frame
-                    let last = self.inner.last_frame.lock();
-                    let frame_ref = last.as_ref().unwrap();
-
-                    let desc_ptr = &frame_ref.desc as *const MsgDescHot;
-                    let payload_slice = if frame_ref.desc.is_inline() {
-                        frame_ref.desc.inline_payload()
-                    } else {
-                        &frame_ref.payload
-                    };
-                    let payload_ptr = payload_slice.as_ptr();
-                    let payload_len = payload_slice.len();
-
-                    // SAFETY: Extending lifetime is safe because:
-                    // - Data lives in Arc<WebSocketInner> which outlives &self
-                    // - FrameView borrows &self, preventing concurrent recv_frame
-                    let desc: &MsgDescHot = unsafe { &*desc_ptr };
-                    let payload: &[u8] =
-                        unsafe { std::slice::from_raw_parts(payload_ptr, payload_len) };
-
-                    return Ok(FrameView::new(desc, payload));
                 }
             }
         }
@@ -453,11 +417,11 @@ mod tungstenite_impl {
             a.send_frame(&frame).await.unwrap();
 
             // Receive on B
-            let view = b.recv_frame().await.unwrap();
-            assert_eq!(view.desc.msg_id, 1);
-            assert_eq!(view.desc.channel_id, 1);
-            assert_eq!(view.desc.method_id, 42);
-            assert_eq!(view.payload, b"hello");
+            let recv = b.recv_frame().await.unwrap();
+            assert_eq!(recv.desc.msg_id, 1);
+            assert_eq!(recv.desc.channel_id, 1);
+            assert_eq!(recv.desc.method_id, 42);
+            assert_eq!(recv.payload_bytes(), b"hello");
         }
 
         #[tokio::test]
@@ -473,9 +437,9 @@ mod tungstenite_impl {
 
             a.send_frame(&frame).await.unwrap();
 
-            let view = b.recv_frame().await.unwrap();
-            assert_eq!(view.desc.msg_id, 2);
-            assert_eq!(view.payload.len(), 1000);
+            let recv = b.recv_frame().await.unwrap();
+            assert_eq!(recv.desc.msg_id, 2);
+            assert_eq!(recv.payload_bytes().len(), 1000);
         }
 
         #[tokio::test]
@@ -495,11 +459,11 @@ mod tungstenite_impl {
             b.send_frame(&frame_b).await.unwrap();
 
             // Receive both
-            let view_b = b.recv_frame().await.unwrap();
-            assert_eq!(view_b.payload, b"from A");
+            let recv_b = b.recv_frame().await.unwrap();
+            assert_eq!(recv_b.payload_bytes(), b"from A");
 
-            let view_a = a.recv_frame().await.unwrap();
-            assert_eq!(view_a.payload, b"from B");
+            let recv_a = a.recv_frame().await.unwrap();
+            assert_eq!(recv_a.payload_bytes(), b"from B");
         }
 
         #[tokio::test]
@@ -692,10 +656,9 @@ pub use axum_impl::AxumTransport;
 
 #[cfg(target_arch = "wasm32")]
 mod wasm {
-    use super::shared::{DESC_SIZE, ReceivedFrame, to_bytes, to_desc};
+    use super::shared::{DESC_SIZE, to_bytes, to_desc};
     use super::*;
     use gloo_timers::future::TimeoutFuture;
-    use parking_lot::Mutex as SyncMutex;
     use std::cell::{Cell, RefCell};
     use std::collections::VecDeque;
     use std::future::Future;
@@ -715,7 +678,6 @@ mod wasm {
 
     struct WebSocketInner {
         ws: WasmWebSocket,
-        last_frame: SyncMutex<Option<ReceivedFrame>>,
         closed: AtomicBool,
     }
 
@@ -726,7 +688,6 @@ mod wasm {
             Ok(Self {
                 inner: Arc::new(WebSocketInner {
                     ws,
-                    last_frame: SyncMutex::new(None),
                     closed: AtomicBool::new(false),
                 }),
             })
@@ -738,6 +699,9 @@ mod wasm {
     }
 
     impl Transport for WebSocketTransport {
+        /// Payload type for received frames.
+        type RecvPayload = Vec<u8>;
+
         async fn send_frame(&self, frame: &Frame) -> Result<(), TransportError> {
             if self.is_closed() {
                 return Err(TransportError::Closed);
@@ -752,7 +716,7 @@ mod wasm {
             Ok(())
         }
 
-        async fn recv_frame(&self) -> Result<FrameView<'_>, TransportError> {
+        async fn recv_frame(&self) -> Result<RecvFrame<Self::RecvPayload>, TransportError> {
             if self.is_closed() {
                 return Err(TransportError::Closed);
             }
@@ -776,32 +740,11 @@ mod wasm {
             if payload_len <= INLINE_PAYLOAD_SIZE {
                 desc.payload_slot = INLINE_PAYLOAD_SLOT;
                 desc.inline_payload[..payload_len].copy_from_slice(&payload);
+                Ok(RecvFrame::inline(desc))
             } else {
                 desc.payload_slot = 0;
+                Ok(RecvFrame::with_payload(desc, payload))
             }
-
-            {
-                let mut last = self.inner.last_frame.lock();
-                *last = Some(ReceivedFrame { desc, payload });
-            }
-
-            let last = self.inner.last_frame.lock();
-            let frame_ref = last.as_ref().unwrap();
-
-            let desc_ptr = &frame_ref.desc as *const MsgDescHot;
-            let payload_slice = if frame_ref.desc.is_inline() {
-                frame_ref.desc.inline_payload()
-            } else {
-                &frame_ref.payload
-            };
-            let payload_ptr = payload_slice.as_ptr();
-            let payload_len = payload_slice.len();
-
-            // SAFETY: Data lives inside Arc<WebSocketInner>.
-            let desc: &MsgDescHot = unsafe { &*desc_ptr };
-            let payload: &[u8] = unsafe { std::slice::from_raw_parts(payload_ptr, payload_len) };
-
-            Ok(FrameView::new(desc, payload))
         }
 
         fn encoder(&self) -> Box<dyn EncodeCtx + '_> {

@@ -48,6 +48,7 @@ Then use `AxumTransport` in your WebSocket handler:
 
 ```rust
 use axum::extract::ws::{WebSocket, WebSocketUpgrade};
+use axum::response::IntoResponse;
 use rapace::RpcSession;
 use rapace_transport_websocket::AxumTransport;
 
