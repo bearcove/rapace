@@ -67,6 +67,7 @@ facet-postcard = "0.32.1"
 
 # WebSocket
 tokio-tungstenite = "0.26"
+axum = { version = "0.8", features = ["ws"] }
 
 # Tracing
 tracing = "0.1"
