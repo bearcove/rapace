@@ -14,6 +14,7 @@ shm = ["dep:libc", "dep:static_assertions", "dep:allocator-api2", "tokio/net"]
 websocket = []
 websocket-tungstenite = ["websocket", "dep:tokio-tungstenite"]
 websocket-axum = ["websocket", "dep:axum"]
+websocket-wasm = ["websocket"]
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--html-in-header", "arborium-header.html"]
