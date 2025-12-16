@@ -37,7 +37,7 @@ async fn main() {
     println!("=== HTTP Tunnel over Rapace Demo ===\n");
 
     // Create in-memory transport pair for the demo
-    let (host_transport, cell_transport) = Transport::inproc_pair();
+    let (host_transport, cell_transport) = Transport::mem_pair();
 
     // Shared metrics
     let host_metrics = Arc::new(GlobalTunnelMetrics::new());

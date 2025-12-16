@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use rapace::{RpcSession, TransportHandle, transport::InProcTransport};
+use rapace::{RpcSession, Transport};
 use tokio_stream::StreamExt;
 
 use rapace_diagnostics_over_rapace::{DiagnosticsClient, DiagnosticsImpl, DiagnosticsServer};
@@ -16,7 +16,7 @@ async fn main() {
     println!("=== Diagnostics over Rapace Demo ===\n");
 
     // Create a transport pair (in-memory for demo)
-    let (host_transport, cell_transport) = InProcTransport::pair();
+    let (host_transport, cell_transport) = Transport::mem_pair();
 
     // ========== CELL SIDE ==========
     // Use DiagnosticsServer::serve() which handles the frame loop
@@ -106,13 +106,12 @@ mod tests {
     use rapace::transport::StreamTransport;
     use rapace_diagnostics_over_rapace::Diagnostic;
     use std::time::Duration;
-    use tokio::io::{ReadHalf, WriteHalf};
     use tokio::net::{TcpListener, TcpStream};
 
     /// Helper to run diagnostics scenario with any transport.
-    async fn run_scenario<T: TransportHandle<SendPayload = Vec<u8>>>(
-        host_transport: T,
-        cell_transport: T,
+    async fn run_scenario(
+        host_transport: Transport,
+        cell_transport: Transport,
         source: &str,
     ) -> Vec<Diagnostic> {
         // Cell side - use DiagnosticsServer::serve()
@@ -189,8 +188,8 @@ fn main() {
     }
 
     #[tokio::test]
-    async fn test_inproc_transport() {
-        let (host_transport, cell_transport) = InProcTransport::pair();
+    async fn test_mem_transport() {
+        let (host_transport, cell_transport) = Transport::mem_pair();
         let diagnostics = run_scenario(host_transport, cell_transport, TEST_SOURCE).await;
         verify_diagnostics(&diagnostics);
     }
@@ -202,14 +201,11 @@ fn main() {
 
         let accept_task = tokio::spawn(async move {
             let (stream, _) = listener.accept().await.unwrap();
-            let transport: StreamTransport<ReadHalf<TcpStream>, WriteHalf<TcpStream>> =
-                StreamTransport::new(stream);
-            transport
+            Transport::Stream(StreamTransport::new(stream))
         });
 
         let stream = TcpStream::connect(addr).await.unwrap();
-        let host_transport: StreamTransport<ReadHalf<TcpStream>, WriteHalf<TcpStream>> =
-            StreamTransport::new(stream);
+        let host_transport = Transport::Stream(StreamTransport::new(stream));
 
         let cell_transport = accept_task.await.unwrap();
 
@@ -242,7 +238,7 @@ fn main() {
 
     #[tokio::test]
     async fn test_empty_source() {
-        let (host_transport, cell_transport) = InProcTransport::pair();
+        let (host_transport, cell_transport) = Transport::mem_pair();
         let diagnostics = run_scenario(host_transport, cell_transport, "").await;
         assert!(
             diagnostics.is_empty(),
@@ -253,7 +249,7 @@ fn main() {
     #[tokio::test]
     async fn test_no_issues() {
         let source = "fn main() {\n    println!(\"Hello\");\n}\n";
-        let (host_transport, cell_transport) = InProcTransport::pair();
+        let (host_transport, cell_transport) = Transport::mem_pair();
         let diagnostics = run_scenario(host_transport, cell_transport, source).await;
         assert!(
             diagnostics.is_empty(),
@@ -269,7 +265,7 @@ fn main() {
             source.push_str(&format!("// Line {} - TODO: item {}\n", i + 1, i));
         }
 
-        let (host_transport, cell_transport) = InProcTransport::pair();
+        let (host_transport, cell_transport) = Transport::mem_pair();
         let diagnostics = run_scenario(host_transport, cell_transport, &source).await;
 
         assert_eq!(diagnostics.len(), 100, "Should have 100 diagnostics");

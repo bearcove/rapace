@@ -33,7 +33,7 @@
 //! Each transport half must be wrapped in an [`RpcSession`] that you own:
 //!
 //! ```ignore
-//! let (client_transport, server_transport) = rapace::InProcTransport::pair();
+//! let (client_transport, server_transport) = rapace::Transport::mem_pair();
 //! let client_session = Arc::new(rapace::RpcSession::with_channel_start(Arc::new(client_transport), 2));
 //! let server_session = Arc::new(rapace::RpcSession::with_channel_start(Arc::new(server_transport), 1));
 //! tokio::spawn(client_session.clone().run());
@@ -198,6 +198,8 @@ pub mod transport {
 
 /// Session layer for flow control and channel management.
 pub mod session;
+#[doc(hidden)]
+pub mod helper_binary;
 
 #[cfg(feature = "mem")]
 pub use transport::MemTransport;

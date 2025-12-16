@@ -9,28 +9,6 @@
 //! - `RAPACE_PREBUILT_HELPERS`: When set to `1` or `true`, enforce that helper
 //!   binaries must be pre-built (skip inline building). Tests will panic if binaries
 //!   are not found. This ensures tests don't rebuild binaries during execution.
-//!
-//! # Usage
-//!
-//! In your cross-process test:
-//!
-//! ```ignore
-//! use rapace_testkit::helper_binary::find_helper_binary;
-//!
-//! #[tokio::test]
-//! async fn test_my_service() {
-//!     // Find the helper binary (will fail fast if not pre-built and RAPACE_PREBUILT_HELPERS is set)
-//!     let helper_path = find_helper_binary("my-helper").unwrap();
-//!
-//!     // Spawn the helper
-//!     let mut helper = Command::new(&helper_path)
-//!         .args(&["--transport=stream", "--addr=127.0.0.1:9000"])
-//!         .spawn()
-//!         .expect("failed to spawn helper");
-//!
-//!     // ... test logic ...
-//! }
-//! ```
 
 use std::path::PathBuf;
 
@@ -67,17 +45,16 @@ pub fn enforce_prebuilt_helpers() -> bool {
 pub fn find_helper_binary(binary_name: &str) -> Result<PathBuf, String> {
     let enforce = enforce_prebuilt_helpers();
 
-    // Get the current executable's directory
     let current_exe =
-        std::env::current_exe().map_err(|e| format!("failed to get current executable: {}", e))?;
+        std::env::current_exe().map_err(|e| format!("failed to get current executable: {e}"))?;
 
-    // The test executable is in target/{debug|release}/deps/ (via nextest) or target/{debug|release}/ (via cargo test)
-    // We need to find the profile directory (target/debug or target/release) containing the binary
+    // The test executable is in target/{debug|release}/deps/ (via nextest) or
+    // target/{debug|release}/ (via cargo test). We need to find the profile
+    // directory (target/debug or target/release) containing the helper binaries.
     let mut search_dir = current_exe
         .parent()
         .ok_or_else(|| "could not find parent directory".to_string())?;
 
-    // Try up to 3 levels up to find the profile directory containing helper binaries
     for _ in 0..3 {
         let candidate_path = search_dir.join(binary_name);
         if candidate_path.exists() {
@@ -91,13 +68,12 @@ pub fn find_helper_binary(binary_name: &str) -> Result<PathBuf, String> {
         }
     }
 
-    // Fallback: Go up 2 levels from deps to get to profile directory
+    // Fallback: go up 2 levels from deps to get to profile directory.
     let profile_dir = match current_exe.parent().and_then(|p| p.parent()) {
         Some(dir) => dir.to_path_buf(),
         None => {
             return Err(format!(
-                "Could not determine target directory from executable path: {:?}",
-                current_exe
+                "could not determine target directory from executable path: {current_exe:?}"
             ));
         }
     };
@@ -105,17 +81,15 @@ pub fn find_helper_binary(binary_name: &str) -> Result<PathBuf, String> {
     let binary_path = profile_dir.join(binary_name);
 
     let error_msg = format!(
-        "helper binary '{}' not found. Searched in: {:?}. \
-         Run 'cargo xtask test' or build helpers with 'cargo build --bin {} -p <package>'",
-        binary_name, binary_path, binary_name
+        "helper binary '{binary_name}' not found. Searched in: {binary_path:?}. \
+         Build helpers (e.g. 'cargo build --bin {binary_name} -p <package>')"
     );
 
     if enforce {
         panic!(
-            "RAPACE_PREBUILT_HELPERS is set: {}\n\
+            "RAPACE_PREBUILT_HELPERS is set: {error_msg}\n\
              To build helpers manually: cargo xtask test --no-run\n\
-             Then use: RAPACE_PREBUILT_HELPERS=1 cargo test",
-            error_msg
+             Then use: RAPACE_PREBUILT_HELPERS=1 cargo test"
         );
     }
 
@@ -148,12 +122,11 @@ mod tests {
     }
 
     #[test]
-    fn test_enforce_prebuilt_helpers_off_by_default() {
+    fn enforce_prebuilt_helpers_off_by_default() {
         let _guard = env_lock().lock().unwrap();
         let prev = get_prebuilt_helpers_var();
         remove_prebuilt_helpers_var();
 
-        // Should be false when env var is not set
         assert!(!enforce_prebuilt_helpers());
 
         match prev {
@@ -163,7 +136,7 @@ mod tests {
     }
 
     #[test]
-    fn test_enforce_prebuilt_helpers_true() {
+    fn enforce_prebuilt_helpers_true() {
         let _guard = env_lock().lock().unwrap();
         let prev = get_prebuilt_helpers_var();
         set_prebuilt_helpers_var("true");
@@ -177,7 +150,7 @@ mod tests {
     }
 
     #[test]
-    fn test_enforce_prebuilt_helpers_1() {
+    fn enforce_prebuilt_helpers_1() {
         let _guard = env_lock().lock().unwrap();
         let prev = get_prebuilt_helpers_var();
         set_prebuilt_helpers_var("1");
@@ -191,7 +164,7 @@ mod tests {
     }
 
     #[test]
-    fn test_enforce_prebuilt_helpers_false() {
+    fn enforce_prebuilt_helpers_false() {
         let _guard = env_lock().lock().unwrap();
         let prev = get_prebuilt_helpers_var();
         set_prebuilt_helpers_var("false");
@@ -205,12 +178,11 @@ mod tests {
     }
 
     #[test]
-    fn test_find_helper_binary_not_found_not_enforced() {
+    fn find_helper_binary_not_found_not_enforced() {
         let _guard = env_lock().lock().unwrap();
         let prev = get_prebuilt_helpers_var();
         remove_prebuilt_helpers_var();
 
-        // Should return an error without panicking
         let result = find_helper_binary("nonexistent-binary");
         assert!(result.is_err());
 
@@ -220,3 +192,4 @@ mod tests {
         }
     }
 }
+

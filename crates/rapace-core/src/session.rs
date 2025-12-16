@@ -854,5 +854,4 @@ pub fn parse_error_payload(payload: &[u8]) -> RpcError {
     RpcError::Status { code, message }
 }
 
-// Note: RpcSession tests live in rapace-testkit to avoid circular dev-dependencies
-// between rapace-core and rapace-transport-mem. See rapace-testkit for test coverage.
+// Note: RpcSession conformance tests live in `crates/rapace-core/tests/`.

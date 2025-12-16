@@ -10,7 +10,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use rapace::{InProcTransport, RpcSession};
+use rapace::{RpcSession, Transport};
 use tracing_subscriber::layer::SubscriberExt;
 
 use rapace_tracing_over_rapace::{
@@ -22,7 +22,7 @@ async fn main() {
     println!("=== Tracing over Rapace Demo ===\n");
 
     // Create a transport pair (in-memory for demo)
-    let (host_transport, cell_transport) = InProcTransport::pair();
+    let (host_transport, cell_transport) = Transport::mem_pair();
 
     // ========== HOST SIDE ==========
     // Create the tracing sink that will collect all traces
@@ -144,13 +144,9 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rapace::TransportHandle;
 
     /// Helper to run tracing scenario with RpcSession
-    async fn run_scenario<T: TransportHandle<SendPayload = Vec<u8>>>(
-        host_transport: T,
-        cell_transport: T,
-    ) -> Vec<TraceRecord> {
+    async fn run_scenario(host_transport: Transport, cell_transport: Transport) -> Vec<TraceRecord> {
         // Host side
         let tracing_sink = HostTracingSink::new();
         let host_session = Arc::new(RpcSession::with_channel_start(host_transport, 1));
@@ -191,8 +187,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_inproc_transport() {
-        let (host_transport, cell_transport) = InProcTransport::pair();
+    async fn test_mem_transport() {
+        let (host_transport, cell_transport) = Transport::mem_pair();
         let records = run_scenario(host_transport, cell_transport).await;
 
         // Should have: new_span, enter, event, exit, drop_span
@@ -239,7 +235,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_span_lifecycle() {
-        let (host_transport, cell_transport) = InProcTransport::pair();
+        let (host_transport, cell_transport) = Transport::mem_pair();
 
         let tracing_sink = HostTracingSink::new();
         let host_session = Arc::new(RpcSession::with_channel_start(host_transport, 1));
@@ -297,7 +293,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_event_with_fields() {
-        let (host_transport, cell_transport) = InProcTransport::pair();
+        let (host_transport, cell_transport) = Transport::mem_pair();
 
         let tracing_sink = HostTracingSink::new();
         let host_session = Arc::new(RpcSession::with_channel_start(host_transport, 1));

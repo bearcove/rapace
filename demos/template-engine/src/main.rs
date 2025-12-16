@@ -36,7 +36,7 @@ async fn main() {
     println!("=== Template Engine with Host Callbacks Demo ===\n");
 
     // Create a transport pair (in-memory for demo)
-    let (host_transport, cell_transport) = Transport::inproc_pair();
+    let (host_transport, cell_transport) = Transport::mem_pair();
 
     // Set up the value host with some test data
     let mut value_host_impl = ValueHostImpl::new();
@@ -159,14 +159,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_inproc_transport() {
-        let (host_transport, cell_transport) = Transport::inproc_pair();
+    async fn test_mem_transport() {
+        let (host_transport, cell_transport) = Transport::mem_pair();
         run_scenario(host_transport, cell_transport).await;
     }
 
     #[tokio::test]
     async fn test_simple_placeholder() {
-        let (host_transport, cell_transport) = Transport::inproc_pair();
+        let (host_transport, cell_transport) = Transport::mem_pair();
 
         let mut value_host_impl = ValueHostImpl::new();
         value_host_impl.set("user.name", "Bob");
@@ -197,7 +197,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_multiple_placeholders() {
-        let (host_transport, cell_transport) = Transport::inproc_pair();
+        let (host_transport, cell_transport) = Transport::mem_pair();
 
         let mut value_host_impl = ValueHostImpl::new();
         value_host_impl.set("user.name", "Alice");
@@ -230,7 +230,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_missing_value() {
-        let (host_transport, cell_transport) = InProcTransport::pair();
+        let (host_transport, cell_transport) = Transport::mem_pair();
 
         let value_host_impl = Arc::new(ValueHostImpl::new()); // Empty
 

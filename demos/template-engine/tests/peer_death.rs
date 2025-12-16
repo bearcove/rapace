@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use rapace::transport::shm::{ShmSession, ShmSessionConfig, ShmTransport};
 use rapace::{RpcSession, StreamTransport, Transport};
-use rapace_testkit::helper_binary::find_helper_binary;
+use rapace::helper_binary::find_helper_binary;
 use tokio::io::{ReadHalf, WriteHalf};
 
 use rapace_template_engine::{TemplateEngineClient, ValueHostImpl, create_value_host_dispatcher};

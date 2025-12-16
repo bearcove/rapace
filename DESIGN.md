@@ -419,7 +419,7 @@ impl ChannelSender {
 For when host and plugin are in the same process (e.g., dynamically loaded `.so`).
 
 ```rust
-struct InProcTransport {
+struct MemTransport {
     // Direct reference to the service implementation
     service: Arc<dyn Any + Send + Sync>,
 }
@@ -784,12 +784,12 @@ trait DecodeCtx<'a> {
 **In-proc encoder:**
 
 ```rust
-struct InProcEncoder {
+struct MemEncoder {
     // May bypass encoding entirely for direct calls
     // Or use a trivial pass-through for consistency
 }
 
-impl EncodeCtx for InProcEncoder {
+impl EncodeCtx for MemEncoder {
     fn encode_value(&mut self, value: &dyn facet::Peek) -> Result<(), EncodeError> {
         // For in-proc, we might just store a reference
         // The "frame" is really just passing the value directly
@@ -985,7 +985,7 @@ let client = CalculatorClient::new(shm_transport);
 let client = CalculatorClient::new(stream_transport);
 
 // In-process (direct calls, no serialization)
-let client = CalculatorClient::new_inproc(Box::new(my_calculator));
+let client = CalculatorClient::new_mem(Box::new(my_calculator));
 ```
 
 ### 7.3 Call Flow
@@ -1038,7 +1038,7 @@ trait Processor {
 #### In-proc
 
 ```rust
-impl InProcTransport {
+impl MemTransport {
     fn call<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&dyn Service) -> R
@@ -1400,7 +1400,7 @@ impl HtmlDiffer for MyDiffer {
 // Host can use it three ways:
 
 // 1. In-proc (same process)
-let differ = HtmlDifferClient::new_inproc(Box::new(MyDiffer));
+let differ = HtmlDifferClient::new_mem(Box::new(MyDiffer));
 
 // 2. SHM (sibling process)
 let session = ShmSession::connect("/tmp/differ.sock")?;

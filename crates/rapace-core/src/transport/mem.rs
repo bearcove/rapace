@@ -10,11 +10,11 @@ const CHANNEL_CAPACITY: usize = 64;
 
 #[derive(Clone, Debug)]
 pub struct MemTransport {
-    inner: Arc<InProcInner>,
+    inner: Arc<MemInner>,
 }
 
 #[derive(Debug)]
-struct InProcInner {
+struct MemInner {
     tx: mpsc::Sender<Frame>,
     rx: tokio::sync::Mutex<mpsc::Receiver<Frame>>,
     closed: std::sync::atomic::AtomicBool,
@@ -25,13 +25,13 @@ impl MemTransport {
         let (tx_a, rx_a) = mpsc::channel(CHANNEL_CAPACITY);
         let (tx_b, rx_b) = mpsc::channel(CHANNEL_CAPACITY);
 
-        let inner_a = Arc::new(InProcInner {
+        let inner_a = Arc::new(MemInner {
             tx: tx_b,
             rx: tokio::sync::Mutex::new(rx_a),
             closed: std::sync::atomic::AtomicBool::new(false),
         });
 
-        let inner_b = Arc::new(InProcInner {
+        let inner_b = Arc::new(MemInner {
             tx: tx_a,
             rx: tokio::sync::Mutex::new(rx_b),
             closed: std::sync::atomic::AtomicBool::new(false),

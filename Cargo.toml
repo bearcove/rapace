@@ -9,7 +9,6 @@ members = [
     "crates/rapace-introspection",
     "crates/rapace-registry",
     "crates/rapace-tracing",
-    "crates/rapace-testkit",
     "crates/rapace-explorer",
     "crates/ur-taking-me-with-you",
     "demos/dashboard",
@@ -41,7 +40,6 @@ rapace-http = { path = "crates/rapace-http", version = "0.4.0" }
 rapace-macros = { path = "crates/rapace-macros", version = "0.4.0" }
 rapace-registry = { path = "crates/rapace-registry", version = "0.4.0" }
 rapace-tracing = { path = "crates/rapace-tracing", version = "0.4.0" }
-rapace-testkit = { path = "crates/rapace-testkit", version = "0.4.0" }
 
 # External dependencies
 async-stream = "0.3"

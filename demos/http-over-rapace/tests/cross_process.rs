@@ -11,7 +11,7 @@ use std::time::Duration;
 use rapace::transport::shm::{ShmSession, ShmSessionConfig, ShmTransport};
 use rapace::{RpcSession, StreamTransport, Transport};
 use rapace_http::{HttpRequest, HttpResponse};
-use rapace_testkit::helper_binary::find_helper_binary;
+use rapace::helper_binary::find_helper_binary;
 use tokio::io::{ReadHalf, WriteHalf};
 #[cfg(not(unix))]
 use tokio::net::TcpListener;

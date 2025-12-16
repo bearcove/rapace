@@ -130,7 +130,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use rapace::transport::shm::{ShmSession, ShmSessionConfig, ShmTransport};
-use rapace::{Frame, RpcError, RpcSession, TransportError};
+use rapace::{Frame, RpcError, RpcSession, Transport, TransportError};
 
 /// Default SHM configuration for two-peer sessions.
 ///
@@ -270,17 +270,20 @@ impl DispatcherBuilder {
     #[allow(clippy::type_complexity)]
     pub fn build(
         self,
-    ) -> impl Fn(u32, u32, Vec<u8>) -> Pin<Box<dyn Future<Output = Result<Frame, RpcError>> + Send>>
+    ) -> impl Fn(Frame) -> Pin<Box<dyn Future<Output = Result<Frame, RpcError>> + Send>>
     + Send
     + Sync
     + 'static {
         let services = Arc::new(self.services);
-        move |_channel_id, method_id, payload| {
+        move |request: Frame| {
             let services = services.clone();
             Box::pin(async move {
+                let method_id = request.desc.method_id;
+                let payload = request.payload_bytes();
+
                 // Try each service in order until one doesn't return Unimplemented
                 for service in services.iter() {
-                    let result = service.dispatch(method_id, &payload).await;
+                    let result = service.dispatch(method_id, payload).await;
 
                     // If not "unknown method_id", return the result
                     if !matches!(
@@ -290,7 +293,10 @@ impl DispatcherBuilder {
                             ..
                         })
                     ) {
-                        return result;
+                        let mut response = result?;
+                        response.desc.channel_id = request.desc.channel_id;
+                        response.desc.msg_id = request.desc.msg_id;
+                        return Ok(response);
                     }
                 }
 
@@ -356,7 +362,7 @@ async fn wait_for_shm(path: &std::path::Path, timeout_ms: u64) -> Result<(), Cel
 /// Setup common cell infrastructure
 async fn setup_cell(
     config: ShmSessionConfig,
-) -> Result<(Arc<RpcSession<ShmTransport>>, PathBuf), CellError> {
+) -> Result<(Arc<RpcSession>, PathBuf), CellError> {
     // Parse CLI args
     let shm_path = parse_args()?;
 
@@ -372,7 +378,7 @@ async fn setup_cell(
 
     // Create RPC session with cell channel start (even IDs)
     let session = Arc::new(RpcSession::with_channel_start(
-        transport,
+        Transport::Shm(transport),
         CELL_CHANNEL_START,
     ));
 
@@ -435,10 +441,14 @@ where
     // Set up single-service dispatcher
     let dispatcher = {
         let service = Arc::new(service);
-        move |_channel_id: u32, method_id: u32, payload: Vec<u8>| {
+        move |request: Frame| {
             let service = service.clone();
-            Box::pin(async move { service.dispatch(method_id, &payload).await })
-                as Pin<Box<dyn Future<Output = Result<Frame, RpcError>> + Send>>
+            Box::pin(async move {
+                let mut response = service.dispatch(request.desc.method_id, request.payload_bytes()).await?;
+                response.desc.channel_id = request.desc.channel_id;
+                response.desc.msg_id = request.desc.msg_id;
+                Ok(response)
+            })
         }
     };
 
@@ -532,7 +542,7 @@ where
 }
 
 /// Extension trait for RpcSession to support single-service setup
-pub trait RpcSessionExt<T> {
+pub trait RpcSessionExt {
     /// Set a single service as the dispatcher for this session
     ///
     /// This is a convenience method for cells that only expose one service.
@@ -542,19 +552,20 @@ pub trait RpcSessionExt<T> {
         S: ServiceDispatch;
 }
 
-impl<T> RpcSessionExt<T> for RpcSession<T>
-where
-    T: rapace::TransportHandle<SendPayload = Vec<u8>>,
-{
+impl RpcSessionExt for RpcSession {
     fn set_service<S>(&self, service: S)
     where
         S: ServiceDispatch,
     {
         let service = Arc::new(service);
-        let dispatcher = move |_channel_id: u32, method_id: u32, payload: Vec<u8>| {
+        let dispatcher = move |request: Frame| {
             let service = service.clone();
-            Box::pin(async move { service.dispatch(method_id, &payload).await })
-                as Pin<Box<dyn Future<Output = Result<Frame, RpcError>> + Send>>
+            Box::pin(async move {
+                let mut response = service.dispatch(request.desc.method_id, request.payload_bytes()).await?;
+                response.desc.channel_id = request.desc.channel_id;
+                response.desc.msg_id = request.desc.msg_id;
+                Ok(response)
+            })
         };
         self.set_dispatcher(dispatcher);
     }

@@ -20,13 +20,12 @@
 use std::time::Duration;
 
 use rapace::{
-    TransportHandle,
     transport::{
-        StreamTransport,
-        shm::{ShmSession, ShmSessionConfig, ShmTransport},
+        shm::{ShmSession, ShmSessionConfig},
     },
+    Transport,
 };
-use tokio::io::{AsyncRead, AsyncWrite, ReadHalf, WriteHalf};
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpStream;
 
 use rapace_diagnostics_over_rapace::{DiagnosticsImpl, DiagnosticsServer};
@@ -130,12 +129,12 @@ async fn accept_inherited_stream() -> Option<TcpStream> {
     None
 }
 
-async fn run_plugin_stream<S: AsyncRead + AsyncWrite + Send + Sync + 'static>(stream: S) {
-    let transport: StreamTransport<ReadHalf<S>, WriteHalf<S>> = StreamTransport::new(stream);
+async fn run_plugin_stream<S: AsyncRead + AsyncWrite + Unpin + Send + Sync + 'static>(stream: S) {
+    let transport = Transport::stream(stream);
     run_plugin(transport).await;
 }
 
-async fn run_plugin<T: TransportHandle<SendPayload = Vec<u8>>>(transport: T) {
+async fn run_plugin(transport: Transport) {
     eprintln!("[diagnostics-plugin] Service ready, waiting for requests...");
 
     // Use DiagnosticsServer::serve() which handles the frame loop
@@ -222,7 +221,7 @@ async fn main() {
             eprintln!("[diagnostics-plugin] Opening SHM file: {}", addr);
             let session = ShmSession::open_file(addr, ShmSessionConfig::default())
                 .expect("failed to open SHM file");
-            let transport = ShmTransport::new(session);
+            let transport = Transport::shm(session);
             eprintln!("[diagnostics-plugin] SHM mapped!");
             run_plugin(transport).await;
         }

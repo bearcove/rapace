@@ -138,7 +138,7 @@ The allocator is optional. Service traits remain transport‑agnostic: they do n
 
 The same `Transport` trait is implemented by several transports:
 
-- **InProcTransport** (`rapace-transport-mem`) – an in‑memory SPSC channel pair used for tests and examples.
+- **MemTransport** (`rapace-core`) – an in‑memory SPSC channel pair used for tests and examples.
 - **Stream transport** (`rapace-transport-stream`) – wraps TCP/Unix‑style streams.
 - **WebSocket transport** (`rapace-transport-websocket`) – wraps WebSocket connections (used for browser‑side tools).
 - **SHM transport** (`rapace-transport-shm`) – the shared memory layout described above.

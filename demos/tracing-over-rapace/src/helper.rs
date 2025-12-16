@@ -21,8 +21,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use rapace::transport::shm::{ShmSession, ShmSessionConfig, ShmTransport};
-use rapace::{RpcSession, StreamTransport, TransportHandle};
-use tokio::io::{AsyncRead, AsyncWrite, ReadHalf, WriteHalf};
+use rapace::{RpcSession, Transport};
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpStream;
 use tracing_subscriber::layer::SubscriberExt;
 
@@ -124,12 +124,12 @@ fn parse_args() -> Args {
     }
 }
 
-async fn run_cell_stream<S: AsyncRead + AsyncWrite + Send + Sync + 'static>(stream: S) {
-    let transport: StreamTransport<ReadHalf<S>, WriteHalf<S>> = StreamTransport::new(stream);
+async fn run_cell_stream<S: AsyncRead + AsyncWrite + Unpin + Send + Sync + 'static>(stream: S) {
+    let transport = Transport::stream(stream);
     run_cell(transport).await;
 }
 
-async fn run_cell<T: TransportHandle<SendPayload = Vec<u8>>>(transport: T) {
+async fn run_cell(transport: Transport) {
     // Cell uses even channel IDs (2, 4, 6, ...)
     let session = Arc::new(RpcSession::with_channel_start(transport, 2));
 
@@ -253,7 +253,7 @@ async fn main() {
                 .expect("failed to open SHM file");
             let transport = ShmTransport::new(session);
             eprintln!("[tracing-cell] SHM mapped!");
-            run_cell(transport).await;
+            run_cell(Transport::Shm(transport)).await;
         }
     }
 

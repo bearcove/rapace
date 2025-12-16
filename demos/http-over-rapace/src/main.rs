@@ -29,7 +29,7 @@ async fn main() {
     println!("=== HTTP over Rapace Demo ===\n");
 
     // Create a transport pair (in-memory for demo)
-    let (host_transport, cell_transport) = Transport::inproc_pair();
+    let (host_transport, cell_transport) = Transport::mem_pair();
 
     // ========== CELL SIDE ==========
     // Create RpcSession for the cell (uses even channel IDs: 2, 4, 6, ...)
@@ -270,8 +270,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_inproc_transport() {
-        let (host_transport, plugin_transport) = InProcTransport::pair();
+    async fn test_mem_transport() {
+        let (host_transport, plugin_transport) = Transport::mem_pair();
         run_scenario(Arc::new(host_transport), Arc::new(plugin_transport)).await;
     }
 
@@ -365,7 +365,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_health_endpoint() {
-        let (host_transport, plugin_transport) = InProcTransport::pair();
+        let (host_transport, plugin_transport) = Transport::mem_pair();
         let host_transport = Arc::new(host_transport);
         let plugin_transport = Arc::new(plugin_transport);
 
@@ -393,7 +393,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_hello_with_param() {
-        let (host_transport, plugin_transport) = InProcTransport::pair();
+        let (host_transport, plugin_transport) = Transport::mem_pair();
         let host_transport = Arc::new(host_transport);
         let plugin_transport = Arc::new(plugin_transport);
 
@@ -430,7 +430,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_json_response() {
-        let (host_transport, plugin_transport) = InProcTransport::pair();
+        let (host_transport, plugin_transport) = Transport::mem_pair();
         let host_transport = Arc::new(host_transport);
         let plugin_transport = Arc::new(plugin_transport);
 
@@ -471,7 +471,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_post_echo() {
-        let (host_transport, plugin_transport) = InProcTransport::pair();
+        let (host_transport, plugin_transport) = Transport::mem_pair();
         let host_transport = Arc::new(host_transport);
         let plugin_transport = Arc::new(plugin_transport);
 

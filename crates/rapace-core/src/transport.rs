@@ -48,9 +48,20 @@ impl Transport {
     }
 
     #[cfg(feature = "mem")]
-    pub fn inproc_pair() -> (Self, Self) {
+    pub fn mem_pair() -> (Self, Self) {
         let (a, b) = mem::MemTransport::pair();
         (Transport::Mem(a), Transport::Mem(b))
+    }
+
+    #[cfg(feature = "shm")]
+    pub fn shm(session: std::sync::Arc<shm::ShmSession>) -> Self {
+        Transport::Shm(shm::ShmTransport::new(session))
+    }
+
+    #[cfg(feature = "shm")]
+    pub fn shm_pair() -> (Self, Self) {
+        let (a, b) = shm::ShmTransport::pair().expect("failed to create shm transport pair");
+        (Transport::Shm(a), Transport::Shm(b))
     }
 
     #[cfg(feature = "stream")]
