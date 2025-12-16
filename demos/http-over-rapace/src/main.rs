@@ -15,8 +15,7 @@ use bytes::Bytes;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper_util::rt::TokioIo;
-use rapace::RpcSession;
-use rapace::transport::InProcTransport;
+use rapace::{RpcSession, Transport};
 use rapace_http::HttpRequest;
 use tokio::net::TcpListener;
 
@@ -30,7 +29,7 @@ async fn main() {
     println!("=== HTTP over Rapace Demo ===\n");
 
     // Create a transport pair (in-memory for demo)
-    let (host_transport, cell_transport) = InProcTransport::pair();
+    let (host_transport, cell_transport) = Transport::inproc_pair();
 
     // ========== CELL SIDE ==========
     // Create RpcSession for the cell (uses even channel IDs: 2, 4, 6, ...)

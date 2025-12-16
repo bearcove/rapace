@@ -30,8 +30,8 @@
 use std::sync::Arc;
 
 use rapace::transport::shm::{ShmSession, ShmSessionConfig, ShmTransport};
-use rapace::{RpcSession, StreamTransport, TransportHandle};
-use tokio::io::{AsyncRead, AsyncWrite, ReadHalf, WriteHalf};
+use rapace::{RpcSession, Transport};
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpStream;
 
 use rapace_http_over_rapace::{AxumHttpService, create_http_service_dispatcher};
@@ -132,12 +132,12 @@ async fn accept_inherited_stream() -> Option<TcpStream> {
     None
 }
 
-async fn run_cell_stream<S: AsyncRead + AsyncWrite + Send + Sync + 'static>(stream: S) {
-    let transport: StreamTransport<ReadHalf<S>, WriteHalf<S>> = StreamTransport::new(stream);
+async fn run_cell_stream<S: AsyncRead + AsyncWrite + Unpin + Send + Sync + 'static>(stream: S) {
+    let transport = Transport::stream(stream);
     run_cell(transport).await;
 }
 
-async fn run_cell<T: TransportHandle<SendPayload = Vec<u8>>>(transport: T) {
+async fn run_cell(transport: Transport) {
     // Cell uses even channel IDs (2, 4, 6, ...)
     let session = Arc::new(RpcSession::with_channel_start(transport, 2));
 
@@ -224,7 +224,7 @@ async fn main() {
             eprintln!("[http-cell] Opening SHM file: {}", addr);
             let session = ShmSession::open_file(addr, ShmSessionConfig::default())
                 .expect("failed to open SHM file");
-            let transport = ShmTransport::new(session);
+            let transport = Transport::Shm(ShmTransport::new(session));
             eprintln!("[http-cell] SHM mapped!");
             run_cell(transport).await;
         }
