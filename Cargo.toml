@@ -46,7 +46,7 @@ async-stream = "0.3"
 libc = "0.2"
 bitflags = "2"
 bytes = "1"
-tokio = { version = "1", features = ["sync", "rt", "macros", "time", "io-util", "net"] }
+tokio = { version = "1", features = ["sync", "rt", "macros", "time"] }
 tokio-stream = "0.1"
 futures = "0.3"
 parking_lot = "0.12"

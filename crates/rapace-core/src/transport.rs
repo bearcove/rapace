@@ -22,9 +22,9 @@ pub(crate) trait TransportBackend: Send + Sync + Clone + 'static {
 pub enum Transport {
     #[cfg(feature = "mem")]
     Mem(mem::MemTransport),
-    #[cfg(feature = "stream")]
+    #[cfg(all(feature = "stream", not(target_arch = "wasm32")))]
     Stream(stream::StreamTransport),
-    #[cfg(feature = "shm")]
+    #[cfg(all(feature = "shm", not(target_arch = "wasm32")))]
     Shm(shm::ShmTransport),
     #[cfg(feature = "websocket")]
     WebSocket(websocket::WebSocketTransport),
@@ -53,18 +53,18 @@ impl Transport {
         (Transport::Mem(a), Transport::Mem(b))
     }
 
-    #[cfg(feature = "shm")]
+    #[cfg(all(feature = "shm", not(target_arch = "wasm32")))]
     pub fn shm(session: std::sync::Arc<shm::ShmSession>) -> Self {
         Transport::Shm(shm::ShmTransport::new(session))
     }
 
-    #[cfg(feature = "shm")]
+    #[cfg(all(feature = "shm", not(target_arch = "wasm32")))]
     pub fn shm_pair() -> (Self, Self) {
         let (a, b) = shm::ShmTransport::pair().expect("failed to create shm transport pair");
         (Transport::Shm(a), Transport::Shm(b))
     }
 
-    #[cfg(feature = "stream")]
+    #[cfg(all(feature = "stream", not(target_arch = "wasm32")))]
     pub fn stream<S>(stream: S) -> Self
     where
         S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + Sync + 'static,
@@ -72,7 +72,7 @@ impl Transport {
         Transport::Stream(stream::StreamTransport::new(stream))
     }
 
-    #[cfg(feature = "stream")]
+    #[cfg(all(feature = "stream", not(target_arch = "wasm32")))]
     pub fn stream_pair() -> (Self, Self) {
         let (a, b) = stream::StreamTransport::pair();
         (Transport::Stream(a), Transport::Stream(b))
@@ -100,9 +100,9 @@ impl Transport {
 
 #[cfg(feature = "mem")]
 pub mod mem;
-#[cfg(feature = "shm")]
+#[cfg(all(feature = "shm", not(target_arch = "wasm32")))]
 pub mod shm;
-#[cfg(feature = "stream")]
+#[cfg(all(feature = "stream", not(target_arch = "wasm32")))]
 pub mod stream;
 #[cfg(feature = "websocket")]
 pub mod websocket;
