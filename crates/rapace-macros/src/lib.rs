@@ -1003,7 +1003,7 @@ fn generate_streaming_dispatch_arm_server_streaming(
                             #rapace_crate::rapace_core::Frame::with_payload(desc, item_bytes)
                         };
 
-                        #rapace_crate::tracing::debug!(channel_id, payload_len = frame.payload().len(), "streaming dispatch: sending DATA frame");
+                        #rapace_crate::tracing::debug!(channel_id, payload_len = frame.payload_bytes().len(), "streaming dispatch: sending DATA frame");
                         transport.send_frame(frame).await
                             .map_err(#rapace_crate::rapace_core::RpcError::Transport)?;
                         #rapace_crate::tracing::debug!(channel_id, "streaming dispatch: DATA frame sent");

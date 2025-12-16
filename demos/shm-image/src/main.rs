@@ -34,7 +34,7 @@ use std::io::Cursor;
 use std::sync::Arc;
 
 use rapace::{
-    ErrorCode, RpcError, RpcSession, Streaming, TransportHandle,
+    ErrorCode, RpcError, RpcSession, Streaming, Transport,
     transport::shm::{ShmAllocator, ShmMetrics, ShmSession, ShmTransport, allocator_api2},
 };
 
@@ -180,8 +180,8 @@ async fn main() {
     let (session_a, session_b) = ShmSession::create_pair().expect("Failed to create SHM sessions");
 
     // Create transports with metrics enabled (transports have internal Arc, cheap to clone).
-    let transport_a = ShmTransport::new_with_metrics(session_a.clone(), metrics.clone());
-    let transport_b = ShmTransport::new_with_metrics(session_b.clone(), metrics.clone());
+    let transport_a = Transport::Shm(ShmTransport::new_with_metrics(session_a.clone(), metrics.clone()));
+    let transport_b = Transport::Shm(ShmTransport::new_with_metrics(session_b.clone(), metrics.clone()));
 
     // Create an allocator from session A (the "host" side).
     let alloc = ShmAllocator::new(session_a.clone());
@@ -259,14 +259,12 @@ async fn main() {
         // Spawn server task
         let server_handle = tokio::spawn(async move {
             // Handle one request then exit
-            // transport_b is Clone (has internal Arc)
             if let Err(e) = server.serve_one(&transport_b).await {
                 eprintln!("Server error: {:?}", e);
             }
         });
 
         // Create client session and spawn its demux loop
-        // transport_a is Clone (has internal Arc)
         let client_session = std::sync::Arc::new(RpcSession::new(transport_a.clone()));
         let client_session_runner = client_session.clone();
         tokio::spawn(async move { client_session_runner.run().await });

@@ -10,7 +10,7 @@ description = "Core types and traits for rapace RPC"
 default = ["mem", "stream"]
 mem = []
 stream = []
-shm = ["dep:libc", "dep:static_assertions"]
+shm = ["dep:libc", "dep:static_assertions", "dep:allocator-api2"]
 websocket = []
 websocket-tungstenite = ["websocket", "dep:tokio-tungstenite"]
 websocket-axum = ["websocket", "dep:axum"]
@@ -30,6 +30,7 @@ rustdoc-args = ["--html-in-header", "arborium-header.html"]
 
 [dependencies]
 async-stream.workspace = true
+allocator-api2 = { workspace = true, optional = true }
 bitflags.workspace = true
 bytes.workspace = true
 enum_dispatch = "0.3.12"
