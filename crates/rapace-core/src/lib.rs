@@ -18,11 +18,11 @@ mod encoding;
 mod error;
 mod flags;
 mod frame;
-mod handle;
 mod header;
 mod limits;
 mod session;
 mod streaming;
+mod transport;
 mod validation;
 
 pub use control::*;
@@ -31,11 +31,11 @@ pub use encoding::*;
 pub use error::*;
 pub use flags::*;
 pub use frame::*;
-pub use handle::*;
 pub use header::*;
 pub use limits::*;
 pub use session::*;
 pub use streaming::*;
+pub use transport::*;
 pub use validation::*;
 
 // Re-export StreamExt for use by macro-generated streaming clients

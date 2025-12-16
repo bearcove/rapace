@@ -57,7 +57,7 @@ rapace-testkit = { path = "crates/rapace-testkit", version = "0.4.0" }
 async-stream = "0.3"
 libc = "0.2"
 bitflags = "2"
-tokio = { version = "1", features = ["sync", "rt", "macros", "time"] }
+tokio = { version = "1", features = ["sync", "rt", "macros", "time", "io-util"] }
 tokio-stream = "0.1"
 futures = "0.3"
 parking_lot = "0.12"
