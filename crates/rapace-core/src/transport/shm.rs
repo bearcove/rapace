@@ -1,24 +1,23 @@
-use crate::{Frame, TransportError};
+//! Shared memory (SHM) transport.
 
-use super::TransportBackend;
+pub mod futex;
+pub mod layout;
+mod session;
+mod transport;
 
-#[derive(Clone, Debug)]
-pub struct ShmTransport;
+pub use session::{ShmSession, ShmSessionConfig};
+pub use transport::{ShmMetrics, ShmTransport};
 
-impl TransportBackend for ShmTransport {
-    async fn send_frame(&self, _frame: Frame) -> Result<(), TransportError> {
-        todo!("shm transport not ported yet")
-    }
+/// Placeholder guard for SHM-backed payloads.
+///
+/// This will eventually be a real slot guard that:
+/// - Derefs to a shared-memory byte slice
+/// - Frees the slot on drop
+#[derive(Debug)]
+pub struct SlotGuard;
 
-    async fn recv_frame(&self) -> Result<Frame, TransportError> {
-        todo!("shm transport not ported yet")
-    }
-
-    fn close(&self) {
-        todo!("shm transport not ported yet")
-    }
-
-    fn is_closed(&self) -> bool {
-        todo!("shm transport not ported yet")
+impl AsRef<[u8]> for SlotGuard {
+    fn as_ref(&self) -> &[u8] {
+        todo!("SlotGuard not implemented yet")
     }
 }

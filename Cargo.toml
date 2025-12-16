@@ -57,6 +57,7 @@ rapace-testkit = { path = "crates/rapace-testkit", version = "0.4.0" }
 async-stream = "0.3"
 libc = "0.2"
 bitflags = "2"
+bytes = "1"
 tokio = { version = "1", features = ["sync", "rt", "macros", "time", "io-util"] }
 tokio-stream = "0.1"
 futures = "0.3"
@@ -77,6 +78,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Allocator API
 allocator-api2 = "0.2"
+static_assertions = "1.1.0"
 
 # FD passing utilities
 async-send-fd = { version = "1.2", features = ["tokio"] }
