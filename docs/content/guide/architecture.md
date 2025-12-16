@@ -36,7 +36,7 @@ pub trait Calculator {
 
 The macro generates:
 
-- a `CalculatorClient<T>` that knows how to encode requests and decode responses;
+- a `CalculatorClient` that knows how to encode requests and decode responses;
 - a `CalculatorServer<S>` that knows how to decode requests and dispatch to an implementation `S`;
 - method IDs and some helper code for registration.
 
@@ -91,7 +91,7 @@ The shared-memory transport lives in `rapace-core` behind the `shm` feature and 
 There are currently two SHM modes used in the wild:
 
 1. **`ShmSession` (pair transport)**: a single SHM segment shared by exactly two peers (A↔B).
-2. **Hub transport (`HubHost` / `HubPeer`)**: one SHM "hub" shared by a host and many peers, with per‑peer rings.
+2. **Hub transport**: a planned multi-peer mode (not currently implemented in `rapace-core`).
 
 Both use **FD-based doorbells** for wakeups (current Unix implementation uses a `socketpair(SOCK_DGRAM)` wrapped in `tokio::io::unix::AsyncFd`).
 
