@@ -102,7 +102,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!();
 
     // Graceful shutdown
-    client_transport.close().await?;
+    client_transport.close();
     server_handle.abort();
 
     println!("\nDone!");

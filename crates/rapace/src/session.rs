@@ -539,8 +539,8 @@ fn now_ns() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rapace_core::Transport;
     use rapace_core::control_method;
-    use rapace_core::mem::MemTransport;
 
     fn data_eos_frame(channel_id: u32) -> Frame {
         let mut desc = MsgDescHot::new();
@@ -572,15 +572,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_closed_channel_is_pruned_and_tombstoned() {
-        let (a, b) = MemTransport::pair();
-        let session = Session::new(Arc::new(a));
+        let (a, b) = Transport::mem_pair();
+        let session = Session::new(a);
 
         // Local EOS: Open -> HalfClosedLocal (state created)
-        session.send_frame(&data_eos_frame(2)).await.unwrap();
+        session.send_frame(data_eos_frame(2)).await.unwrap();
         assert_eq!(session.channels.lock().len(), 1);
 
         // Remote EOS: HalfClosedLocal -> Closed (state removed + tombstoned)
-        b.send_frame(&data_eos_frame(2)).await.unwrap();
+        b.send_frame(data_eos_frame(2)).await.unwrap();
         let _ = session.recv_frame().await.unwrap();
         assert_eq!(session.channels.lock().len(), 0);
         assert!(session.tombstones.lock().contains(2));
@@ -588,12 +588,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_late_frames_on_closed_channel_are_dropped() {
-        let (a, b) = MemTransport::pair();
-        let session = Session::new(Arc::new(a));
+        let (a, b) = Transport::mem_pair();
+        let session = Session::new(a);
 
         // Close channel 2
-        session.send_frame(&data_eos_frame(2)).await.unwrap();
-        b.send_frame(&data_eos_frame(2)).await.unwrap();
+        session.send_frame(data_eos_frame(2)).await.unwrap();
+        b.send_frame(data_eos_frame(2)).await.unwrap();
         let _ = session.recv_frame().await.unwrap();
         assert!(session.tombstones.lock().contains(2));
 
@@ -602,8 +602,8 @@ mod tests {
         late_desc.channel_id = 2;
         late_desc.flags = FrameFlags::DATA;
         let late = Frame::with_inline_payload(late_desc, &[1, 2, 3]).unwrap();
-        b.send_frame(&late).await.unwrap();
-        b.send_frame(&ping_frame()).await.unwrap();
+        b.send_frame(late).await.unwrap();
+        b.send_frame(ping_frame()).await.unwrap();
 
         // recv_frame should skip the late frame and return the ping.
         let got = session.recv_frame().await.unwrap();
@@ -613,10 +613,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_cancelled_channel_is_tombstoned_and_drops_late_frames() {
-        let (a, b) = MemTransport::pair();
-        let session = Session::new(Arc::new(a));
+        let (a, b) = Transport::mem_pair();
+        let session = Session::new(a);
 
-        b.send_frame(&cancel_frame(2)).await.unwrap();
+        b.send_frame(cancel_frame(2)).await.unwrap();
         let got = session.recv_frame().await.unwrap();
         assert_eq!(got.desc.channel_id, 0);
         assert_eq!(got.desc.method_id, control_method::CANCEL_CHANNEL);
@@ -628,8 +628,8 @@ mod tests {
         late_desc.channel_id = 2;
         late_desc.flags = FrameFlags::DATA;
         let late = Frame::with_inline_payload(late_desc, &[1, 2, 3]).unwrap();
-        b.send_frame(&late).await.unwrap();
-        b.send_frame(&ping_frame()).await.unwrap();
+        b.send_frame(late).await.unwrap();
+        b.send_frame(ping_frame()).await.unwrap();
 
         // recv_frame should skip the late frame and return the ping.
         let got = session.recv_frame().await.unwrap();

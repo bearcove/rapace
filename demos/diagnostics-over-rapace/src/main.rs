@@ -216,18 +216,18 @@ fn main() {
     #[cfg(unix)]
     #[tokio::test]
     async fn test_shm_transport() {
-        use rapace::transport::shm::{ShmSession, ShmSessionConfig, ShmTransport};
+        use rapace::transport::shm::{ShmSession, ShmSessionConfig};
 
         let shm_path = format!("/tmp/rapace-diag-test-{}.shm", std::process::id());
         let _ = std::fs::remove_file(&shm_path);
 
         let host_shm_session = ShmSession::create_file(&shm_path, ShmSessionConfig::default())
             .expect("Failed to create SHM");
-        let host_transport = ShmTransport::new(host_shm_session);
+        let host_transport = Transport::shm(host_shm_session);
 
         let cell_shm_session = ShmSession::open_file(&shm_path, ShmSessionConfig::default())
             .expect("Failed to open SHM");
-        let cell_transport = ShmTransport::new(cell_shm_session);
+        let cell_transport = Transport::shm(cell_shm_session);
 
         let diagnostics = run_scenario(host_transport, cell_transport, TEST_SOURCE).await;
 

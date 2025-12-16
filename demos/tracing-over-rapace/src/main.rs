@@ -146,7 +146,10 @@ mod tests {
     use super::*;
 
     /// Helper to run tracing scenario with RpcSession
-    async fn run_scenario(host_transport: Transport, cell_transport: Transport) -> Vec<TraceRecord> {
+    async fn run_scenario(
+        host_transport: Transport,
+        cell_transport: Transport,
+    ) -> Vec<TraceRecord> {
         // Host side
         let tracing_sink = HostTracingSink::new();
         let host_session = Arc::new(RpcSession::with_channel_start(host_transport, 1));
@@ -210,7 +213,6 @@ mod tests {
     #[tokio::test]
     async fn test_stream_transport_tcp() {
         use rapace::StreamTransport;
-        use tokio::io::{ReadHalf, WriteHalf};
         use tokio::net::{TcpListener, TcpStream};
 
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -218,14 +220,11 @@ mod tests {
 
         let accept_task = tokio::spawn(async move {
             let (stream, _) = listener.accept().await.unwrap();
-            let transport: StreamTransport<ReadHalf<TcpStream>, WriteHalf<TcpStream>> =
-                StreamTransport::new(stream);
-            transport
+            Transport::Stream(StreamTransport::new(stream))
         });
 
         let stream = TcpStream::connect(addr).await.unwrap();
-        let host_transport: StreamTransport<ReadHalf<TcpStream>, WriteHalf<TcpStream>> =
-            StreamTransport::new(stream);
+        let host_transport = Transport::Stream(StreamTransport::new(stream));
 
         let cell_transport = accept_task.await.unwrap();
 
@@ -368,11 +367,11 @@ mod tests {
 
         let host_shm_session = ShmSession::create_file(&shm_path, ShmSessionConfig::default())
             .expect("Failed to create SHM");
-        let host_transport = ShmTransport::new(host_shm_session);
+        let host_transport = Transport::shm(host_shm_session);
 
         let cell_shm_session = ShmSession::open_file(&shm_path, ShmSessionConfig::default())
             .expect("Failed to open SHM");
-        let cell_transport = ShmTransport::new(cell_shm_session);
+        let cell_transport = Transport::shm(cell_shm_session);
 
         let records = run_scenario(host_transport, cell_transport).await;
 
