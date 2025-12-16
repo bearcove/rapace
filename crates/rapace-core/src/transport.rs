@@ -52,6 +52,20 @@ impl Transport {
         let (a, b) = mem::MemTransport::pair();
         (Transport::Mem(a), Transport::Mem(b))
     }
+
+    #[cfg(feature = "stream")]
+    pub fn stream<S>(stream: S) -> Self
+    where
+        S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + Sync + 'static,
+    {
+        Transport::Stream(stream::StreamTransport::new(stream))
+    }
+
+    #[cfg(feature = "stream")]
+    pub fn stream_pair() -> (Self, Self) {
+        let (a, b) = stream::StreamTransport::pair();
+        (Transport::Stream(a), Transport::Stream(b))
+    }
 }
 
 #[cfg(feature = "mem")]
