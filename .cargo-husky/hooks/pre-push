@@ -1,3 +1,4 @@
 cargo install --git https://github.com/facet-rs/facet-dev
+cargo check -p rapace-core --features websocket --target wasm32-unknown-unknown
 facet-dev pre-push
 
