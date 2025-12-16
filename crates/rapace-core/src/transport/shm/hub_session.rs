@@ -12,9 +12,9 @@ use std::sync::atomic::Ordering;
 use super::doorbell::Doorbell;
 use super::hub_alloc::{HubAllocator, init_extent_free_list};
 use super::hub_layout::{
-    DEFAULT_HUB_RING_CAPACITY, ExtentHeader, HUB_SIZE_CLASSES, HubHeader,
-    HubOffsets, HubSlotMeta, MAX_PEERS, NUM_SIZE_CLASSES, PEER_FLAG_ACTIVE, PEER_FLAG_RESERVED,
-    PeerEntry, SizeClassHeader, calculate_extent_size, calculate_initial_hub_size,
+    DEFAULT_HUB_RING_CAPACITY, ExtentHeader, HUB_SIZE_CLASSES, HubHeader, HubOffsets, HubSlotMeta,
+    MAX_PEERS, NUM_SIZE_CLASSES, PEER_FLAG_ACTIVE, PEER_FLAG_RESERVED, PeerEntry, SizeClassHeader,
+    calculate_extent_size, calculate_initial_hub_size,
 };
 use super::layout::{DescRing, DescRingHeader};
 use crate::MsgDescHot;
@@ -110,7 +110,9 @@ impl HubHost {
 
         let header = unsafe { &mut *(base_addr as *mut HubHeader) };
         header.init(config.max_peers, config.ring_capacity);
-        header.current_size.store(total_size as u64, Ordering::Release);
+        header
+            .current_size
+            .store(total_size as u64, Ordering::Release);
         header.peer_table_offset = offsets.peer_table as u64;
         header.ring_region_offset = offsets.ring_region as u64;
         header.size_class_offset = offsets.size_class_headers as u64;
@@ -151,9 +153,9 @@ impl HubHost {
 
         for class in 0..NUM_SIZE_CLASSES {
             let ptr = unsafe {
-                base_addr
-                    .add(offsets.size_class_headers + class * std::mem::size_of::<SizeClassHeader>())
-                    as *mut SizeClassHeader
+                base_addr.add(
+                    offsets.size_class_headers + class * std::mem::size_of::<SizeClassHeader>(),
+                ) as *mut SizeClassHeader
             };
             size_class_ptrs[class] = ptr;
 
@@ -169,8 +171,8 @@ impl HubHost {
         // Initialize extents inline in the initial mapping.
         let mut extent_offset = offsets.extent_region;
         for (class, (slot_size, slot_count)) in HUB_SIZE_CLASSES.iter().enumerate() {
-            let extent_size =
-                calculate_extent_size(*slot_size, *slot_count).map_err(|e| HubSessionError::Layout(e.to_string()))?;
+            let extent_size = calculate_extent_size(*slot_size, *slot_count)
+                .map_err(|e| HubSessionError::Layout(e.to_string()))?;
 
             // Write extent header.
             let extent_header =
@@ -181,8 +183,9 @@ impl HubHost {
             extent_header.slot_count = *slot_count;
             extent_header.slot_size = *slot_size;
             extent_header.meta_offset = std::mem::size_of::<ExtentHeader>() as u32;
-            extent_header.data_offset =
-                (std::mem::size_of::<ExtentHeader>() + (*slot_count as usize) * std::mem::size_of::<HubSlotMeta>()) as u32;
+            extent_header.data_offset = (std::mem::size_of::<ExtentHeader>()
+                + (*slot_count as usize) * std::mem::size_of::<HubSlotMeta>())
+                as u32;
             extent_header._pad = [0; 32];
 
             // Initialize slot metas.
@@ -200,7 +203,8 @@ impl HubHost {
 
             // Store extent offset in size class header.
             unsafe {
-                (*size_class_ptrs[class]).extent_offsets[0].store(extent_offset as u64, Ordering::Release);
+                (*size_class_ptrs[class]).extent_offsets[0]
+                    .store(extent_offset as u64, Ordering::Release);
             }
 
             unsafe {
@@ -223,6 +227,10 @@ impl HubHost {
         })
     }
 
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
     pub fn add_peer(&self) -> Result<PeerInfo, HubSessionError> {
         let header = self.header();
         let peer_id = header.peer_id_counter.fetch_add(1, Ordering::AcqRel);
@@ -233,7 +241,9 @@ impl HubHost {
         let peer_entry = unsafe { &mut *self.peer_entry_ptr(peer_id) };
         peer_entry.peer_id = peer_id;
         peer_entry.peer_type = 1;
-        peer_entry.flags.store(PEER_FLAG_RESERVED, Ordering::Release);
+        peer_entry
+            .flags
+            .store(PEER_FLAG_RESERVED, Ordering::Release);
         peer_entry.epoch.store(0, Ordering::Release);
         peer_entry.last_seen.store(0, Ordering::Release);
 
@@ -252,7 +262,9 @@ impl HubHost {
             return Err(HubSessionError::InvalidPeerId);
         }
         let peer_entry = self.peer_entry(peer_id);
-        peer_entry.flags.fetch_or(PEER_FLAG_ACTIVE, Ordering::Release);
+        peer_entry
+            .flags
+            .fetch_or(PEER_FLAG_ACTIVE, Ordering::Release);
         peer_entry
             .flags
             .fetch_and(!PEER_FLAG_RESERVED, Ordering::Release);
@@ -296,7 +308,8 @@ impl HubHost {
         let descs_ptr = unsafe {
             self.mapping
                 .base_addr
-                .add(ring_offset + std::mem::size_of::<DescRingHeader>()) as *mut MsgDescHot
+                .add(ring_offset + std::mem::size_of::<DescRingHeader>())
+                as *mut MsgDescHot
         };
         unsafe { DescRing::from_raw(header_ptr, descs_ptr) }
     }
@@ -308,7 +321,8 @@ impl HubHost {
         let descs_ptr = unsafe {
             self.mapping
                 .base_addr
-                .add(ring_offset + std::mem::size_of::<DescRingHeader>()) as *mut MsgDescHot
+                .add(ring_offset + std::mem::size_of::<DescRingHeader>())
+                as *mut MsgDescHot
         };
         unsafe { DescRing::from_raw(header_ptr, descs_ptr) }
     }
@@ -332,8 +346,7 @@ impl HubHost {
 
 fn self_peer_entry_ptr(base_addr: *mut u8, offsets: &HubOffsets, peer_id: u16) -> *mut PeerEntry {
     unsafe {
-        base_addr
-            .add(offsets.peer_table + peer_id as usize * std::mem::size_of::<PeerEntry>())
+        base_addr.add(offsets.peer_table + peer_id as usize * std::mem::size_of::<PeerEntry>())
             as *mut PeerEntry
     }
 }
@@ -379,7 +392,9 @@ impl HubPeer {
         let base_addr = base_addr as *mut u8;
 
         let header = unsafe { &*(base_addr as *const HubHeader) };
-        header.validate().map_err(|e| HubSessionError::Layout(e.to_string()))?;
+        header
+            .validate()
+            .map_err(|e| HubSessionError::Layout(e.to_string()))?;
 
         let offsets = HubOffsets::calculate(header.max_peers, header.ring_capacity)
             .map_err(|e| HubSessionError::Layout(e.to_string()))?;
@@ -390,11 +405,15 @@ impl HubPeer {
 
         let mut size_class_ptrs: [*mut SizeClassHeader; NUM_SIZE_CLASSES] =
             [std::ptr::null_mut(); NUM_SIZE_CLASSES];
-        for class in 0..NUM_SIZE_CLASSES {
-            size_class_ptrs[class] = unsafe {
-                base_addr
-                    .add(offsets.size_class_headers + class * std::mem::size_of::<SizeClassHeader>())
-                    as *mut SizeClassHeader
+        for (class, slot) in size_class_ptrs
+            .iter_mut()
+            .enumerate()
+            .take(NUM_SIZE_CLASSES)
+        {
+            *slot = unsafe {
+                base_addr.add(
+                    offsets.size_class_headers + class * std::mem::size_of::<SizeClassHeader>(),
+                ) as *mut SizeClassHeader
             };
         }
 
@@ -416,8 +435,12 @@ impl HubPeer {
 
     pub fn register(&self) {
         let peer_entry = self.peer_entry();
-        peer_entry.flags.fetch_or(PEER_FLAG_ACTIVE, Ordering::Release);
-        peer_entry.flags.fetch_and(!PEER_FLAG_RESERVED, Ordering::Release);
+        peer_entry
+            .flags
+            .fetch_or(PEER_FLAG_ACTIVE, Ordering::Release);
+        peer_entry
+            .flags
+            .fetch_and(!PEER_FLAG_RESERVED, Ordering::Release);
     }
 
     pub fn peer_id(&self) -> u16 {
@@ -439,7 +462,8 @@ impl HubPeer {
         let descs_ptr = unsafe {
             self.mapping
                 .base_addr
-                .add(ring_offset + std::mem::size_of::<DescRingHeader>()) as *mut MsgDescHot
+                .add(ring_offset + std::mem::size_of::<DescRingHeader>())
+                as *mut MsgDescHot
         };
         unsafe { DescRing::from_raw(header_ptr, descs_ptr) }
     }
@@ -451,7 +475,8 @@ impl HubPeer {
         let descs_ptr = unsafe {
             self.mapping
                 .base_addr
-                .add(ring_offset + std::mem::size_of::<DescRingHeader>()) as *mut MsgDescHot
+                .add(ring_offset + std::mem::size_of::<DescRingHeader>())
+                as *mut MsgDescHot
         };
         unsafe { DescRing::from_raw(header_ptr, descs_ptr) }
     }

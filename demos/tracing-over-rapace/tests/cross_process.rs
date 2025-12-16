@@ -8,7 +8,7 @@ use std::process::{Command, Stdio};
 use std::time::Duration;
 
 use rapace::helper_binary::find_helper_binary;
-use rapace::transport::shm::{ShmSession, ShmSessionConfig, ShmTransport};
+use rapace::transport::shm::{ShmSession, ShmSessionConfig};
 use rapace::{RpcSession, StreamTransport, Transport};
 #[cfg(not(unix))]
 use tokio::net::TcpListener;

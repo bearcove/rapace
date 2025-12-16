@@ -330,7 +330,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_shm_transport() {
-        use rapace::transport::shm::{ShmSession, ShmSessionConfig, ShmTransport};
+        use rapace::transport::shm::{ShmSession, ShmSessionConfig};
 
         // Create a temp SHM file path
         let shm_path = format!("/tmp/rapace-http-test-{}.shm", std::process::id());

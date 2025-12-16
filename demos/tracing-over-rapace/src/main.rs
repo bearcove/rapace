@@ -360,7 +360,7 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn test_shm_transport() {
-        use rapace::transport::shm::{ShmSession, ShmSessionConfig, ShmTransport};
+        use rapace::transport::shm::{ShmSession, ShmSessionConfig};
 
         let shm_path = format!("/tmp/rapace-tracing-test-{}.shm", std::process::id());
         let _ = std::fs::remove_file(&shm_path);

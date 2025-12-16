@@ -632,10 +632,7 @@ where
         Ok(result) => result?,
         Err(join_err) => {
             return Err(CellError::Transport(TransportError::Io(
-                std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("demux task join error: {join_err}"),
-                ),
+                std::io::Error::other(format!("demux task join error: {join_err}")),
             )));
         }
     }
