@@ -1,7 +1,7 @@
 //! SHM memory layout definitions.
 //!
 //! This module defines the `repr(C)` structures that make up the shared memory
-//! segment. These are the canonical layouts from DESIGN.md.
+//! segment. These are the canonical layouts; see `docs/content/guide/design.md`.
 //!
 //! # Memory Layout
 //!

@@ -34,14 +34,19 @@
 //!
 //! ```ignore
 //! let (client_transport, server_transport) = rapace::Transport::mem_pair();
-//! let client_session = Arc::new(rapace::RpcSession::with_channel_start(Arc::new(client_transport), 2));
-//! let server_session = Arc::new(rapace::RpcSession::with_channel_start(Arc::new(server_transport), 1));
+//! let client_session = Arc::new(rapace::RpcSession::with_channel_start(client_transport, 2));
+//! let server_session = Arc::new(rapace::RpcSession::with_channel_start(server_transport, 1));
 //! tokio::spawn(client_session.clone().run());
 //! tokio::spawn(server_session.clone().run());
 //!
-//! server_session.set_dispatcher(move |_channel_id, method_id, payload| {
+//! server_session.set_dispatcher(move |request: rapace::Frame| {
 //!     let server = CalculatorServer::new(CalculatorImpl);
-//!     Box::pin(async move { server.dispatch(method_id, &payload).await })
+//!     Box::pin(async move {
+//!         let mut response = server.dispatch(request.desc.method_id, request.payload_bytes()).await?;
+//!         response.desc.channel_id = request.desc.channel_id;
+//!         response.desc.msg_id = request.desc.msg_id;
+//!         Ok(response)
+//!     })
 //! });
 //!
 //! let client = CalculatorClient::new(client_session.clone());
