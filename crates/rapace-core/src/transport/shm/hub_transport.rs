@@ -9,7 +9,10 @@ use std::time::Duration;
 
 use tokio::sync::Mutex as AsyncMutex;
 
-use crate::{EncodeError, Frame, INLINE_PAYLOAD_SIZE, INLINE_PAYLOAD_SLOT, Payload, TransportError, ValidationError};
+use crate::{
+    EncodeError, Frame, INLINE_PAYLOAD_SIZE, INLINE_PAYLOAD_SLOT, Payload, TransportError,
+    ValidationError,
+};
 
 use super::doorbell::Doorbell;
 use super::futex;
@@ -26,14 +29,18 @@ fn slot_error_to_transport(e: HubSlotError) -> TransportError {
                 max: max as u32,
             })
         }
-        HubSlotError::StaleGeneration => TransportError::Validation(ValidationError::StaleGeneration {
-            expected: 0,
-            actual: 0,
-        }),
+        HubSlotError::StaleGeneration => {
+            TransportError::Validation(ValidationError::StaleGeneration {
+                expected: 0,
+                actual: 0,
+            })
+        }
         HubSlotError::InvalidSlotRef
         | HubSlotError::InvalidState
         | HubSlotError::InvalidSizeClass
-        | HubSlotError::InvalidExtent => TransportError::Encode(EncodeError::EncodeFailed(e.to_string())),
+        | HubSlotError::InvalidExtent => {
+            TransportError::Encode(EncodeError::EncodeFailed(e.to_string()))
+        }
     }
 }
 
@@ -106,8 +113,12 @@ impl TransportBackend for HubPeerTransport {
                 .alloc(payload.len(), self.inner.peer.peer_id() as u32)
                 .map_err(slot_error_to_transport)?;
 
-            let slot_ptr =
-                unsafe { self.inner.peer.allocator().slot_data_ptr(class as usize, global_index) };
+            let slot_ptr = unsafe {
+                self.inner
+                    .peer
+                    .allocator()
+                    .slot_data_ptr(class as usize, global_index)
+            };
             unsafe {
                 std::ptr::copy_nonoverlapping(payload.as_ptr(), slot_ptr, payload.len());
             }
@@ -138,7 +149,11 @@ impl TransportBackend for HubPeerTransport {
                 return Err(TransportError::Closed);
             }
 
-            let _ = futex::futex_wait_async_ptr(self.inner.peer.send_data_futex(), Some(Duration::from_millis(100))).await;
+            let _ = futex::futex_wait_async_ptr(
+                self.inner.peer.send_data_futex(),
+                Some(Duration::from_millis(100)),
+            )
+            .await;
         }
 
         self.inner.doorbell.signal();
@@ -167,14 +182,22 @@ impl TransportBackend for HubPeerTransport {
                 }
 
                 let (class, global_index) = decode_slot_ref(desc.payload_slot);
-                let slot_ptr =
-                    unsafe { self.inner.peer.allocator().slot_data_ptr(class as usize, global_index) };
+                let slot_ptr = unsafe {
+                    self.inner
+                        .peer
+                        .allocator()
+                        .slot_data_ptr(class as usize, global_index)
+                };
                 let slot_ptr = unsafe { slot_ptr.add(desc.payload_offset as usize) };
                 let payload =
                     unsafe { std::slice::from_raw_parts(slot_ptr, desc.payload_len as usize) }
                         .to_vec();
 
-                let _ = self.inner.peer.allocator().free(class, global_index, desc.payload_generation);
+                let _ =
+                    self.inner
+                        .peer
+                        .allocator()
+                        .free(class, global_index, desc.payload_generation);
 
                 // Normalize descriptor to match the fact we copied bytes out.
                 desc.payload_slot = 0;
@@ -336,13 +359,16 @@ impl TransportBackend for HubHostPeerTransport {
                 }
 
                 let (class, global_index) = decode_slot_ref(desc.payload_slot);
-                let slot_ptr = unsafe { self.allocator().slot_data_ptr(class as usize, global_index) };
+                let slot_ptr =
+                    unsafe { self.allocator().slot_data_ptr(class as usize, global_index) };
                 let slot_ptr = unsafe { slot_ptr.add(desc.payload_offset as usize) };
                 let payload =
                     unsafe { std::slice::from_raw_parts(slot_ptr, desc.payload_len as usize) }
                         .to_vec();
 
-                let _ = self.allocator().free(class, global_index, desc.payload_generation);
+                let _ = self
+                    .allocator()
+                    .free(class, global_index, desc.payload_generation);
 
                 desc.payload_slot = 0;
                 desc.payload_generation = 0;

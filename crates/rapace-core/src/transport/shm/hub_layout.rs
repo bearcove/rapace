@@ -207,7 +207,8 @@ impl PeerEntry {
 
     pub fn mark_active(&self) {
         self.flags.fetch_or(PEER_FLAG_ACTIVE, Ordering::Release);
-        self.flags.fetch_and(!(PEER_FLAG_RESERVED | PEER_FLAG_DEAD), Ordering::Release);
+        self.flags
+            .fetch_and(!(PEER_FLAG_RESERVED | PEER_FLAG_DEAD), Ordering::Release);
     }
 
     pub fn mark_dead(&self) {
@@ -428,7 +429,10 @@ pub fn calculate_extent_size(slot_size: u32, slot_count: u32) -> Result<usize, &
     Ok(align_up(total, 64))
 }
 
-pub fn calculate_initial_hub_size(max_peers: u16, ring_capacity: u32) -> Result<usize, &'static str> {
+pub fn calculate_initial_hub_size(
+    max_peers: u16,
+    ring_capacity: u32,
+) -> Result<usize, &'static str> {
     let offsets = HubOffsets::calculate(max_peers, ring_capacity)
         .map_err(|_| "hub offsets calculation failed")?;
 
@@ -529,4 +533,3 @@ fn align_up(x: usize, align: usize) -> usize {
     debug_assert!(align.is_power_of_two());
     (x + align - 1) & !(align - 1)
 }
-

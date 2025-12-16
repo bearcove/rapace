@@ -132,10 +132,7 @@ impl TunnelHost {
 }
 
 /// Run the host server that accepts browser connections and tunnels them to the plugin.
-pub async fn run_host_server(
-    host: Arc<TunnelHost>,
-    listen_port: u16,
-) -> std::io::Result<()> {
+pub async fn run_host_server(host: Arc<TunnelHost>, listen_port: u16) -> std::io::Result<()> {
     let listener = TcpListener::bind(format!("127.0.0.1:{}", listen_port)).await?;
     tracing::info!(
         port = listen_port,

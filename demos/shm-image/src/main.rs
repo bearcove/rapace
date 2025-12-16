@@ -180,8 +180,14 @@ async fn main() {
     let (session_a, session_b) = ShmSession::create_pair().expect("Failed to create SHM sessions");
 
     // Create transports with metrics enabled (transports have internal Arc, cheap to clone).
-    let transport_a = Transport::Shm(ShmTransport::new_with_metrics(session_a.clone(), metrics.clone()));
-    let transport_b = Transport::Shm(ShmTransport::new_with_metrics(session_b.clone(), metrics.clone()));
+    let transport_a = Transport::Shm(ShmTransport::new_with_metrics(
+        session_a.clone(),
+        metrics.clone(),
+    ));
+    let transport_b = Transport::Shm(ShmTransport::new_with_metrics(
+        session_b.clone(),
+        metrics.clone(),
+    ));
 
     // Create an allocator from session A (the "host" side).
     let alloc = ShmAllocator::new(session_a.clone());

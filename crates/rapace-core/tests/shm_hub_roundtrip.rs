@@ -2,9 +2,9 @@
 mod tests {
     use std::sync::Arc;
 
-    use rapace_core::{Frame, FrameFlags, MsgDescHot};
-    use rapace_core::{Transport};
+    use rapace_core::Transport;
     use rapace_core::shm::{Doorbell, HubConfig, HubHost, HubPeer, ShmTransport};
+    use rapace_core::{Frame, FrameFlags, MsgDescHot};
 
     fn temp_hub_path() -> std::path::PathBuf {
         std::env::temp_dir().join(format!("rapace_hub_test_{}.shm", std::process::id()))
@@ -22,10 +22,14 @@ mod tests {
         peer.register();
 
         // Plugin wraps the inherited fd end.
-        let peer_doorbell = Doorbell::from_raw_fd(peer_info.peer_doorbell_fd).expect("peer doorbell");
+        let peer_doorbell =
+            Doorbell::from_raw_fd(peer_info.peer_doorbell_fd).expect("peer doorbell");
 
-        let host_transport =
-            Transport::Shm(ShmTransport::hub_host_peer(host.clone(), peer_info.peer_id, peer_info.doorbell));
+        let host_transport = Transport::Shm(ShmTransport::hub_host_peer(
+            host.clone(),
+            peer_info.peer_id,
+            peer_info.doorbell,
+        ));
         let peer_transport =
             Transport::Shm(ShmTransport::hub_peer(peer.clone(), peer_doorbell, "peer"));
 
@@ -66,10 +70,14 @@ mod tests {
 
         let peer = Arc::new(HubPeer::open(&path, peer_info.peer_id).expect("open peer"));
         peer.register();
-        let peer_doorbell = Doorbell::from_raw_fd(peer_info.peer_doorbell_fd).expect("peer doorbell");
+        let peer_doorbell =
+            Doorbell::from_raw_fd(peer_info.peer_doorbell_fd).expect("peer doorbell");
 
-        let host_transport =
-            Transport::Shm(ShmTransport::hub_host_peer(host.clone(), peer_info.peer_id, peer_info.doorbell));
+        let host_transport = Transport::Shm(ShmTransport::hub_host_peer(
+            host.clone(),
+            peer_info.peer_id,
+            peer_info.doorbell,
+        ));
         let peer_transport =
             Transport::Shm(ShmTransport::hub_peer(peer.clone(), peer_doorbell, "peer"));
 
@@ -77,7 +85,10 @@ mod tests {
         desc.channel_id = 1;
         desc.method_id = 1;
         desc.flags = FrameFlags::DATA | FrameFlags::EOS;
-        peer_transport.send_frame(Frame::with_payload(desc, vec![1, 2, 3])).await.expect("send");
+        peer_transport
+            .send_frame(Frame::with_payload(desc, vec![1, 2, 3]))
+            .await
+            .expect("send");
 
         let got = host_transport.recv_frame().await.expect("recv");
         assert_eq!(got.payload_bytes(), &[1, 2, 3]);

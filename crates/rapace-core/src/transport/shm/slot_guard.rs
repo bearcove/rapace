@@ -69,7 +69,8 @@ impl SlotGuard {
 
 impl AsRef<[u8]> for SlotGuard {
     fn as_ref(&self) -> &[u8] {
-        self.read_slice().expect("SHM SlotGuard slice must be valid")
+        self.read_slice()
+            .expect("SHM SlotGuard slice must be valid")
     }
 }
 

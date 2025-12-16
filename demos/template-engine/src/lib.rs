@@ -156,7 +156,9 @@ impl TemplateEngine for TemplateEngineImpl {
 /// Create a dispatcher for ValueHost service.
 pub fn create_value_host_dispatcher(
     value_host: Arc<ValueHostImpl>,
-) -> impl Fn(Frame) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Frame, RpcError>> + Send>>
+) -> impl Fn(
+    Frame,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Frame, RpcError>> + Send>>
 + Send
 + Sync
 + 'static {
@@ -164,7 +166,8 @@ pub fn create_value_host_dispatcher(
         let value_host = value_host.clone();
         Box::pin(async move {
             let server = ValueHostServer::new(value_host.as_ref().clone());
-            server.dispatch(request.desc.method_id, request.payload_bytes())
+            server
+                .dispatch(request.desc.method_id, request.payload_bytes())
                 .await
         })
     }
@@ -173,7 +176,9 @@ pub fn create_value_host_dispatcher(
 /// Create a dispatcher for TemplateEngine service.
 pub fn create_template_engine_dispatcher(
     session: Arc<RpcSession>,
-) -> impl Fn(Frame) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Frame, RpcError>> + Send>>
+) -> impl Fn(
+    Frame,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Frame, RpcError>> + Send>>
 + Send
 + Sync
 + 'static {

@@ -201,10 +201,10 @@ pub mod transport {
     }
 }
 
-/// Session layer for flow control and channel management.
-pub mod session;
 #[doc(hidden)]
 pub mod helper_binary;
+/// Session layer for flow control and channel management.
+pub mod session;
 
 #[cfg(feature = "mem")]
 pub use transport::MemTransport;
@@ -244,9 +244,7 @@ pub mod server {
     ///     });
     /// }
     /// ```
-    pub fn serve_connection(
-        stream: TcpStream,
-    ) -> Arc<crate::StreamTransport> {
+    pub fn serve_connection(stream: TcpStream) -> Arc<crate::StreamTransport> {
         Arc::new(crate::StreamTransport::new(stream))
     }
 

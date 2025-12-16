@@ -361,9 +361,7 @@ impl RpcSession {
                 is_error = flags.contains(FrameFlags::ERROR),
                 "try_route_to_tunnel: routing to tunnel"
             );
-            let chunk = TunnelChunk {
-                frame,
-            };
+            let chunk = TunnelChunk { frame };
 
             // Send with backpressure; if receiver dropped, remove the tunnel
             if tx.send(chunk).await.is_err() {

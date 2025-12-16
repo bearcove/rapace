@@ -12,10 +12,7 @@ use rapace_http_tunnel::{
 };
 
 /// Helper to start the plugin side (HTTP server + tunnel service).
-async fn start_plugin(
-    session: Arc<RpcSession>,
-    http_port: u16,
-) -> Arc<GlobalTunnelMetrics> {
+async fn start_plugin(session: Arc<RpcSession>, http_port: u16) -> Arc<GlobalTunnelMetrics> {
     let metrics = Arc::new(GlobalTunnelMetrics::new());
 
     // Create the tunnel service

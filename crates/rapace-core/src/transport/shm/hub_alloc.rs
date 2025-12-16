@@ -63,9 +63,8 @@ impl HubAllocator {
         let extent_header = unsafe { self.extent_header(extent_offset) };
         let meta_offset = extent_header.meta_offset as usize;
         let meta_base = unsafe { self.base_addr.add(extent_offset as usize + meta_offset) };
-        let meta_ptr = unsafe {
-            meta_base.add(slot_in_extent as usize * std::mem::size_of::<HubSlotMeta>())
-        };
+        let meta_ptr =
+            unsafe { meta_base.add(slot_in_extent as usize * std::mem::size_of::<HubSlotMeta>()) };
 
         unsafe { &*(meta_ptr as *const HubSlotMeta) }
     }
@@ -121,7 +120,8 @@ impl HubAllocator {
                 .is_ok()
             {
                 // Mark allocated + set owner
-                meta.state.store(SlotState::Allocated as u32, Ordering::Release);
+                meta.state
+                    .store(SlotState::Allocated as u32, Ordering::Release);
                 meta.owner_peer.store(owner_peer, Ordering::Release);
                 let slot_generation = meta.generation.load(Ordering::Acquire);
                 return Ok((global_index, slot_generation));
@@ -147,7 +147,12 @@ impl HubAllocator {
         Err(HubSlotError::NoFreeSlots)
     }
 
-    pub fn mark_in_flight(&self, class: u16, global_index: u32, generation: u32) -> Result<(), HubSlotError> {
+    pub fn mark_in_flight(
+        &self,
+        class: u16,
+        global_index: u32,
+        generation: u32,
+    ) -> Result<(), HubSlotError> {
         let class = class as usize;
         if class >= NUM_SIZE_CLASSES {
             return Err(HubSlotError::InvalidSizeClass);
@@ -164,7 +169,8 @@ impl HubAllocator {
             return Err(HubSlotError::InvalidState);
         }
 
-        meta.state.store(SlotState::InFlight as u32, Ordering::Release);
+        meta.state
+            .store(SlotState::InFlight as u32, Ordering::Release);
         Ok(())
     }
 
@@ -215,7 +221,8 @@ impl HubAllocator {
             let extent_slot_shift = header.extent_slot_shift;
 
             for extent_id in 0..super::hub_layout::MAX_EXTENTS_PER_CLASS as u32 {
-                let extent_offset = header.extent_offsets[extent_id as usize].load(Ordering::Acquire);
+                let extent_offset =
+                    header.extent_offsets[extent_id as usize].load(Ordering::Acquire);
                 if extent_offset == 0 {
                     continue;
                 }
@@ -237,7 +244,8 @@ impl HubAllocator {
                         continue;
                     }
 
-                    meta.state.store(SlotState::InFlight as u32, Ordering::Release);
+                    meta.state
+                        .store(SlotState::InFlight as u32, Ordering::Release);
                     let slot_generation = meta.generation.load(Ordering::Acquire);
                     let _ = self.free(class as u16, global_index, slot_generation);
                 }

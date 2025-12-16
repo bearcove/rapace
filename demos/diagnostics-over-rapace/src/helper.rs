@@ -20,10 +20,8 @@
 use std::time::Duration;
 
 use rapace::{
-    transport::{
-        shm::{ShmSession, ShmSessionConfig},
-    },
     Transport,
+    transport::shm::{ShmSession, ShmSessionConfig},
 };
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpStream;

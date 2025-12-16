@@ -38,7 +38,11 @@ fn drain_fd(fd: RawFd, would_block_is_error: bool) -> io::Result<bool> {
             if drained {
                 return Ok(true);
             }
-            return if would_block_is_error { Err(err) } else { Ok(false) };
+            return if would_block_is_error {
+                Err(err)
+            } else {
+                Ok(false)
+            };
         }
 
         return Err(err);
@@ -141,11 +145,7 @@ impl Doorbell {
         let fd = self.async_fd.get_ref().as_raw_fd();
         let mut pending: libc::c_int = 0;
         let ret = unsafe { libc::ioctl(fd, libc::FIONREAD, &mut pending) };
-        if ret < 0 {
-            0
-        } else {
-            pending as usize
-        }
+        if ret < 0 { 0 } else { pending as usize }
     }
 }
 

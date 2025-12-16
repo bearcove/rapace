@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use rapace_core::{ErrorCode, Frame, FrameFlags, INLINE_PAYLOAD_SIZE, MsgDescHot, RpcError, RpcSession, Transport};
+use rapace_core::{
+    ErrorCode, Frame, FrameFlags, INLINE_PAYLOAD_SIZE, MsgDescHot, RpcError, RpcSession, Transport,
+};
 
 async fn spawn_echo_server(
     server_transport: Transport,
@@ -28,7 +30,10 @@ async fn spawn_echo_server(
                 bytes.extend_from_slice(message.as_bytes());
                 (FrameFlags::ERROR | FrameFlags::EOS, bytes)
             } else {
-                (FrameFlags::DATA | FrameFlags::EOS, request.payload_bytes().to_vec())
+                (
+                    FrameFlags::DATA | FrameFlags::EOS,
+                    request.payload_bytes().to_vec(),
+                )
             };
 
             desc.flags = flags;
@@ -199,10 +204,7 @@ async fn run_server_streaming(make_pair: impl FnOnce() -> (Transport, Transport)
         received.push(chunk.payload_bytes().to_vec());
     }
 
-    assert_eq!(
-        received,
-        vec![vec![0u8; 8], vec![1u8; 8], vec![2u8; 8]]
-    );
+    assert_eq!(received, vec![vec![0u8; 8], vec![1u8; 8], vec![2u8; 8]]);
 
     server_task.await.expect("server task join failed");
 }

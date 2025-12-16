@@ -21,8 +21,8 @@
 
 use std::sync::Arc;
 
-use rapace::{RpcSession, Transport};
 use rapace::transport::shm::{ShmMetrics, ShmSession, ShmSessionConfig, ShmTransport};
+use rapace::{RpcSession, Transport};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpListener;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -205,7 +205,8 @@ async fn main() {
 
             // Create metrics for SHM transport
             let shm_metrics = Arc::new(ShmMetrics::new());
-            let transport = Transport::Shm(ShmTransport::new_with_metrics(session, shm_metrics.clone()));
+            let transport =
+                Transport::Shm(ShmTransport::new_with_metrics(session, shm_metrics.clone()));
             eprintln!("[http-tunnel-host] SHM created, waiting for plugin...");
             // Give plugin time to map
             tokio::time::sleep(std::time::Duration::from_millis(500)).await;

@@ -102,4 +102,3 @@ unsafe impl Allocator for ShmAllocator {
         let _ = data_segment.free_allocated(header.slot, header.generation);
     }
 }
-

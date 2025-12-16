@@ -1,13 +1,13 @@
 //! Shared memory (SHM) transport.
 
-pub mod futex;
+mod alloc;
 mod doorbell;
+pub mod futex;
 mod hub_alloc;
 pub mod hub_layout;
 pub mod hub_session;
 mod hub_transport;
 pub mod layout;
-mod alloc;
 mod session;
 mod slot_guard;
 mod transport;

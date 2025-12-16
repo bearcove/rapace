@@ -269,7 +269,8 @@ pub fn create_http_service_dispatcher(
         let service = service.clone();
         Box::pin(async move {
             let server = HttpServiceServer::new(service);
-            server.dispatch(request.desc.method_id, request.payload_bytes())
+            server
+                .dispatch(request.desc.method_id, request.payload_bytes())
                 .await
         })
     }

@@ -215,11 +215,19 @@ impl ShmTransport {
         Ok((ShmTransport::Pair(a), ShmTransport::Pair(b)))
     }
 
-    pub fn hub_peer(peer: Arc<super::hub_session::HubPeer>, doorbell: super::Doorbell, name: impl Into<String>) -> Self {
+    pub fn hub_peer(
+        peer: Arc<super::hub_session::HubPeer>,
+        doorbell: super::Doorbell,
+        name: impl Into<String>,
+    ) -> Self {
         ShmTransport::HubPeer(HubPeerTransport::new(peer, doorbell, name))
     }
 
-    pub fn hub_host_peer(host: Arc<super::hub_session::HubHost>, peer_id: u16, doorbell: super::Doorbell) -> Self {
+    pub fn hub_host_peer(
+        host: Arc<super::hub_session::HubHost>,
+        peer_id: u16,
+        doorbell: super::Doorbell,
+    ) -> Self {
         ShmTransport::HubHostPeer(HubHostPeerTransport::new(host, peer_id, doorbell))
     }
 

@@ -22,9 +22,7 @@ mod native {
     use tokio::sync::Mutex as AsyncMutex;
     use tokio::sync::mpsc;
 
-    use crate::{
-        Frame, INLINE_PAYLOAD_SIZE, INLINE_PAYLOAD_SLOT, Payload, TransportError,
-    };
+    use crate::{Frame, INLINE_PAYLOAD_SIZE, INLINE_PAYLOAD_SLOT, Payload, TransportError};
 
     use super::super::TransportBackend;
 
@@ -123,9 +121,7 @@ mod native {
                 }
             });
 
-            Self {
-                inner,
-            }
+            Self { inner }
         }
 
         #[cfg(feature = "websocket-tungstenite")]
@@ -207,9 +203,7 @@ mod native {
                 }
             });
 
-            Self {
-                inner,
-            }
+            Self { inner }
         }
 
         fn is_closed_inner(&self) -> bool {
@@ -287,7 +281,6 @@ mod native {
             self.is_closed_inner()
         }
     }
-
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -310,9 +303,7 @@ mod wasm {
     use wasm_bindgen::prelude::*;
     use web_sys::{BinaryType, CloseEvent, ErrorEvent, MessageEvent, WebSocket};
 
-    use crate::{
-        Frame, INLINE_PAYLOAD_SIZE, INLINE_PAYLOAD_SLOT, Payload, TransportError,
-    };
+    use crate::{Frame, INLINE_PAYLOAD_SIZE, INLINE_PAYLOAD_SLOT, Payload, TransportError};
 
     use super::super::TransportBackend;
 
