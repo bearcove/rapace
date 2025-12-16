@@ -29,7 +29,7 @@ mod native {
     #[cfg(feature = "websocket-axum")]
     use axum::extract::ws::{Message as AxumMessage, WebSocket as AxumWebSocket};
 
-    #[cfg(feature = "websocket-tungstenite")]
+    #[cfg(feature = "websocket")]
     use tokio_tungstenite::tungstenite::Message as TungsteniteMessage;
 
     enum OutMsg {
@@ -57,7 +57,7 @@ mod native {
     }
 
     impl WebSocketTransport {
-        #[cfg(feature = "websocket-tungstenite")]
+        #[cfg(feature = "websocket")]
         pub fn new<S>(ws: tokio_tungstenite::WebSocketStream<S>) -> Self
         where
             S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static,
@@ -124,7 +124,7 @@ mod native {
             Self { inner }
         }
 
-        #[cfg(feature = "websocket-tungstenite")]
+        #[cfg(feature = "websocket")]
         pub async fn pair() -> (Self, Self) {
             let (client_stream, server_stream) = tokio::io::duplex(65536);
 
