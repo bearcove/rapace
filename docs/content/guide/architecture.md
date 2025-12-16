@@ -91,7 +91,7 @@ The shared-memory transport lives in `rapace-core` behind the `shm` feature and 
 There are currently two SHM modes used in the wild:
 
 1. **`ShmSession` (pair transport)**: a single SHM segment shared by exactly two peers (A↔B).
-2. **Hub transport**: a planned multi-peer mode (not currently implemented in `rapace-core`).
+2. **Hub transport**: a single SHM file shared by a host and many peers, with per-peer rings (see `rapace_core::shm::{HubHost, HubPeer}`).
 
 Both use **FD-based doorbells** for wakeups (current Unix implementation uses a `socketpair(SOCK_DGRAM)` wrapped in `tokio::io::unix::AsyncFd`).
 

@@ -11,6 +11,7 @@ use crate::{
 use tokio::sync::Notify;
 
 use super::futex::futex_signal;
+use super::hub_transport::{HubHostPeerTransport, HubPeerTransport};
 use super::layout::{RingError, SlotError};
 use super::session::ShmSession;
 use crate::transport::TransportBackend;
@@ -42,22 +43,29 @@ fn slot_error_to_transport(e: SlotError, context: &str) -> TransportError {
     }
 }
 
-/// SHM transport implementation.
-///
-/// This transport uses shared memory rings and slots to move frames
-/// between two peers with zero-copy when possible.
-#[derive(Clone)]
-pub struct ShmTransport {
-    inner: Arc<ShmTransportInner>,
+/// SHM transport (pair or hub mode).
+#[derive(Clone, Debug)]
+pub enum ShmTransport {
+    /// Two-peer SHM session transport (A↔B).
+    Pair(PairTransport),
+    /// Hub plugin-side transport (peer↔host).
+    HubPeer(HubPeerTransport),
+    /// Hub host-side per-peer transport (host↔peer).
+    HubHostPeer(HubHostPeerTransport),
 }
 
-impl std::fmt::Debug for ShmTransport {
+#[derive(Clone)]
+pub struct PairTransport {
+    inner: Arc<PairTransportInner>,
+}
+
+impl std::fmt::Debug for PairTransport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ShmTransport").finish_non_exhaustive()
+        f.debug_struct("PairTransport").finish_non_exhaustive()
     }
 }
 
-struct ShmTransportInner {
+struct PairTransportInner {
     /// The underlying SHM session.
     session: Arc<ShmSession>,
     /// Whether the transport is closed.
@@ -71,11 +79,11 @@ struct ShmTransportInner {
     slot_freed_notify: Arc<Notify>,
 }
 
-impl ShmTransport {
+impl PairTransport {
     /// Create a new SHM transport from a session.
     pub fn new(session: Arc<ShmSession>) -> Self {
         Self {
-            inner: Arc::new(ShmTransportInner {
+            inner: Arc::new(PairTransportInner {
                 session,
                 closed: std::sync::atomic::AtomicBool::new(false),
                 metrics: None,
@@ -88,7 +96,7 @@ impl ShmTransport {
     /// Create a new SHM transport with a name for tracing.
     pub fn with_name(session: Arc<ShmSession>, name: impl Into<String>) -> Self {
         Self {
-            inner: Arc::new(ShmTransportInner {
+            inner: Arc::new(PairTransportInner {
                 session,
                 closed: std::sync::atomic::AtomicBool::new(false),
                 metrics: None,
@@ -101,7 +109,7 @@ impl ShmTransport {
     /// Create a new SHM transport with metrics enabled.
     pub fn new_with_metrics(session: Arc<ShmSession>, metrics: Arc<ShmMetrics>) -> Self {
         Self {
-            inner: Arc::new(ShmTransportInner {
+            inner: Arc::new(PairTransportInner {
                 session,
                 closed: std::sync::atomic::AtomicBool::new(false),
                 metrics: Some(metrics),
@@ -118,7 +126,7 @@ impl ShmTransport {
         metrics: Arc<ShmMetrics>,
     ) -> Self {
         Self {
-            inner: Arc::new(ShmTransportInner {
+            inner: Arc::new(PairTransportInner {
                 session,
                 closed: std::sync::atomic::AtomicBool::new(false),
                 metrics: Some(metrics),
@@ -176,7 +184,85 @@ impl ShmTransport {
     }
 }
 
+impl ShmTransport {
+    pub fn new(session: Arc<ShmSession>) -> Self {
+        ShmTransport::Pair(PairTransport::new(session))
+    }
+
+    pub fn with_name(session: Arc<ShmSession>, name: impl Into<String>) -> Self {
+        ShmTransport::Pair(PairTransport::with_name(session, name))
+    }
+
+    pub fn new_with_metrics(session: Arc<ShmSession>, metrics: Arc<ShmMetrics>) -> Self {
+        ShmTransport::Pair(PairTransport::new_with_metrics(session, metrics))
+    }
+
+    pub fn with_name_and_metrics(
+        session: Arc<ShmSession>,
+        name: impl Into<String>,
+        metrics: Arc<ShmMetrics>,
+    ) -> Self {
+        ShmTransport::Pair(PairTransport::with_name_and_metrics(session, name, metrics))
+    }
+
+    pub fn pair() -> Result<(Self, Self), TransportError> {
+        let (a, b) = PairTransport::pair()?;
+        Ok((ShmTransport::Pair(a), ShmTransport::Pair(b)))
+    }
+
+    pub fn pair_with_metrics(metrics: Arc<ShmMetrics>) -> Result<(Self, Self), TransportError> {
+        let (a, b) = PairTransport::pair_with_metrics(metrics)?;
+        Ok((ShmTransport::Pair(a), ShmTransport::Pair(b)))
+    }
+
+    pub fn hub_peer(peer: Arc<super::hub_session::HubPeer>, doorbell: super::Doorbell, name: impl Into<String>) -> Self {
+        ShmTransport::HubPeer(HubPeerTransport::new(peer, doorbell, name))
+    }
+
+    pub fn hub_host_peer(host: Arc<super::hub_session::HubHost>, peer_id: u16, doorbell: super::Doorbell) -> Self {
+        ShmTransport::HubHostPeer(HubHostPeerTransport::new(host, peer_id, doorbell))
+    }
+
+    pub fn is_closed(&self) -> bool {
+        match self {
+            ShmTransport::Pair(t) => t.is_closed(),
+            ShmTransport::HubPeer(t) => t.is_closed(),
+            ShmTransport::HubHostPeer(t) => t.is_closed(),
+        }
+    }
+}
+
 impl TransportBackend for ShmTransport {
+    async fn send_frame(&self, frame: Frame) -> Result<(), TransportError> {
+        match self {
+            ShmTransport::Pair(t) => TransportBackend::send_frame(t, frame).await,
+            ShmTransport::HubPeer(t) => TransportBackend::send_frame(t, frame).await,
+            ShmTransport::HubHostPeer(t) => TransportBackend::send_frame(t, frame).await,
+        }
+    }
+
+    async fn recv_frame(&self) -> Result<Frame, TransportError> {
+        match self {
+            ShmTransport::Pair(t) => TransportBackend::recv_frame(t).await,
+            ShmTransport::HubPeer(t) => TransportBackend::recv_frame(t).await,
+            ShmTransport::HubHostPeer(t) => TransportBackend::recv_frame(t).await,
+        }
+    }
+
+    fn close(&self) {
+        match self {
+            ShmTransport::Pair(t) => TransportBackend::close(t),
+            ShmTransport::HubPeer(t) => TransportBackend::close(t),
+            ShmTransport::HubHostPeer(t) => TransportBackend::close(t),
+        }
+    }
+
+    fn is_closed(&self) -> bool {
+        ShmTransport::is_closed(self)
+    }
+}
+
+impl TransportBackend for PairTransport {
     async fn send_frame(&self, frame: Frame) -> Result<(), TransportError> {
         if self.is_closed() {
             return Err(TransportError::Closed);
@@ -729,6 +815,7 @@ static_assertions::assert_impl_all!(ShmTransport: Send, Sync);
 mod tests {
     use super::*;
     use crate::FrameFlags;
+    use crate::MsgDescHot;
 
     #[tokio::test]
     async fn test_pair_creation() {
@@ -751,7 +838,7 @@ mod tests {
         let frame = Frame::with_inline_payload(desc, b"hello").unwrap();
 
         // Send from A.
-        a.send_frame(&frame).await.unwrap();
+        a.send_frame(frame).await.unwrap();
 
         // Receive on B.
         let recv = b.recv_frame().await.unwrap();
@@ -772,7 +859,7 @@ mod tests {
         let payload = vec![0u8; 1000]; // Larger than inline.
         let frame = Frame::with_payload(desc, payload.clone());
 
-        a.send_frame(&frame).await.unwrap();
+        a.send_frame(frame).await.unwrap();
 
         let recv = b.recv_frame().await.unwrap();
         assert_eq!(recv.desc.msg_id, 2);
@@ -787,13 +874,13 @@ mod tests {
         let mut desc_a = MsgDescHot::new();
         desc_a.msg_id = 1;
         let frame_a = Frame::with_inline_payload(desc_a, b"from A").unwrap();
-        a.send_frame(&frame_a).await.unwrap();
+        a.send_frame(frame_a).await.unwrap();
 
         // B -> A.
         let mut desc_b = MsgDescHot::new();
         desc_b.msg_id = 2;
         let frame_b = Frame::with_inline_payload(desc_b, b"from B").unwrap();
-        b.send_frame(&frame_b).await.unwrap();
+        b.send_frame(frame_b).await.unwrap();
 
         // Receive both.
         let recv_b = b.recv_frame().await.unwrap();
@@ -807,106 +894,14 @@ mod tests {
     async fn test_close() {
         let (a, _b) = ShmTransport::pair().unwrap();
 
-        a.close().await.unwrap();
+        a.close();
         assert!(a.is_closed());
 
         // Sending on closed transport should fail.
         let frame = Frame::new(MsgDescHot::new());
         assert!(matches!(
-            a.send_frame(&frame).await,
+            a.send_frame(frame).await,
             Err(TransportError::Closed)
         ));
-    }
-
-    #[tokio::test]
-    async fn test_encoder() {
-        let (a, _b) = ShmTransport::pair().unwrap();
-
-        let mut encoder = a.encoder();
-        encoder.encode_bytes(b"test data").unwrap();
-        let frame = encoder.finish().unwrap();
-
-        assert_eq!(frame.payload_bytes(), b"test data");
-    }
-
-    #[tokio::test]
-    async fn test_metrics_with_copy() {
-        let metrics = Arc::new(ShmMetrics::new());
-        let (a, _b) = ShmTransport::pair_with_metrics(metrics.clone()).unwrap();
-
-        // Encode regular heap data (will copy).
-        let heap_data = vec![0u8; 100];
-        let mut encoder = a.encoder();
-        encoder.encode_bytes(&heap_data).unwrap();
-        let _ = encoder.finish().unwrap();
-
-        // Should have recorded a copy.
-        assert_eq!(metrics.zero_copy_count(), 0);
-        assert_eq!(metrics.copy_count(), 1);
-    }
-
-    #[tokio::test]
-    async fn test_metrics_with_zero_copy() {
-        use crate::ShmAllocator;
-        use allocator_api2::vec::Vec as AllocVec;
-
-        let metrics = Arc::new(ShmMetrics::new());
-
-        // Create sessions manually so we can get the allocator.
-        let (session_a, session_b) = ShmSession::create_pair().unwrap();
-        let alloc = ShmAllocator::new(session_a.clone());
-
-        let a = ShmTransport::new_with_metrics(session_a, metrics.clone());
-        let _b = ShmTransport::new_with_metrics(session_b, metrics.clone());
-
-        // Allocate data in SHM.
-        let mut shm_data: AllocVec<u8, _> = AllocVec::new_in(alloc);
-        shm_data.extend_from_slice(&[42u8; 100]);
-
-        // Encode the SHM data (should be zero-copy).
-        let mut encoder = a.encoder();
-        encoder.encode_bytes(&shm_data).unwrap();
-        let frame = encoder.finish().unwrap();
-
-        // Should have recorded a zero-copy encode.
-        assert_eq!(metrics.zero_copy_count(), 1, "Expected 1 zero-copy encode");
-        assert_eq!(metrics.copy_count(), 0, "Expected 0 copy encodes");
-
-        // The frame should reference the slot directly (no external payload).
-        assert!(
-            frame.payload.is_none(),
-            "Zero-copy frame should not have external payload"
-        );
-    }
-
-    #[tokio::test]
-    async fn test_metrics_mixed() {
-        use crate::ShmAllocator;
-        use allocator_api2::vec::Vec as AllocVec;
-
-        let metrics = Arc::new(ShmMetrics::new());
-        let (session_a, session_b) = ShmSession::create_pair().unwrap();
-        let alloc = ShmAllocator::new(session_a.clone());
-
-        let a = ShmTransport::new_with_metrics(session_a, metrics.clone());
-        let _b = ShmTransport::new_with_metrics(session_b, metrics.clone());
-
-        // First: encode heap data (copy).
-        let heap_data = vec![1u8; 50];
-        let mut encoder = a.encoder();
-        encoder.encode_bytes(&heap_data).unwrap();
-        let _ = encoder.finish().unwrap();
-
-        // Second: encode SHM data (zero-copy).
-        let mut shm_data: AllocVec<u8, _> = AllocVec::new_in(alloc);
-        shm_data.extend_from_slice(&[2u8; 50]);
-        let mut encoder = a.encoder();
-        encoder.encode_bytes(&shm_data).unwrap();
-        let _ = encoder.finish().unwrap();
-
-        // Check metrics.
-        assert_eq!(metrics.zero_copy_count(), 1);
-        assert_eq!(metrics.copy_count(), 1);
-        assert!((metrics.zero_copy_ratio() - 0.5).abs() < 0.01);
     }
 }

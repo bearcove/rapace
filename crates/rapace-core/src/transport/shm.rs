@@ -1,6 +1,11 @@
 //! Shared memory (SHM) transport.
 
 pub mod futex;
+mod doorbell;
+mod hub_alloc;
+pub mod hub_layout;
+pub mod hub_session;
+mod hub_transport;
 pub mod layout;
 mod alloc;
 mod session;
@@ -9,6 +14,10 @@ mod transport;
 
 pub use alloc::ShmAllocator;
 pub use allocator_api2;
+pub use doorbell::{Doorbell, close_peer_fd};
+pub use hub_alloc::HubAllocator;
+pub use hub_session::{HubConfig, HubHost, HubPeer, HubSessionError, PeerInfo};
+pub use hub_transport::{HubHostPeerTransport, HubPeerTransport};
 pub use session::{ShmSession, ShmSessionConfig};
 pub use slot_guard::SlotGuard;
 pub use transport::{ShmMetrics, ShmTransport};
