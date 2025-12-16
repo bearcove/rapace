@@ -68,7 +68,7 @@ struct ShmTransportInner {
     name: Option<String>,
     /// Notify waiters when a slot is freed (in-process notification).
     /// This complements the futex for faster in-process wakeups.
-    slot_freed_notify: Notify,
+    slot_freed_notify: Arc<Notify>,
 }
 
 impl ShmTransport {
@@ -80,7 +80,7 @@ impl ShmTransport {
                 closed: std::sync::atomic::AtomicBool::new(false),
                 metrics: None,
                 name: None,
-                slot_freed_notify: Notify::new(),
+                slot_freed_notify: Arc::new(Notify::new()),
             }),
         }
     }
@@ -93,7 +93,7 @@ impl ShmTransport {
                 closed: std::sync::atomic::AtomicBool::new(false),
                 metrics: None,
                 name: Some(name.into()),
-                slot_freed_notify: Notify::new(),
+                slot_freed_notify: Arc::new(Notify::new()),
             }),
         }
     }
@@ -106,7 +106,7 @@ impl ShmTransport {
                 closed: std::sync::atomic::AtomicBool::new(false),
                 metrics: Some(metrics),
                 name: None,
-                slot_freed_notify: Notify::new(),
+                slot_freed_notify: Arc::new(Notify::new()),
             }),
         }
     }
@@ -123,7 +123,7 @@ impl ShmTransport {
                 closed: std::sync::atomic::AtomicBool::new(false),
                 metrics: Some(metrics),
                 name: Some(name.into()),
-                slot_freed_notify: Notify::new(),
+                slot_freed_notify: Arc::new(Notify::new()),
             }),
         }
     }
@@ -467,24 +467,29 @@ impl TransportBackend for ShmTransport {
                     // in the descriptor were set by the peer during send_frame.
                     let payload_data = unsafe {
                         data_segment
-                            .read_slot(desc.payload_slot, desc.payload_offset, desc.payload_len)
+                            .read_slot(
+                                desc.payload_slot,
+                                desc.payload_generation,
+                                desc.payload_offset,
+                                desc.payload_len,
+                            )
                             .map_err(|e| slot_error_to_transport(e, "read_slot"))?
                     };
-                    let payload = payload_data.to_vec();
+                    let _ = payload_data;
 
-                    if data_segment
-                        .free(desc.payload_slot, desc.payload_generation)
-                        .is_ok()
-                    {
-                        if let Some(ref metrics) = self.inner.metrics {
-                            metrics.record_slot_free();
-                        }
-                        self.inner.slot_freed_notify.notify_waiters();
-                    }
+                    let guard = crate::transport::shm::SlotGuard::new(
+                        self.inner.session.clone(),
+                        desc.payload_slot,
+                        desc.payload_generation,
+                        desc.payload_offset,
+                        desc.payload_len,
+                        Some(self.inner.slot_freed_notify.clone()),
+                        self.inner.metrics.clone(),
+                    );
 
                     return Ok(Frame {
                         desc,
-                        payload: Payload::Owned(payload),
+                        payload: Payload::Shm(guard),
                     });
                 }
             }

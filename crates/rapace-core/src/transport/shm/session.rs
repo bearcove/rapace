@@ -1086,7 +1086,8 @@ mod tests {
         data.mark_in_flight(slot_idx, generation).unwrap();
 
         // Read it back.
-        let read_data = unsafe { data.read_slot(slot_idx, 0, test_data.len() as u32).unwrap() };
+        let read_data =
+            unsafe { data.read_slot(slot_idx, generation, 0, test_data.len() as u32).unwrap() };
         assert_eq!(read_data, test_data);
 
         // Free it.

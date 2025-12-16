@@ -848,11 +848,28 @@ impl DataSegment {
     /// # Safety
     ///
     /// Caller must have read access (InFlight state with matching generation).
-    pub unsafe fn read_slot(&self, index: u32, offset: u32, len: u32) -> Result<&[u8], SlotError> {
+    pub unsafe fn read_slot(
+        &self,
+        index: u32,
+        expected_gen: u32,
+        offset: u32,
+        len: u32,
+    ) -> Result<&[u8], SlotError> {
         let header = self.header();
 
         if index >= header.slot_count {
             return Err(SlotError::InvalidIndex);
+        }
+
+        // SAFETY: index < slot_count (checked above).
+        let meta = unsafe { self.meta(index) };
+
+        if meta.get_generation() != expected_gen {
+            return Err(SlotError::StaleGeneration);
+        }
+
+        if meta.get_state() != SlotState::InFlight {
+            return Err(SlotError::InvalidState);
         }
 
         let end = offset.saturating_add(len);

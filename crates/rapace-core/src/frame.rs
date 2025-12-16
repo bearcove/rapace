@@ -17,9 +17,6 @@ pub enum Payload {
     /// Placeholder for pooled buffers (see issue #46).
     Pooled(PooledBuf),
     /// Payload bytes backed by a shared-memory slot guard (frees slot on drop).
-    ///
-    /// Placeholder; the SHM backend will start returning this once slot guards
-    /// are ported end-to-end.
     #[cfg(feature = "shm")]
     Shm(crate::transport::shm::SlotGuard),
 }
