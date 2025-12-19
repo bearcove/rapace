@@ -385,7 +385,21 @@ impl TreiberSlabRaw {
                     );
 
                     if result.is_err() {
-                        self.push_to_free_list(index);
+                        // The slot was popped from the free list but its state wasn't Free.
+                        // This should never happen - it indicates an invariant violation.
+                        // Only push it back if it's actually in Free state to avoid corrupting
+                        // data that another thread may be using.
+                        let current_state = meta.state.load(Ordering::Acquire);
+                        if current_state == SlotState::Free as u32 {
+                            self.push_to_free_list(index);
+                        }
+                        // If not Free, the slot is leaked - but that's better than data corruption.
+                        // In debug builds, this would indicate a serious bug.
+                        debug_assert_eq!(
+                            current_state,
+                            SlotState::Free as u32,
+                            "slot popped from free list had unexpected state"
+                        );
                         spin_loop();
                         continue;
                     }

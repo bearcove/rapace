@@ -286,9 +286,8 @@ impl std::fmt::Display for RingStatus {
 // =============================================================================
 
 // SlotState, SlotMeta, and DataSegmentHeader are now re-exported from
-// shm-primitives (see imports at top of file). The layouts are identical.
-const _: () = assert!(core::mem::size_of::<SlotMeta>() == 8);
-const _: () = assert!(core::mem::size_of::<DataSegmentHeader>() == 64);
+// shm-primitives (see imports at top of file). Size assertions are in
+// shm-primitives with proper #[cfg(not(feature = "loom"))] guards.
 
 /// A view into the data segment in SHM.
 ///
@@ -908,40 +907,67 @@ mod tests {
     // Stress tests for alloc/enqueue/dequeue/free cycle
     // =========================================================================
 
+    /// An aligned buffer for testing. Uses aligned allocation to satisfy
+    /// the 64-byte alignment requirement of segment headers.
+    struct AlignedBuffer {
+        ptr: *mut u8,
+        layout: std::alloc::Layout,
+    }
+
+    impl AlignedBuffer {
+        fn new(size: usize) -> Self {
+            let layout = std::alloc::Layout::from_size_align(size, 64).expect("valid layout");
+            let ptr = unsafe { std::alloc::alloc_zeroed(layout) };
+            assert!(!ptr.is_null(), "allocation failed");
+            Self { ptr, layout }
+        }
+
+        fn as_mut_slice(&mut self) -> &mut [u8] {
+            unsafe { std::slice::from_raw_parts_mut(self.ptr, self.layout.size()) }
+        }
+    }
+
+    impl Drop for AlignedBuffer {
+        fn drop(&mut self) {
+            unsafe { std::alloc::dealloc(self.ptr, self.layout) };
+        }
+    }
+
     /// Helper to create a heap-backed segment for testing.
     fn create_test_segment(
         ring_capacity: u32,
         slot_size: u32,
         slot_count: u32,
-    ) -> (Vec<u8>, SegmentOffsets) {
+    ) -> (AlignedBuffer, SegmentOffsets) {
         let size = calculate_segment_size(ring_capacity, slot_size, slot_count);
-        let mut buf = vec![0u8; size];
+        let buf = AlignedBuffer::new(size);
         let offsets = SegmentOffsets::calculate(ring_capacity, slot_count);
 
+        let base = buf.ptr;
+
         // Initialize segment header
-        let header = unsafe { &mut *(buf.as_mut_ptr().add(offsets.header) as *mut SegmentHeader) };
+        let header = unsafe { &mut *(base.add(offsets.header) as *mut SegmentHeader) };
         header.init(ring_capacity, slot_size, slot_count);
 
         // Initialize A→B ring header
         let ring_a_to_b_header =
-            unsafe { &mut *(buf.as_mut_ptr().add(offsets.ring_a_to_b_header) as *mut DescRingHeader) };
+            unsafe { &mut *(base.add(offsets.ring_a_to_b_header) as *mut DescRingHeader) };
         ring_a_to_b_header.init(ring_capacity);
 
         // Initialize B→A ring header
         let ring_b_to_a_header =
-            unsafe { &mut *(buf.as_mut_ptr().add(offsets.ring_b_to_a_header) as *mut DescRingHeader) };
+            unsafe { &mut *(base.add(offsets.ring_b_to_a_header) as *mut DescRingHeader) };
         ring_b_to_a_header.init(ring_capacity);
 
         // Initialize data segment header
         let data_header =
-            unsafe { &mut *(buf.as_mut_ptr().add(offsets.data_header) as *mut DataSegmentHeader) };
+            unsafe { &mut *(base.add(offsets.data_header) as *mut DataSegmentHeader) };
         data_header.init(slot_size, slot_count);
 
         // Initialize slot metadata
         for i in 0..slot_count {
-            let meta = unsafe {
-                &mut *(buf.as_mut_ptr().add(offsets.slot_meta + i as usize * 8) as *mut SlotMeta)
-            };
+            let meta =
+                unsafe { &mut *(base.add(offsets.slot_meta + i as usize * 8) as *mut SlotMeta) };
             meta.init();
         }
 
@@ -981,7 +1007,7 @@ mod tests {
         let ring_capacity = 32u32;
         let (mut buf, offsets) = create_test_segment(ring_capacity, 64, slot_count);
 
-        let (data_segment, ring) = unsafe { create_segment_views(&mut buf, &offsets) };
+        let (data_segment, ring) = unsafe { create_segment_views(buf.as_mut_slice(), &offsets) };
 
         let mut local_head = 0u64;
         let iterations = 1000;
@@ -1026,7 +1052,7 @@ mod tests {
         let ring_capacity = 64u32;
         let (mut buf, offsets) = create_test_segment(ring_capacity, 64, slot_count);
 
-        let (data_segment, ring) = unsafe { create_segment_views(&mut buf, &offsets) };
+        let (data_segment, ring) = unsafe { create_segment_views(buf.as_mut_slice(), &offsets) };
 
         // Wrap in Arc for sharing between threads
         let data_segment = Arc::new(data_segment);
@@ -1044,7 +1070,7 @@ mod tests {
             while sent < message_count {
                 // Try to allocate - may need to spin if slots are exhausted
                 let alloc_result = producer_data.alloc();
-                let (slot_idx, gen) = match alloc_result {
+                let (slot_idx, generation) = match alloc_result {
                     Ok(result) => result,
                     Err(SlotError::NoFreeSlots) => {
                         std::hint::spin_loop();
@@ -1056,12 +1082,12 @@ mod tests {
                 // Create descriptor
                 let mut desc = crate::MsgDescHot::new();
                 desc.channel_id = sent as u32;
-                desc.slot_index = slot_idx;
-                desc.generation = gen;
+                desc.payload_slot = slot_idx;
+                desc.payload_generation = generation;
 
                 // Mark in-flight
                 producer_data
-                    .mark_in_flight(slot_idx, gen)
+                    .mark_in_flight(slot_idx, generation)
                     .expect("mark_in_flight should succeed");
 
                 // Try to enqueue - may need to spin if ring is full
@@ -1088,7 +1114,7 @@ mod tests {
                     Some(desc) => {
                         channel_ids.push(desc.channel_id);
                         consumer_data
-                            .free(desc.slot_index, desc.generation)
+                            .free(desc.payload_slot, desc.payload_generation)
                             .expect("free should succeed");
                         received += 1;
                     }
@@ -1119,7 +1145,7 @@ mod tests {
         let ring_capacity = 16u32;
         let (mut buf, offsets) = create_test_segment(ring_capacity, 64, slot_count);
 
-        let (data_segment, _ring) = unsafe { create_segment_views(&mut buf, &offsets) };
+        let (data_segment, _ring) = unsafe { create_segment_views(buf.as_mut_slice(), &offsets) };
 
         // Should be able to allocate slot_count slots
         let mut handles = Vec::new();
@@ -1136,9 +1162,9 @@ mod tests {
         );
 
         // Free all slots
-        for (idx, gen) in handles {
+        for (idx, generation) in handles {
             data_segment
-                .free_allocated(idx, gen)
+                .free_allocated(idx, generation)
                 .expect("free_allocated should succeed");
         }
 

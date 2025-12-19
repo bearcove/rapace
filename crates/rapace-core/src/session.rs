@@ -456,9 +456,8 @@ impl RpcSession {
         desc.method_id = 0; // Tunnels don't use method_id
         desc.flags = FrameFlags::DATA;
 
-        tracing::info!(channel_id, payload_len = payload.len(), "send_chunk");
-
         let payload_len = payload.len();
+        tracing::info!(channel_id, payload_len, "send_chunk");
         let frame = if payload_len <= INLINE_PAYLOAD_SIZE {
             Frame::with_inline_payload(desc, &payload).expect("inline payload should fit")
         } else {
