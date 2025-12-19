@@ -34,6 +34,10 @@ pub struct TunnelStream {
     read_buf: Bytes,
     read_eof: bool,
     read_eos_after_buf: bool,
+    logged_first_read: bool,
+    logged_first_write: bool,
+    logged_read_eof: bool,
+    logged_shutdown: bool,
 
     pending_send: Option<PendingSend>,
     write_closed: bool,
@@ -58,6 +62,10 @@ impl TunnelStream {
             read_eos_after_buf: false,
             pending_send: None,
             write_closed: false,
+            logged_first_read: false,
+            logged_first_write: false,
+            logged_read_eof: false,
+            logged_shutdown: false,
         }
     }
 
@@ -125,9 +133,23 @@ impl AsyncRead for TunnelStream {
             Poll::Pending => Poll::Pending,
             Poll::Ready(None) => {
                 self.read_eof = true;
+                if !self.logged_read_eof {
+                    self.logged_read_eof = true;
+                    tracing::info!(channel_id = self.channel_id, "tunnel read EOF (rx closed)");
+                }
                 Poll::Ready(Ok(()))
             }
             Poll::Ready(Some(chunk)) => {
+                if !self.logged_first_read {
+                    self.logged_first_read = true;
+                    tracing::info!(
+                        channel_id = self.channel_id,
+                        payload_len = chunk.payload_bytes().len(),
+                        is_eos = chunk.is_eos(),
+                        is_error = chunk.is_error(),
+                        "tunnel read first chunk"
+                    );
+                }
                 if chunk.is_error() {
                     let err = parse_error_payload(chunk.payload_bytes());
                     let (kind, msg) = match err {
@@ -150,6 +172,10 @@ impl AsyncRead for TunnelStream {
                 let payload = chunk.payload_bytes();
                 if chunk.is_eos() && payload.is_empty() {
                     self.read_eof = true;
+                    if !self.logged_read_eof {
+                        self.logged_read_eof = true;
+                        tracing::info!(channel_id = self.channel_id, "tunnel read EOF (empty EOS)");
+                    }
                     return Poll::Ready(Ok(()));
                 }
 
@@ -196,6 +222,10 @@ impl AsyncWrite for TunnelStream {
         }
 
         let channel_id = self.channel_id;
+        if !self.logged_first_write {
+            self.logged_first_write = true;
+            tracing::info!(channel_id, payload_len = data.len(), "tunnel first write");
+        }
         let session = self.session.clone();
         let bytes = data.to_vec();
         let len = bytes.len();
@@ -257,6 +287,10 @@ impl AsyncWrite for TunnelStream {
         }
 
         self.write_closed = true;
+        if !self.logged_shutdown {
+            self.logged_shutdown = true;
+            tracing::info!(channel_id = self.channel_id, "tunnel shutdown");
+        }
         let channel_id = self.channel_id;
         let session = self.session.clone();
         tokio::spawn(async move {
