@@ -12,8 +12,8 @@ use bytes::Bytes;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::sync::mpsc;
 
-use crate::{RpcError, TunnelChunk, parse_error_payload};
 use crate::session::RpcSession;
+use crate::{RpcError, TunnelChunk, parse_error_payload};
 
 /// A handle identifying a tunnel channel.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -35,9 +35,8 @@ pub struct TunnelStream {
     read_eof: bool,
     read_eos_after_buf: bool,
 
-    pending_send: Option<
-        Pin<Box<dyn std::future::Future<Output = Result<(), RpcError>> + Send + 'static>>,
-    >,
+    pending_send:
+        Option<Pin<Box<dyn std::future::Future<Output = Result<(), RpcError>> + Send + 'static>>>,
     write_closed: bool,
 }
 
@@ -47,6 +46,7 @@ impl TunnelStream {
     /// This registers a tunnel receiver immediately, so the peer can start sending.
     pub fn new(session: Arc<RpcSession>, channel_id: u32) -> Self {
         let rx = session.register_tunnel(channel_id);
+        tracing::info!(channel_id, "tunnel stream created");
         Self {
             channel_id,
             session,
@@ -62,6 +62,7 @@ impl TunnelStream {
     /// Allocate a fresh tunnel channel ID and return a stream for it.
     pub fn open(session: Arc<RpcSession>) -> (TunnelHandle, Self) {
         let channel_id = session.next_channel_id();
+        tracing::info!(channel_id, "tunnel stream open");
         let stream = Self::new(session, channel_id);
         (TunnelHandle { channel_id }, stream)
     }
@@ -73,6 +74,12 @@ impl TunnelStream {
 
 impl Drop for TunnelStream {
     fn drop(&mut self) {
+        tracing::info!(
+            channel_id = self.channel_id,
+            write_closed = self.write_closed,
+            read_eof = self.read_eof,
+            "tunnel stream dropped"
+        );
         // Always unregister locally to avoid leaking an entry in `RpcSession::tunnels`
         // when the peer stops sending without an EOS.
         self.session.unregister_tunnel(self.channel_id);
@@ -125,9 +132,15 @@ impl AsyncRead for TunnelStream {
                         RpcError::Status { code, message } => {
                             (std::io::ErrorKind::Other, format!("{code:?}: {message}"))
                         }
-                        RpcError::Transport(e) => (std::io::ErrorKind::BrokenPipe, format!("{e:?}")),
-                        RpcError::Cancelled => (std::io::ErrorKind::Interrupted, "cancelled".into()),
-                        RpcError::DeadlineExceeded => (std::io::ErrorKind::TimedOut, "deadline exceeded".into()),
+                        RpcError::Transport(e) => {
+                            (std::io::ErrorKind::BrokenPipe, format!("{e:?}"))
+                        }
+                        RpcError::Cancelled => {
+                            (std::io::ErrorKind::Interrupted, "cancelled".into())
+                        }
+                        RpcError::DeadlineExceeded => {
+                            (std::io::ErrorKind::TimedOut, "deadline exceeded".into())
+                        }
                     };
                     return Poll::Ready(Err(std::io::Error::new(kind, msg)));
                 }
@@ -184,7 +197,9 @@ impl AsyncWrite for TunnelStream {
         let session = self.session.clone();
         let bytes = data.to_vec();
         let len = bytes.len();
-        self.pending_send = Some(Box::pin(async move { session.send_chunk(channel_id, bytes).await }));
+        self.pending_send = Some(Box::pin(async move {
+            session.send_chunk(channel_id, bytes).await
+        }));
 
         // Immediately poll the future once.
         if let Some(fut) = self.pending_send.as_mut() {
@@ -228,10 +243,7 @@ impl AsyncWrite for TunnelStream {
         }
     }
 
-    fn poll_shutdown(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<std::io::Result<()>> {
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         if self.write_closed {
             return Poll::Ready(Ok(()));
         }

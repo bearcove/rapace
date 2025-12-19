@@ -339,6 +339,7 @@ impl RpcSession {
             "tunnel already registered on channel {}",
             channel_id
         );
+        tracing::info!(channel_id, "tunnel registered");
         rx
     }
 
@@ -396,7 +397,13 @@ impl RpcSession {
 
             Ok(()) // Frame was handled by tunnel
         } else {
-            tracing::trace!(channel_id, "try_route_to_tunnel: no tunnel for channel");
+            tracing::warn!(
+                channel_id,
+                payload_len = frame.payload_bytes().len(),
+                is_eos = flags.contains(FrameFlags::EOS),
+                is_error = flags.contains(FrameFlags::ERROR),
+                "try_route_to_tunnel: no tunnel for channel"
+            );
             Err(frame) // No tunnel, continue normal processing
         }
     }
@@ -411,6 +418,8 @@ impl RpcSession {
         desc.channel_id = channel_id;
         desc.method_id = 0; // Tunnels don't use method_id
         desc.flags = FrameFlags::DATA;
+
+        tracing::info!(channel_id, payload_len = payload.len(), "send_chunk");
 
         let frame = if payload.len() <= INLINE_PAYLOAD_SIZE {
             Frame::with_inline_payload(desc, &payload).expect("inline payload should fit")
@@ -446,6 +455,8 @@ impl RpcSession {
         // Send EOS with empty payload
         let frame = Frame::with_inline_payload(desc, &[]).expect("empty payload should fit");
 
+        tracing::info!(channel_id, "close_tunnel");
+
         self.transport
             .send_frame(frame)
             .await
@@ -457,6 +468,7 @@ impl RpcSession {
     /// Use this when the tunnel was closed by the remote side (you received EOS)
     /// and you want to clean up without sending another EOS.
     pub fn unregister_tunnel(&self, channel_id: u32) {
+        tracing::info!(channel_id, "tunnel unregistered");
         self.tunnels.lock().remove(&channel_id);
     }
 
