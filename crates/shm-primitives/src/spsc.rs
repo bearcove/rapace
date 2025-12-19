@@ -20,6 +20,7 @@ pub struct SpscRingHeader {
     _pad3: [u8; 60],
 }
 
+#[cfg(not(feature = "loom"))]
 const _: () = assert!(core::mem::size_of::<SpscRingHeader>() == 192);
 
 impl SpscRingHeader {
@@ -93,7 +94,7 @@ impl<T: Copy> SpscRing<T> {
         assert!(required <= region.len(), "region too small for ring");
         assert!(entries_offset % align_of::<T>() == 0, "entries misaligned");
 
-        let header = region.get_mut::<SpscRingHeader>(header_offset);
+        let header = unsafe { region.get_mut::<SpscRingHeader>(header_offset) };
         header.init(capacity);
 
         Self {
@@ -117,7 +118,7 @@ impl<T: Copy> SpscRing<T> {
         assert!(align_of::<T>() <= 64, "entry alignment must be <= 64");
 
         let entries_offset = header_offset + size_of::<SpscRingHeader>();
-        let header = region.get::<SpscRingHeader>(header_offset);
+        let header = unsafe { region.get::<SpscRingHeader>(header_offset) };
         let capacity = header.capacity;
 
         assert!(
@@ -265,7 +266,6 @@ impl<'a, T: Copy> SpscConsumer<'a, T> {
             return None;
         }
 
-        let capacity = header.capacity as u64;
         let mask = header.mask();
         let slot = (tail & mask) as usize;
         let entry = unsafe { ptr::read(self.ring.entry_ptr(slot)) };

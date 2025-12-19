@@ -5,6 +5,7 @@ use crate::spsc::SpscRing;
 use crate::sync::{AtomicU32, Ordering, thread};
 use crate::treiber::{AllocResult, SlotHandle, TreiberSlab};
 use crate::{SlotMeta, SlotState};
+use alloc::vec;
 use loom::sync::Arc;
 
 #[test]

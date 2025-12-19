@@ -24,6 +24,7 @@ pub struct TreiberSlabHeader {
     _pad2: [u8; 36],
 }
 
+#[cfg(not(feature = "loom"))]
 const _: () = assert!(core::mem::size_of::<TreiberSlabHeader>() == 64);
 
 impl TreiberSlabHeader {
@@ -112,12 +113,14 @@ impl TreiberSlab {
         let required = data_offset + (slot_count as usize * slot_size as usize);
         assert!(required <= region.len(), "region too small for slab");
 
-        let header = region.get_mut::<TreiberSlabHeader>(header_offset);
+        let header = unsafe { region.get_mut::<TreiberSlabHeader>(header_offset) };
         header.init(slot_size, slot_count);
 
         // Initialize slot metadata.
         for i in 0..slot_count {
-            let meta = region.get_mut::<SlotMeta>(meta_offset + i as usize * size_of::<SlotMeta>());
+            let meta = unsafe {
+                region.get_mut::<SlotMeta>(meta_offset + i as usize * size_of::<SlotMeta>())
+            };
             meta.init();
         }
 
@@ -129,7 +132,7 @@ impl TreiberSlab {
         };
 
         // Initialize free list by linking all slots together.
-        slab.init_free_list();
+        unsafe { slab.init_free_list() };
 
         slab
     }
@@ -144,7 +147,7 @@ impl TreiberSlab {
             header_offset % 64 == 0,
             "header_offset must be 64-byte aligned"
         );
-        let header = region.get::<TreiberSlabHeader>(header_offset);
+        let header = unsafe { region.get::<TreiberSlabHeader>(header_offset) };
         if header.slot_count == 0 {
             return Err("slot_count must be > 0");
         }
@@ -181,7 +184,7 @@ impl TreiberSlab {
     #[inline]
     unsafe fn meta(&self, index: u32) -> &SlotMeta {
         let off = self.meta_offset + index as usize * size_of::<SlotMeta>();
-        self.region.get::<SlotMeta>(off)
+        unsafe { self.region.get::<SlotMeta>(off) }
     }
 
     #[inline]
@@ -193,13 +196,13 @@ impl TreiberSlab {
 
     #[inline]
     unsafe fn read_next_free(&self, index: u32) -> u32 {
-        let ptr = self.data_ptr(index) as *const u32;
+        let ptr = unsafe { self.data_ptr(index) as *const u32 };
         unsafe { core::ptr::read_volatile(ptr) }
     }
 
     #[inline]
     unsafe fn write_next_free(&self, index: u32, next: u32) {
-        let ptr = self.data_ptr(index) as *mut u32;
+        let ptr = unsafe { self.data_ptr(index) as *mut u32 };
         unsafe { core::ptr::write_volatile(ptr, next) };
     }
 

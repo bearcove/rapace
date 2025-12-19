@@ -29,19 +29,19 @@ impl Region {
 
     /// Returns the base pointer of the region.
     #[inline]
-    pub fn as_ptr(self) -> *mut u8 {
+    pub fn as_ptr(&self) -> *mut u8 {
         self.base.as_ptr()
     }
 
     /// Returns the size of the region in bytes.
     #[inline]
-    pub fn len(self) -> usize {
+    pub fn len(&self) -> usize {
         self.len
     }
 
     /// Returns a pointer to offset `off` within the region.
     #[inline]
-    pub fn offset(self, off: usize) -> *mut u8 {
+    pub fn offset(&self, off: usize) -> *mut u8 {
         assert!(
             off < self.len,
             "offset {off} out of bounds (len={})",
@@ -56,10 +56,10 @@ impl Region {
     ///
     /// The offset must be aligned for `T` and within bounds.
     #[inline]
-    pub unsafe fn get<T>(self, off: usize) -> &T {
+    pub unsafe fn get<T>(&self, off: usize) -> &T {
         debug_assert!(off + size_of::<T>() <= self.len);
         debug_assert!(off % align_of::<T>() == 0);
-        &*(self.offset(off) as *const T)
+        unsafe { &*(self.offset(off) as *const T) }
     }
 
     /// Returns a mutable reference to a `T` at the given byte offset.
@@ -68,10 +68,10 @@ impl Region {
     ///
     /// The offset must be aligned for `T` and within bounds.
     #[inline]
-    pub unsafe fn get_mut<T>(self, off: usize) -> &mut T {
+    pub unsafe fn get_mut<T>(&self, off: usize) -> &mut T {
         debug_assert!(off + size_of::<T>() <= self.len);
         debug_assert!(off % align_of::<T>() == 0);
-        &mut *(self.offset(off) as *mut T)
+        unsafe { &mut *(self.offset(off) as *mut T) }
     }
 }
 
@@ -126,9 +126,7 @@ mod heap {
 
     unsafe impl Send for HeapRegion {}
     unsafe impl Sync for HeapRegion {}
-
-    pub(super) use HeapRegion as HeapRegionExport;
 }
 
 #[cfg(any(test, feature = "alloc"))]
-pub use heap::HeapRegionExport as HeapRegion;
+pub use heap::HeapRegion;

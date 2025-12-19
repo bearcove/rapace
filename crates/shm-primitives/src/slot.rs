@@ -28,6 +28,7 @@ pub struct SlotMeta {
     pub state: AtomicU32,
 }
 
+#[cfg(not(feature = "loom"))]
 const _: () = assert!(core::mem::size_of::<SlotMeta>() == 8);
 
 impl SlotMeta {
