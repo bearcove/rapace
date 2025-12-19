@@ -62,11 +62,15 @@ impl SpscRingHeader {
 }
 
 /// A wait-free SPSC ring buffer in a shared memory region.
+///
+/// This is a convenience wrapper around `SpscRingRaw<T>` that manages
+/// memory through a `Region`. All operations delegate to the raw implementation.
 pub struct SpscRing<T> {
+    /// We hold the region to keep the backing memory alive.
+    /// All operations go through `inner` which holds raw pointers into this region.
+    #[allow(dead_code)]
     region: Region,
-    header_offset: usize,
-    entries_offset: usize,
-    _marker: core::marker::PhantomData<T>,
+    inner: SpscRingRaw<T>,
 }
 
 unsafe impl<T: Send> Send for SpscRing<T> {}
@@ -97,15 +101,16 @@ impl<T: Copy> SpscRing<T> {
             "entries misaligned"
         );
 
-        let header = unsafe { region.get_mut::<SpscRingHeader>(header_offset) };
-        header.init(capacity);
+        let header_ptr = region.offset(header_offset) as *mut SpscRingHeader;
+        let entries_ptr = region.offset(entries_offset) as *mut T;
 
-        Self {
-            region,
-            header_offset,
-            entries_offset,
-            _marker: core::marker::PhantomData,
-        }
+        // Initialize the header
+        unsafe { (*header_ptr).init(capacity) };
+
+        // Create the inner raw ring
+        let inner = unsafe { SpscRingRaw::from_raw(header_ptr, entries_ptr) };
+
+        Self { region, inner }
     }
 
     /// Attach to an existing ring in the region.
@@ -121,8 +126,8 @@ impl<T: Copy> SpscRing<T> {
         assert!(align_of::<T>() <= 64, "entry alignment must be <= 64");
 
         let entries_offset = header_offset + size_of::<SpscRingHeader>();
-        let header = unsafe { region.get::<SpscRingHeader>(header_offset) };
-        let capacity = header.capacity;
+        let header_ptr = region.offset(header_offset) as *mut SpscRingHeader;
+        let capacity = unsafe { (*header_ptr).capacity };
 
         assert!(
             capacity.is_power_of_two() && capacity > 0,
@@ -135,28 +140,21 @@ impl<T: Copy> SpscRing<T> {
             "entries misaligned"
         );
 
-        Self {
-            region,
-            header_offset,
-            entries_offset,
-            _marker: core::marker::PhantomData,
-        }
+        let entries_ptr = region.offset(entries_offset) as *mut T;
+        let inner = unsafe { SpscRingRaw::from_raw(header_ptr, entries_ptr) };
+
+        Self { region, inner }
     }
 
+    /// Get a reference to the inner raw ring.
     #[inline]
-    fn header(&self) -> &SpscRingHeader {
-        unsafe { self.region.get::<SpscRingHeader>(self.header_offset) }
-    }
-
-    #[inline]
-    unsafe fn entry_ptr(&self, slot: usize) -> *mut T {
-        let base = self.region.offset(self.entries_offset);
-        unsafe { base.add(slot * size_of::<T>()) as *mut T }
+    pub fn inner(&self) -> &SpscRingRaw<T> {
+        &self.inner
     }
 
     /// Split into producer and consumer handles.
     pub fn split(&self) -> (SpscProducer<'_, T>, SpscConsumer<'_, T>) {
-        let head = self.header().visible_head.load(Ordering::Acquire);
+        let head = self.inner.status().visible_head;
         (
             SpscProducer {
                 ring: self,
@@ -169,29 +167,18 @@ impl<T: Copy> SpscRing<T> {
     /// Returns the ring capacity.
     #[inline]
     pub fn capacity(&self) -> u32 {
-        self.header().capacity
+        self.inner.capacity()
     }
 
     /// Returns true if the ring appears empty.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.header().is_empty()
+        self.inner.is_empty()
     }
 
     /// Returns a status snapshot of head/tail.
     pub fn status(&self) -> RingStatus {
-        let header = self.header();
-        let visible_head = header.visible_head.load(Ordering::Acquire);
-        let tail = header.tail.load(Ordering::Acquire);
-        let capacity = header.capacity;
-        let len = visible_head.saturating_sub(tail) as u32;
-
-        RingStatus {
-            visible_head,
-            tail,
-            capacity,
-            len,
-        }
+        self.inner.status()
     }
 }
 
@@ -222,62 +209,36 @@ impl PushResult {
 
 impl<'a, T: Copy> SpscProducer<'a, T> {
     /// Try to push an entry to the ring.
+    ///
+    /// Delegates to `SpscRingRaw::enqueue`.
     pub fn try_push(&mut self, entry: T) -> PushResult {
-        let header = self.ring.header();
-        let capacity = header.capacity as u64;
-        let mask = header.mask();
-
-        let tail = header.tail.load(Ordering::Acquire);
-        if self.local_head.wrapping_sub(tail) >= capacity {
-            return PushResult::WouldBlock;
+        match self.ring.inner.enqueue(&mut self.local_head, &entry) {
+            Ok(()) => PushResult::Ok,
+            Err(RingFull) => PushResult::WouldBlock,
         }
-
-        let slot = (self.local_head & mask) as usize;
-        unsafe {
-            let ptr = self.ring.entry_ptr(slot);
-            ptr::write(ptr, entry);
-        }
-
-        self.local_head = self.local_head.wrapping_add(1);
-        header
-            .visible_head
-            .store(self.local_head, Ordering::Release);
-
-        PushResult::Ok
     }
 
     /// Returns true if the ring appears full.
     #[inline]
     pub fn is_full(&self) -> bool {
-        self.ring.header().is_full(self.local_head)
+        self.ring.inner.is_full(self.local_head)
     }
 
     /// Returns the number of entries that can be pushed (approximate).
     #[inline]
     pub fn available_capacity(&self) -> u64 {
-        let capacity = self.ring.header().capacity as u64;
-        let tail = self.ring.header().tail.load(Ordering::Acquire);
+        let capacity = self.ring.inner.capacity() as u64;
+        let tail = self.ring.inner.status().tail;
         capacity.saturating_sub(self.local_head.wrapping_sub(tail))
     }
 }
 
 impl<'a, T: Copy> SpscConsumer<'a, T> {
     /// Try to pop an entry from the ring.
+    ///
+    /// Delegates to `SpscRingRaw::dequeue`.
     pub fn try_pop(&mut self) -> Option<T> {
-        let header = self.ring.header();
-        let tail = header.tail.load(Ordering::Relaxed);
-        let head = header.visible_head.load(Ordering::Acquire);
-
-        if tail == head {
-            return None;
-        }
-
-        let mask = header.mask();
-        let slot = (tail & mask) as usize;
-        let entry = unsafe { ptr::read(self.ring.entry_ptr(slot)) };
-        header.tail.store(tail.wrapping_add(1), Ordering::Release);
-
-        Some(entry)
+        self.ring.inner.dequeue()
     }
 
     /// Returns true if the ring appears empty.
@@ -289,7 +250,7 @@ impl<'a, T: Copy> SpscConsumer<'a, T> {
     /// Returns the number of entries available to pop (approximate).
     #[inline]
     pub fn len(&self) -> u64 {
-        self.ring.header().len()
+        self.ring.inner.status().len as u64
     }
 }
 

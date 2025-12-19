@@ -70,11 +70,15 @@ pub enum SlotError {
 pub type FreeError = SlotError;
 
 /// A lock-free slab allocator backed by a region.
+///
+/// This is a convenience wrapper around `TreiberSlabRaw` that manages
+/// memory through a `Region`. All operations delegate to the raw implementation.
 pub struct TreiberSlab {
+    /// We hold the region to keep the backing memory alive.
+    /// All operations go through `inner` which holds raw pointers into this region.
+    #[allow(dead_code)]
     region: Region,
-    header_offset: usize,
-    meta_offset: usize,
-    data_offset: usize,
+    inner: TreiberSlabRaw,
 }
 
 unsafe impl Send for TreiberSlab {}
@@ -113,28 +117,27 @@ impl TreiberSlab {
         let required = data_offset + (slot_count as usize * slot_size as usize);
         assert!(required <= region.len(), "region too small for slab");
 
-        let header = unsafe { region.get_mut::<TreiberSlabHeader>(header_offset) };
-        header.init(slot_size, slot_count);
+        // Get raw pointers
+        let header_ptr = region.offset(header_offset) as *mut TreiberSlabHeader;
+        let slot_meta_ptr = region.offset(meta_offset) as *mut SlotMeta;
+        let slot_data_ptr = region.offset(data_offset);
 
-        // Initialize slot metadata.
+        // Initialize header
+        unsafe { (*header_ptr).init(slot_size, slot_count) };
+
+        // Initialize slot metadata
         for i in 0..slot_count {
-            let meta = unsafe {
-                region.get_mut::<SlotMeta>(meta_offset + i as usize * size_of::<SlotMeta>())
-            };
+            let meta = unsafe { &mut *slot_meta_ptr.add(i as usize) };
             meta.init();
         }
 
-        let slab = Self {
-            region,
-            header_offset,
-            meta_offset,
-            data_offset,
-        };
+        // Create inner raw slab
+        let inner = unsafe { TreiberSlabRaw::from_raw(header_ptr, slot_meta_ptr, slot_data_ptr) };
 
-        // Initialize free list by linking all slots together.
-        unsafe { slab.init_free_list() };
+        // Initialize free list by linking all slots together
+        unsafe { inner.init_free_list() };
 
-        slab
+        Self { region, inner }
     }
 
     /// Attach to an existing slab.
@@ -147,7 +150,10 @@ impl TreiberSlab {
             header_offset.is_multiple_of(64),
             "header_offset must be 64-byte aligned"
         );
-        let header = unsafe { region.get::<TreiberSlabHeader>(header_offset) };
+
+        let header_ptr = region.offset(header_offset) as *mut TreiberSlabHeader;
+        let header = unsafe { &*header_ptr };
+
         if header.slot_count == 0 {
             return Err("slot_count must be > 0");
         }
@@ -168,202 +174,46 @@ impl TreiberSlab {
             return Err("region too small for slab");
         }
 
-        Ok(Self {
-            region,
-            header_offset,
-            meta_offset,
-            data_offset,
-        })
+        let slot_meta_ptr = region.offset(meta_offset) as *mut SlotMeta;
+        let slot_data_ptr = region.offset(data_offset);
+
+        let inner = unsafe { TreiberSlabRaw::from_raw(header_ptr, slot_meta_ptr, slot_data_ptr) };
+
+        Ok(Self { region, inner })
     }
 
+    /// Get a reference to the inner raw slab.
     #[inline]
-    fn header(&self) -> &TreiberSlabHeader {
-        unsafe { self.region.get::<TreiberSlabHeader>(self.header_offset) }
-    }
-
-    #[inline]
-    unsafe fn meta(&self, index: u32) -> &SlotMeta {
-        let off = self.meta_offset + index as usize * size_of::<SlotMeta>();
-        unsafe { self.region.get::<SlotMeta>(off) }
-    }
-
-    #[inline]
-    unsafe fn data_ptr(&self, index: u32) -> *mut u8 {
-        let slot_size = self.header().slot_size as usize;
-        let off = self.data_offset + index as usize * slot_size;
-        self.region.offset(off)
-    }
-
-    #[inline]
-    unsafe fn read_next_free(&self, index: u32) -> u32 {
-        let ptr = unsafe { self.data_ptr(index) as *const u32 };
-        unsafe { core::ptr::read_volatile(ptr) }
-    }
-
-    #[inline]
-    unsafe fn write_next_free(&self, index: u32, next: u32) {
-        let ptr = unsafe { self.data_ptr(index) as *mut u32 };
-        unsafe { core::ptr::write_volatile(ptr, next) };
-    }
-
-    unsafe fn init_free_list(&self) {
-        let slot_count = self.header().slot_count;
-        if slot_count == 0 {
-            return;
-        }
-
-        for i in 0..slot_count - 1 {
-            unsafe { self.write_next_free(i, i + 1) };
-        }
-        unsafe { self.write_next_free(slot_count - 1, FREE_LIST_END) };
-
-        let header = unsafe { self.region.get_mut::<TreiberSlabHeader>(self.header_offset) };
-        header
-            .free_head
-            .store(pack_free_head(0, 0), Ordering::Release);
+    pub fn inner(&self) -> &TreiberSlabRaw {
+        &self.inner
     }
 
     /// Try to allocate a slot.
+    ///
+    /// Delegates to `TreiberSlabRaw::try_alloc`.
     pub fn try_alloc(&self) -> AllocResult {
-        let header = self.header();
-
-        loop {
-            let old_head = header.free_head.load(Ordering::Acquire);
-            let (index, tag) = unpack_free_head(old_head);
-
-            if index == FREE_LIST_END {
-                return AllocResult::WouldBlock;
-            }
-
-            let next = unsafe { self.read_next_free(index) };
-            let new_head = pack_free_head(next, tag.wrapping_add(1));
-
-            match header.free_head.compare_exchange_weak(
-                old_head,
-                new_head,
-                Ordering::AcqRel,
-                Ordering::Acquire,
-            ) {
-                Ok(_) => {
-                    let meta = unsafe { self.meta(index) };
-                    let result = meta.state.compare_exchange(
-                        SlotState::Free as u32,
-                        SlotState::Allocated as u32,
-                        Ordering::AcqRel,
-                        Ordering::Acquire,
-                    );
-
-                    if result.is_err() {
-                        self.push_to_free_list(index);
-                        spin_loop();
-                        continue;
-                    }
-
-                    let generation = meta.generation.fetch_add(1, Ordering::AcqRel) + 1;
-                    return AllocResult::Ok(SlotHandle { index, generation });
-                }
-                Err(_) => {
-                    spin_loop();
-                    continue;
-                }
-            }
-        }
+        self.inner.try_alloc()
     }
 
     /// Mark a slot as in-flight (after enqueue).
+    ///
+    /// Delegates to `TreiberSlabRaw::mark_in_flight`.
     pub fn mark_in_flight(&self, handle: SlotHandle) -> Result<(), SlotError> {
-        if handle.index >= self.header().slot_count {
-            return Err(SlotError::InvalidIndex);
-        }
-
-        let meta = unsafe { self.meta(handle.index) };
-        let actual = meta.generation.load(Ordering::Acquire);
-        if actual != handle.generation {
-            return Err(SlotError::GenerationMismatch {
-                expected: handle.generation,
-                actual,
-            });
-        }
-
-        let result = meta.state.compare_exchange(
-            SlotState::Allocated as u32,
-            SlotState::InFlight as u32,
-            Ordering::AcqRel,
-            Ordering::Acquire,
-        );
-
-        result
-            .map(|_| ())
-            .map_err(|actual| SlotError::InvalidState {
-                expected: SlotState::Allocated,
-                actual: SlotState::from_u32(actual).unwrap_or(SlotState::Free),
-            })
+        self.inner.mark_in_flight(handle)
     }
 
     /// Free an in-flight slot and push it to the free list.
+    ///
+    /// Delegates to `TreiberSlabRaw::free`.
     pub fn free(&self, handle: SlotHandle) -> Result<(), SlotError> {
-        if handle.index >= self.header().slot_count {
-            return Err(SlotError::InvalidIndex);
-        }
-
-        let meta = unsafe { self.meta(handle.index) };
-        let actual = meta.generation.load(Ordering::Acquire);
-        if actual != handle.generation {
-            return Err(SlotError::GenerationMismatch {
-                expected: handle.generation,
-                actual,
-            });
-        }
-
-        let result = meta.state.compare_exchange(
-            SlotState::InFlight as u32,
-            SlotState::Free as u32,
-            Ordering::AcqRel,
-            Ordering::Acquire,
-        );
-
-        if result.is_ok() {
-            self.push_to_free_list(handle.index);
-            Ok(())
-        } else {
-            Err(SlotError::InvalidState {
-                expected: SlotState::InFlight,
-                actual: SlotState::from_u32(result.err().unwrap()).unwrap_or(SlotState::Free),
-            })
-        }
+        self.inner.free(handle)
     }
 
     /// Free a slot that is still Allocated (never sent).
+    ///
+    /// Delegates to `TreiberSlabRaw::free_allocated`.
     pub fn free_allocated(&self, handle: SlotHandle) -> Result<(), SlotError> {
-        if handle.index >= self.header().slot_count {
-            return Err(SlotError::InvalidIndex);
-        }
-
-        let meta = unsafe { self.meta(handle.index) };
-        let actual = meta.generation.load(Ordering::Acquire);
-        if actual != handle.generation {
-            return Err(SlotError::GenerationMismatch {
-                expected: handle.generation,
-                actual,
-            });
-        }
-
-        let result = meta.state.compare_exchange(
-            SlotState::Allocated as u32,
-            SlotState::Free as u32,
-            Ordering::AcqRel,
-            Ordering::Acquire,
-        );
-
-        if result.is_ok() {
-            self.push_to_free_list(handle.index);
-            Ok(())
-        } else {
-            Err(SlotError::InvalidState {
-                expected: SlotState::Allocated,
-                actual: SlotState::from_u32(result.err().unwrap()).unwrap_or(SlotState::Free),
-            })
-        }
+        self.inner.free_allocated(handle)
     }
 
     /// Return a pointer to the slot data.
@@ -372,61 +222,24 @@ impl TreiberSlab {
     ///
     /// The handle must be valid and the slot must be allocated.
     pub unsafe fn slot_data_ptr(&self, handle: SlotHandle) -> *mut u8 {
-        unsafe { self.data_ptr(handle.index) }
+        unsafe { self.inner.slot_data_ptr(handle) }
     }
 
     /// Returns the slot size in bytes.
     #[inline]
     pub fn slot_size(&self) -> u32 {
-        self.header().slot_size
+        self.inner.slot_size()
     }
 
     /// Returns the total number of slots.
     #[inline]
     pub fn slot_count(&self) -> u32 {
-        self.header().slot_count
+        self.inner.slot_count()
     }
 
     /// Approximate number of free slots.
     pub fn free_count_approx(&self) -> u32 {
-        let slot_count = self.header().slot_count;
-        let mut free_list_len = 0u32;
-        let mut current = {
-            let (index, _tag) = unpack_free_head(self.header().free_head.load(Ordering::Acquire));
-            index
-        };
-
-        while current != FREE_LIST_END && free_list_len < slot_count + 1 {
-            free_list_len += 1;
-            if current < slot_count {
-                current = unsafe { self.read_next_free(current) };
-            } else {
-                break;
-            }
-        }
-
-        free_list_len
-    }
-
-    fn push_to_free_list(&self, index: u32) {
-        let header = self.header();
-
-        loop {
-            let old_head = header.free_head.load(Ordering::Acquire);
-            let (old_index, tag) = unpack_free_head(old_head);
-
-            unsafe { self.write_next_free(index, old_index) };
-
-            let new_head = pack_free_head(index, tag.wrapping_add(1));
-
-            if header
-                .free_head
-                .compare_exchange_weak(old_head, new_head, Ordering::AcqRel, Ordering::Acquire)
-                .is_ok()
-            {
-                return;
-            }
-        }
+        self.inner.free_count_approx()
     }
 }
 
