@@ -399,9 +399,12 @@ impl RpcSession {
         } else {
             tracing::warn!(
                 channel_id,
+                msg_id = frame.desc.msg_id,
+                method_id = frame.desc.method_id,
                 payload_len = frame.payload_bytes().len(),
                 is_eos = flags.contains(FrameFlags::EOS),
                 is_error = flags.contains(FrameFlags::ERROR),
+                flags = ?flags,
                 "try_route_to_tunnel: no tunnel for channel"
             );
             Err(frame) // No tunnel, continue normal processing
