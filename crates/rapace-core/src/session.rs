@@ -299,6 +299,12 @@ impl RpcSession {
 
         let (tx, rx) = oneshot::channel();
         pending.insert(channel_id, tx);
+        tracing::info!(
+            channel_id,
+            pending_len = pending_len + 1,
+            max_pending = max,
+            "registered pending waiter"
+        );
         Ok(rx)
     }
 
@@ -430,7 +436,8 @@ impl RpcSession {
 
         tracing::info!(channel_id, payload_len = payload.len(), "send_chunk");
 
-        let frame = if payload.len() <= INLINE_PAYLOAD_SIZE {
+        let payload_len = payload.len();
+        let frame = if payload_len <= INLINE_PAYLOAD_SIZE {
             Frame::with_inline_payload(desc, &payload).expect("inline payload should fit")
         } else {
             Frame::with_payload(desc, payload)
@@ -534,7 +541,8 @@ impl RpcSession {
         // don't attempt to send a unary response frame that would corrupt the stream.
         desc.flags = FrameFlags::DATA | FrameFlags::EOS | FrameFlags::NO_REPLY;
 
-        let frame = if payload.len() <= INLINE_PAYLOAD_SIZE {
+        let payload_len = payload.len();
+        let frame = if payload_len <= INLINE_PAYLOAD_SIZE {
             Frame::with_inline_payload(desc, &payload).expect("inline payload should fit")
         } else {
             Frame::with_payload(desc, payload)
@@ -619,7 +627,8 @@ impl RpcSession {
         desc.method_id = method_id;
         desc.flags = FrameFlags::DATA | FrameFlags::EOS;
 
-        let frame = if payload.len() <= INLINE_PAYLOAD_SIZE {
+        let payload_len = payload.len();
+        let frame = if payload_len <= INLINE_PAYLOAD_SIZE {
             Frame::with_inline_payload(desc, &payload).expect("inline payload should fit")
         } else {
             Frame::with_payload(desc, payload)
@@ -629,6 +638,14 @@ impl RpcSession {
             .send_frame(frame)
             .await
             .map_err(RpcError::Transport)?;
+
+        tracing::info!(
+            channel_id,
+            method_id,
+            msg_id = desc.msg_id,
+            payload_len,
+            "call: request sent"
+        );
 
         // Wait for response with timeout (cross-platform: works on native and WASM)
         let timeout_ms = std::env::var("RAPACE_CALL_TIMEOUT_MS")
@@ -756,6 +773,7 @@ impl RpcSession {
             }
 
             let no_reply = received.flags().contains(FrameFlags::NO_REPLY);
+            tracing::info!(channel_id, method_id, no_reply, "dispatching request");
 
             // Dispatch to handler
             // We need to call the dispatcher while holding the lock, then spawn the future
@@ -795,11 +813,13 @@ impl RpcSession {
 
                     if no_reply {
                         if let Err(e) = response_result {
-                            tracing::debug!(
+                            tracing::info!(
                                 channel_id,
                                 error = ?e,
                                 "RpcSession::run: no-reply request failed"
                             );
+                        } else {
+                            tracing::info!(channel_id, "RpcSession::run: no-reply request ok");
                         }
                         return;
                     }
