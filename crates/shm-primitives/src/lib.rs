@@ -18,7 +18,9 @@ pub use slot::{SlotMeta, SlotState};
 pub use spsc::{
     PushResult, RingFull, SpscConsumer, SpscProducer, SpscRing, SpscRingHeader, SpscRingRaw,
 };
-pub use treiber::{AllocResult, FreeError, SlotError, SlotHandle, TreiberSlab, TreiberSlabHeader};
+pub use treiber::{
+    AllocResult, FreeError, SlotError, SlotHandle, TreiberSlab, TreiberSlabHeader, TreiberSlabRaw,
+};
 
 #[cfg(all(test, feature = "loom"))]
 mod loom_tests;

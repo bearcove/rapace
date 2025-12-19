@@ -29,9 +29,22 @@ use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 use crate::MsgDescHot;
 
-// Re-export SpscRingHeader as DescRingHeader for API compatibility
+// Re-export types from shm-primitives for API compatibility
 pub use shm_primitives::SpscRingHeader as DescRingHeader;
-use shm_primitives::SpscRingRaw;
+pub use shm_primitives::TreiberSlabHeader as DataSegmentHeader;
+use shm_primitives::{AllocResult, SlotHandle, SpscRingRaw, TreiberSlabRaw};
+pub use shm_primitives::{SlotMeta, SlotState};
+
+/// Sentinel value indicating end of free list.
+pub use shm_primitives::treiber::FREE_LIST_END;
+
+/// Unpack a free list head into (index, tag).
+#[inline]
+fn unpack_free_head(packed: u64) -> (u32, u32) {
+    let index = packed as u32;
+    let tag = (packed >> 32) as u32;
+    (index, tag)
+}
 
 /// Magic bytes identifying a rapace SHM segment.
 pub const MAGIC: [u8; 8] = *b"RAPACE\0\0";
@@ -48,9 +61,6 @@ pub const DEFAULT_SLOT_SIZE: u32 = 4096;
 
 /// Default number of slots.
 pub const DEFAULT_SLOT_COUNT: u32 = 64;
-
-/// Sentinel value indicating end of free list.
-pub const FREE_LIST_END: u32 = u32::MAX;
 
 // =============================================================================
 // Segment Header
@@ -275,126 +285,25 @@ impl std::fmt::Display for RingStatus {
 // Data Segment (Slab Allocator)
 // =============================================================================
 
-/// Slot state in the data segment.
-#[repr(u32)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SlotState {
-    /// Slot is free and available for allocation.
-    Free = 0,
-    /// Slot is allocated, sender is writing payload.
-    Allocated = 1,
-    /// Descriptor enqueued, awaiting receiver.
-    InFlight = 2,
-}
-
-impl SlotState {
-    /// Convert from u32.
-    pub fn from_u32(v: u32) -> Option<Self> {
-        match v {
-            0 => Some(SlotState::Free),
-            1 => Some(SlotState::Allocated),
-            2 => Some(SlotState::InFlight),
-            _ => None,
-        }
-    }
-}
-
-/// Metadata for a single slot in the data segment.
-#[repr(C)]
-pub struct SlotMeta {
-    /// Generation counter, incremented on each allocation.
-    pub generation: AtomicU32,
-    /// Current state (Free / Allocated / InFlight).
-    pub state: AtomicU32,
-}
-
+// SlotState, SlotMeta, and DataSegmentHeader are now re-exported from
+// shm-primitives (see imports at top of file). The layouts are identical.
 const _: () = assert!(core::mem::size_of::<SlotMeta>() == 8);
-
-impl SlotMeta {
-    /// Initialize a new slot metadata entry.
-    pub fn init(&mut self) {
-        self.generation = AtomicU32::new(0);
-        self.state = AtomicU32::new(SlotState::Free as u32);
-    }
-
-    /// Get the current state.
-    #[inline]
-    pub fn get_state(&self) -> SlotState {
-        SlotState::from_u32(self.state.load(Ordering::Acquire)).unwrap_or(SlotState::Free)
-    }
-
-    /// Get the current generation.
-    #[inline]
-    pub fn get_generation(&self) -> u32 {
-        self.generation.load(Ordering::Acquire)
-    }
-}
-
-/// Data segment header.
-#[repr(C, align(64))]
-pub struct DataSegmentHeader {
-    /// Size of each slot in bytes.
-    pub slot_size: u32,
-    /// Number of slots.
-    pub slot_count: u32,
-    /// Maximum frame size (must be <= slot_size).
-    pub max_frame_size: u32,
-    _pad: u32,
-
-    /// Free list head: index (low 32 bits) + tag (high 32 bits) for ABA safety.
-    /// Uses tagged pointer to prevent ABA problem in lock-free free list.
-    pub free_head: AtomicU64,
-
-    /// Futex for slot availability signaling.
-    /// Signaled when a slot is freed, waited on when allocation fails.
-    pub slot_available: AtomicU32,
-
-    _pad2: [u8; 36],
-}
-
 const _: () = assert!(core::mem::size_of::<DataSegmentHeader>() == 64);
 
-impl DataSegmentHeader {
-    /// Initialize a new data segment header.
-    ///
-    /// Note: The free list must be initialized separately via `DataSegment::init_free_list()`
-    /// after the slot data region is available.
-    pub fn init(&mut self, slot_size: u32, slot_count: u32) {
-        self.slot_size = slot_size;
-        self.slot_count = slot_count;
-        self.max_frame_size = slot_size;
-        self._pad = 0;
-        // Free list starts empty (will be populated by init_free_list).
-        // Using FREE_LIST_END with tag 0.
-        self.free_head = AtomicU64::new(pack_free_head(FREE_LIST_END, 0));
-        self.slot_available = AtomicU32::new(0);
-        self._pad2 = [0; 36];
-    }
-}
-
-/// Pack a free list head from index and tag.
-#[inline]
-fn pack_free_head(index: u32, tag: u32) -> u64 {
-    ((tag as u64) << 32) | (index as u64)
-}
-
-/// Unpack a free list head into (index, tag).
-#[inline]
-fn unpack_free_head(packed: u64) -> (u32, u32) {
-    let index = packed as u32;
-    let tag = (packed >> 32) as u32;
-    (index, tag)
-}
-
 /// A view into the data segment in SHM.
+///
+/// Internally delegates to `shm_primitives::TreiberSlabRaw` for the lock-free
+/// slab allocator algorithm, keeping the rapace-specific API intact (including
+/// futex signaling for backpressure).
 pub struct DataSegment {
+    inner: TreiberSlabRaw,
     header: *mut DataSegmentHeader,
     slot_meta: *mut SlotMeta,
     slot_data: *mut u8,
 }
 
-// SAFETY: DataSegment is Send + Sync because it points to shared memory
-// that is synchronized via atomics.
+// SAFETY: DataSegment is Send + Sync because it wraps TreiberSlabRaw which is
+// Send + Sync.
 unsafe impl Send for DataSegment {}
 unsafe impl Sync for DataSegment {}
 
@@ -411,6 +320,7 @@ impl DataSegment {
         slot_data: *mut u8,
     ) -> Self {
         Self {
+            inner: unsafe { TreiberSlabRaw::from_raw(header, slot_meta, slot_data) },
             header,
             slot_meta,
             slot_data,
@@ -420,7 +330,6 @@ impl DataSegment {
     /// Get the header.
     #[inline]
     fn header(&self) -> &DataSegmentHeader {
-        // SAFETY: Caller guaranteed valid pointer in from_raw.
         unsafe { &*self.header }
     }
 
@@ -431,7 +340,6 @@ impl DataSegment {
     /// Index must be < slot_count.
     #[inline]
     unsafe fn meta(&self, index: u32) -> &SlotMeta {
-        // SAFETY: Caller guarantees index < slot_count.
         unsafe { &*self.slot_meta.add(index as usize) }
     }
 
@@ -443,7 +351,6 @@ impl DataSegment {
     #[inline]
     unsafe fn data_ptr(&self, index: u32) -> *mut u8 {
         let slot_size = self.header().slot_size as usize;
-        // SAFETY: Caller guarantees index < slot_count.
         unsafe { self.slot_data.add(index as usize * slot_size) }
     }
 
@@ -457,10 +364,6 @@ impl DataSegment {
         unsafe { self.data_ptr(index) }
     }
 
-    // =========================================================================
-    // Lock-free free list operations
-    // =========================================================================
-
     /// Read the next_free link stored in the first 4 bytes of a slot's data.
     ///
     /// # Safety
@@ -469,50 +372,19 @@ impl DataSegment {
     #[inline]
     unsafe fn get_slot_next_free(&self, index: u32) -> u32 {
         let ptr = unsafe { self.data_ptr(index) as *const u32 };
-        // Use atomic load for cross-process visibility
         unsafe { std::ptr::read_volatile(ptr) }
-    }
-
-    /// Write the next_free link to the first 4 bytes of a slot's data.
-    ///
-    /// # Safety
-    ///
-    /// Index must be < slot_count and the caller must own the slot.
-    #[inline]
-    unsafe fn set_slot_next_free(&self, index: u32, next: u32) {
-        let ptr = unsafe { self.data_ptr(index) as *mut u32 };
-        // Use atomic store for cross-process visibility
-        unsafe { std::ptr::write_volatile(ptr, next) };
     }
 
     /// Initialize the free list by linking all slots together.
     ///
     /// This should be called once when creating a new SHM segment.
-    /// Each slot's data region stores the index of the next free slot.
     ///
     /// # Safety
     ///
     /// Must only be called during segment initialization, before any
     /// concurrent access.
     pub unsafe fn init_free_list(&self) {
-        let slot_count = self.header().slot_count;
-
-        if slot_count == 0 {
-            return;
-        }
-
-        // Link slots: 0 -> 1 -> 2 -> ... -> (n-1) -> END
-        for i in 0..slot_count - 1 {
-            unsafe { self.set_slot_next_free(i, i + 1) };
-        }
-        // Last slot points to END
-        unsafe { self.set_slot_next_free(slot_count - 1, FREE_LIST_END) };
-
-        // Set free_head to slot 0 with tag 0
-        let header = unsafe { &mut *self.header };
-        header
-            .free_head
-            .store(pack_free_head(0, 0), Ordering::Release);
+        unsafe { self.inner.init_free_list() }
     }
 
     /// Allocate a slot using lock-free pop from free list.
@@ -521,140 +393,37 @@ impl DataSegment {
     ///
     /// This is O(1) on the happy path (no contention).
     pub fn alloc(&self) -> Result<(u32, u32), SlotError> {
-        let header = unsafe { &*self.header };
-
-        loop {
-            // Load current head
-            let old_head = header.free_head.load(Ordering::Acquire);
-            let (index, tag) = unpack_free_head(old_head);
-
-            // Check if list is empty
-            if index == FREE_LIST_END {
-                return Err(SlotError::NoFreeSlots);
-            }
-
-            // SAFETY: index < slot_count (it came from the free list)
-            let next = unsafe { self.get_slot_next_free(index) };
-
-            // Try to CAS head to next, incrementing tag to prevent ABA
-            let new_head = pack_free_head(next, tag.wrapping_add(1));
-
-            if header
-                .free_head
-                .compare_exchange_weak(old_head, new_head, Ordering::AcqRel, Ordering::Acquire)
-                .is_ok()
-            {
-                // Successfully popped. Now mark the slot as Allocated.
-                // SAFETY: index < slot_count
-                let meta = unsafe { self.meta(index) };
-
-                // Transition Free -> Allocated
-                let result = meta.state.compare_exchange(
-                    SlotState::Free as u32,
-                    SlotState::Allocated as u32,
-                    Ordering::AcqRel,
-                    Ordering::Acquire,
-                );
-
-                if result.is_err() {
-                    // Slot was not in Free state - this shouldn't happen if free list is consistent.
-                    // Push it back and try again.
-                    self.push_to_free_list(index);
-                    continue;
-                }
-
-                // Increment generation
-                let generation = meta.generation.fetch_add(1, Ordering::AcqRel) + 1;
-                return Ok((index, generation));
-            }
-            // CAS failed, retry
-        }
-    }
-
-    /// Push a slot onto the free list (lock-free).
-    fn push_to_free_list(&self, index: u32) {
-        let header = unsafe { &*self.header };
-
-        loop {
-            let old_head = header.free_head.load(Ordering::Acquire);
-            let (old_index, tag) = unpack_free_head(old_head);
-
-            // Store the old head as our next pointer
-            // SAFETY: index < slot_count
-            unsafe { self.set_slot_next_free(index, old_index) };
-
-            // Try to CAS head to point to us
-            let new_head = pack_free_head(index, tag.wrapping_add(1));
-
-            if header
-                .free_head
-                .compare_exchange_weak(old_head, new_head, Ordering::AcqRel, Ordering::Acquire)
-                .is_ok()
-            {
-                return;
-            }
-            // CAS failed, retry
+        match self.inner.try_alloc() {
+            AllocResult::Ok(handle) => Ok((handle.index, handle.generation)),
+            AllocResult::WouldBlock => Err(SlotError::NoFreeSlots),
         }
     }
 
     /// Mark a slot as in-flight (after enqueuing descriptor).
     pub fn mark_in_flight(&self, index: u32, expected_gen: u32) -> Result<(), SlotError> {
-        if index >= self.header().slot_count {
-            return Err(SlotError::InvalidIndex);
-        }
-
-        // SAFETY: index < slot_count (checked above).
-        let meta = unsafe { self.meta(index) };
-
-        // Verify generation matches.
-        if meta.get_generation() != expected_gen {
-            return Err(SlotError::StaleGeneration);
-        }
-
-        // Transition Allocated -> InFlight.
-        let result = meta.state.compare_exchange(
-            SlotState::Allocated as u32,
-            SlotState::InFlight as u32,
-            Ordering::AcqRel,
-            Ordering::Acquire,
-        );
-
-        result.map(|_| ()).map_err(|_| SlotError::InvalidState)
+        let handle = SlotHandle {
+            index,
+            generation: expected_gen,
+        };
+        self.inner
+            .mark_in_flight(handle)
+            .map_err(convert_slot_error)
     }
 
     /// Free a slot (receiver side, after processing).
     ///
     /// After transitioning to Free state, the slot is pushed back onto the free list.
     pub fn free(&self, index: u32, expected_gen: u32) -> Result<(), SlotError> {
-        if index >= self.header().slot_count {
-            return Err(SlotError::InvalidIndex);
-        }
-
-        // SAFETY: index < slot_count (checked above).
-        let meta = unsafe { self.meta(index) };
-
-        // Verify generation matches.
-        if meta.get_generation() != expected_gen {
-            return Err(SlotError::StaleGeneration);
-        }
-
-        // Transition InFlight -> Free.
-        let result = meta.state.compare_exchange(
-            SlotState::InFlight as u32,
-            SlotState::Free as u32,
-            Ordering::AcqRel,
-            Ordering::Acquire,
-        );
-
+        let handle = SlotHandle {
+            index,
+            generation: expected_gen,
+        };
+        let result = self.inner.free(handle).map_err(convert_slot_error);
         if result.is_ok() {
-            // Push back onto free list
-            self.push_to_free_list(index);
             // Signal anyone waiting for slots
             super::futex::futex_signal(self.slot_available_futex());
-            Ok(())
-        } else {
-            Err(SlotError::InvalidState)
         }
+        result
     }
 
     /// Get the slot availability futex for backpressure signaling.
@@ -668,35 +437,19 @@ impl DataSegment {
     /// This is used by the allocator when data is dropped before being sent.
     /// After transitioning to Free state, the slot is pushed back onto the free list.
     pub fn free_allocated(&self, index: u32, expected_gen: u32) -> Result<(), SlotError> {
-        if index >= self.header().slot_count {
-            return Err(SlotError::InvalidIndex);
-        }
-
-        // SAFETY: index < slot_count (checked above).
-        let meta = unsafe { self.meta(index) };
-
-        // Verify generation matches.
-        if meta.get_generation() != expected_gen {
-            return Err(SlotError::StaleGeneration);
-        }
-
-        // Transition Allocated -> Free.
-        let result = meta.state.compare_exchange(
-            SlotState::Allocated as u32,
-            SlotState::Free as u32,
-            Ordering::AcqRel,
-            Ordering::Acquire,
-        );
-
+        let handle = SlotHandle {
+            index,
+            generation: expected_gen,
+        };
+        let result = self
+            .inner
+            .free_allocated(handle)
+            .map_err(convert_slot_error);
         if result.is_ok() {
-            // Push back onto free list
-            self.push_to_free_list(index);
             // Signal anyone waiting for slots
             super::futex::futex_signal(self.slot_available_futex());
-            Ok(())
-        } else {
-            Err(SlotError::InvalidState)
         }
+        result
     }
 
     /// Copy data into a slot.
@@ -748,11 +501,11 @@ impl DataSegment {
         // SAFETY: index < slot_count (checked above).
         let meta = unsafe { self.meta(index) };
 
-        if meta.get_generation() != expected_gen {
+        if meta.generation() != expected_gen {
             return Err(SlotError::StaleGeneration);
         }
 
-        if meta.get_state() != SlotState::InFlight {
+        if meta.state() != SlotState::InFlight {
             return Err(SlotError::InvalidState);
         }
 
@@ -794,7 +547,7 @@ impl DataSegment {
         for i in 0..slot_count {
             // SAFETY: i < slot_count
             let meta = unsafe { self.meta(i) };
-            match meta.get_state() {
+            match meta.state() {
                 SlotState::Free => free += 1,
                 SlotState::Allocated => allocated += 1,
                 SlotState::InFlight => in_flight += 1,
@@ -960,6 +713,15 @@ impl std::fmt::Display for SlotError {
 }
 
 impl std::error::Error for SlotError {}
+
+/// Convert shm_primitives::SlotError to our local SlotError.
+fn convert_slot_error(e: shm_primitives::SlotError) -> SlotError {
+    match e {
+        shm_primitives::SlotError::InvalidIndex => SlotError::InvalidIndex,
+        shm_primitives::SlotError::GenerationMismatch { .. } => SlotError::StaleGeneration,
+        shm_primitives::SlotError::InvalidState { .. } => SlotError::InvalidState,
+    }
+}
 
 // =============================================================================
 // Layout Calculations
