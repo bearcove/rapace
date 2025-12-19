@@ -903,4 +903,249 @@ mod tests {
         header.magic[0] = b'X';
         assert!(matches!(header.validate(), Err(LayoutError::InvalidMagic)));
     }
+
+    // =========================================================================
+    // Stress tests for alloc/enqueue/dequeue/free cycle
+    // =========================================================================
+
+    /// Helper to create a heap-backed segment for testing.
+    fn create_test_segment(
+        ring_capacity: u32,
+        slot_size: u32,
+        slot_count: u32,
+    ) -> (Vec<u8>, SegmentOffsets) {
+        let size = calculate_segment_size(ring_capacity, slot_size, slot_count);
+        let mut buf = vec![0u8; size];
+        let offsets = SegmentOffsets::calculate(ring_capacity, slot_count);
+
+        // Initialize segment header
+        let header = unsafe { &mut *(buf.as_mut_ptr().add(offsets.header) as *mut SegmentHeader) };
+        header.init(ring_capacity, slot_size, slot_count);
+
+        // Initialize A→B ring header
+        let ring_a_to_b_header =
+            unsafe { &mut *(buf.as_mut_ptr().add(offsets.ring_a_to_b_header) as *mut DescRingHeader) };
+        ring_a_to_b_header.init(ring_capacity);
+
+        // Initialize B→A ring header
+        let ring_b_to_a_header =
+            unsafe { &mut *(buf.as_mut_ptr().add(offsets.ring_b_to_a_header) as *mut DescRingHeader) };
+        ring_b_to_a_header.init(ring_capacity);
+
+        // Initialize data segment header
+        let data_header =
+            unsafe { &mut *(buf.as_mut_ptr().add(offsets.data_header) as *mut DataSegmentHeader) };
+        data_header.init(slot_size, slot_count);
+
+        // Initialize slot metadata
+        for i in 0..slot_count {
+            let meta = unsafe {
+                &mut *(buf.as_mut_ptr().add(offsets.slot_meta + i as usize * 8) as *mut SlotMeta)
+            };
+            meta.init();
+        }
+
+        (buf, offsets)
+    }
+
+    /// Create DataSegment and DescRing views from a buffer.
+    unsafe fn create_segment_views(
+        buf: &mut [u8],
+        offsets: &SegmentOffsets,
+    ) -> (DataSegment, DescRing) {
+        let base = buf.as_mut_ptr();
+
+        let data_segment = unsafe {
+            DataSegment::from_raw(
+                base.add(offsets.data_header) as *mut DataSegmentHeader,
+                base.add(offsets.slot_meta) as *mut SlotMeta,
+                base.add(offsets.slot_data),
+            )
+        };
+        unsafe { data_segment.init_free_list() };
+
+        let ring = unsafe {
+            DescRing::from_raw(
+                base.add(offsets.ring_a_to_b_header) as *mut DescRingHeader,
+                base.add(offsets.ring_a_to_b_descs) as *mut crate::MsgDescHot,
+            )
+        };
+
+        (data_segment, ring)
+    }
+
+    #[test]
+    fn stress_alloc_enqueue_dequeue_free_single_threaded() {
+        // Single-threaded stress test: allocate, enqueue, dequeue, free in a loop
+        let slot_count = 16u32;
+        let ring_capacity = 32u32;
+        let (mut buf, offsets) = create_test_segment(ring_capacity, 64, slot_count);
+
+        let (data_segment, ring) = unsafe { create_segment_views(&mut buf, &offsets) };
+
+        let mut local_head = 0u64;
+        let iterations = 1000;
+
+        for i in 0..iterations {
+            // Allocate a slot
+            let (slot_idx, slot_gen) = data_segment.alloc().expect("alloc should succeed");
+
+            // Create a descriptor for this slot
+            let mut desc = crate::MsgDescHot::new();
+            desc.channel_id = i as u32;
+            desc.payload_slot = slot_idx;
+            desc.payload_generation = slot_gen;
+
+            // Mark in-flight and enqueue
+            data_segment
+                .mark_in_flight(slot_idx, slot_gen)
+                .expect("mark_in_flight should succeed");
+            ring.enqueue(&mut local_head, &desc)
+                .expect("enqueue should succeed");
+
+            // Dequeue and free
+            let dequeued = ring.dequeue().expect("dequeue should return descriptor");
+            assert_eq!(dequeued.channel_id, i as u32);
+            data_segment
+                .free(dequeued.payload_slot, dequeued.payload_generation)
+                .expect("free should succeed");
+        }
+
+        // All slots should be back on free list
+        assert!(ring.dequeue().is_none());
+    }
+
+    #[test]
+    fn stress_alloc_enqueue_dequeue_free_concurrent() {
+        use std::sync::Arc;
+        use std::thread;
+
+        // Concurrent stress test: producer allocates and enqueues,
+        // consumer dequeues and frees
+        let slot_count = 32u32;
+        let ring_capacity = 64u32;
+        let (mut buf, offsets) = create_test_segment(ring_capacity, 64, slot_count);
+
+        let (data_segment, ring) = unsafe { create_segment_views(&mut buf, &offsets) };
+
+        // Wrap in Arc for sharing between threads
+        let data_segment = Arc::new(data_segment);
+        let ring = Arc::new(ring);
+
+        let message_count = 5000;
+
+        // Producer thread
+        let producer_data = Arc::clone(&data_segment);
+        let producer_ring = Arc::clone(&ring);
+        let producer = thread::spawn(move || {
+            let mut local_head = 0u64;
+            let mut sent = 0usize;
+
+            while sent < message_count {
+                // Try to allocate - may need to spin if slots are exhausted
+                let alloc_result = producer_data.alloc();
+                let (slot_idx, gen) = match alloc_result {
+                    Ok(result) => result,
+                    Err(SlotError::NoFreeSlots) => {
+                        std::hint::spin_loop();
+                        continue;
+                    }
+                    Err(e) => panic!("unexpected alloc error: {:?}", e),
+                };
+
+                // Create descriptor
+                let mut desc = crate::MsgDescHot::new();
+                desc.channel_id = sent as u32;
+                desc.slot_index = slot_idx;
+                desc.generation = gen;
+
+                // Mark in-flight
+                producer_data
+                    .mark_in_flight(slot_idx, gen)
+                    .expect("mark_in_flight should succeed");
+
+                // Try to enqueue - may need to spin if ring is full
+                loop {
+                    match producer_ring.enqueue(&mut local_head, &desc) {
+                        Ok(()) => break,
+                        Err(_) => std::hint::spin_loop(),
+                    }
+                }
+
+                sent += 1;
+            }
+        });
+
+        // Consumer thread
+        let consumer_data = Arc::clone(&data_segment);
+        let consumer_ring = Arc::clone(&ring);
+        let consumer = thread::spawn(move || {
+            let mut received = 0usize;
+            let mut channel_ids = Vec::with_capacity(message_count);
+
+            while received < message_count {
+                match consumer_ring.dequeue() {
+                    Some(desc) => {
+                        channel_ids.push(desc.channel_id);
+                        consumer_data
+                            .free(desc.slot_index, desc.generation)
+                            .expect("free should succeed");
+                        received += 1;
+                    }
+                    None => std::hint::spin_loop(),
+                }
+            }
+
+            channel_ids
+        });
+
+        producer.join().expect("producer should complete");
+        let channel_ids = consumer.join().expect("consumer should complete");
+
+        // Verify we received all messages (order may vary due to concurrency)
+        assert_eq!(channel_ids.len(), message_count);
+        let mut sorted = channel_ids.clone();
+        sorted.sort();
+        for (i, &id) in sorted.iter().enumerate() {
+            assert_eq!(id as usize, i, "missing message {}", i);
+        }
+    }
+
+    #[test]
+    fn stress_no_slot_leak() {
+        // Verify that after many alloc/free cycles, we have the same number
+        // of free slots as we started with
+        let slot_count = 8u32;
+        let ring_capacity = 16u32;
+        let (mut buf, offsets) = create_test_segment(ring_capacity, 64, slot_count);
+
+        let (data_segment, _ring) = unsafe { create_segment_views(&mut buf, &offsets) };
+
+        // Should be able to allocate slot_count slots
+        let mut handles = Vec::new();
+        for _ in 0..slot_count {
+            let result = data_segment.alloc();
+            assert!(result.is_ok(), "should be able to allocate all slots");
+            handles.push(result.unwrap());
+        }
+
+        // Next allocation should fail
+        assert!(
+            matches!(data_segment.alloc(), Err(SlotError::NoFreeSlots)),
+            "should be out of slots"
+        );
+
+        // Free all slots
+        for (idx, gen) in handles {
+            data_segment
+                .free_allocated(idx, gen)
+                .expect("free_allocated should succeed");
+        }
+
+        // Should be able to allocate all slots again
+        for _ in 0..slot_count {
+            let result = data_segment.alloc();
+            assert!(result.is_ok(), "should be able to reallocate all slots");
+        }
+    }
 }
