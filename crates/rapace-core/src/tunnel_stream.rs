@@ -35,10 +35,12 @@ pub struct TunnelStream {
     read_eof: bool,
     read_eos_after_buf: bool,
 
-    pending_send:
-        Option<Pin<Box<dyn std::future::Future<Output = Result<(), RpcError>> + Send + 'static>>>,
+    pending_send: Option<PendingSend>,
     write_closed: bool,
 }
+
+type PendingSend =
+    Pin<Box<dyn std::future::Future<Output = Result<(), RpcError>> + Send + 'static>>;
 
 impl TunnelStream {
     /// Create a new tunnel stream for an existing `channel_id`.
