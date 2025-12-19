@@ -84,7 +84,7 @@ impl<T: Copy> SpscRing<T> {
             "capacity must be power of 2"
         );
         assert!(
-            header_offset % 64 == 0,
+            header_offset.is_multiple_of(64),
             "header_offset must be 64-byte aligned"
         );
         assert!(align_of::<T>() <= 64, "entry alignment must be <= 64");
@@ -92,7 +92,10 @@ impl<T: Copy> SpscRing<T> {
         let entries_offset = header_offset + size_of::<SpscRingHeader>();
         let required = entries_offset + (capacity as usize * size_of::<T>());
         assert!(required <= region.len(), "region too small for ring");
-        assert!(entries_offset % align_of::<T>() == 0, "entries misaligned");
+        assert!(
+            entries_offset.is_multiple_of(align_of::<T>()),
+            "entries misaligned"
+        );
 
         let header = unsafe { region.get_mut::<SpscRingHeader>(header_offset) };
         header.init(capacity);
@@ -112,7 +115,7 @@ impl<T: Copy> SpscRing<T> {
     /// The region must contain a valid, initialized ring header.
     pub unsafe fn attach(region: Region, header_offset: usize) -> Self {
         assert!(
-            header_offset % 64 == 0,
+            header_offset.is_multiple_of(64),
             "header_offset must be 64-byte aligned"
         );
         assert!(align_of::<T>() <= 64, "entry alignment must be <= 64");
@@ -127,7 +130,10 @@ impl<T: Copy> SpscRing<T> {
         );
         let required = entries_offset + (capacity as usize * size_of::<T>());
         assert!(required <= region.len(), "region too small for ring");
-        assert!(entries_offset % align_of::<T>() == 0, "entries misaligned");
+        assert!(
+            entries_offset.is_multiple_of(align_of::<T>()),
+            "entries misaligned"
+        );
 
         Self {
             region,

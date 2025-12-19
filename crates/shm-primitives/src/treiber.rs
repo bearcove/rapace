@@ -98,7 +98,7 @@ impl TreiberSlab {
             "slot_size must be >= 4"
         );
         assert!(
-            header_offset % 64 == 0,
+            header_offset.is_multiple_of(64),
             "header_offset must be 64-byte aligned"
         );
 
@@ -144,7 +144,7 @@ impl TreiberSlab {
     /// The region must contain a valid, initialized slab header at `header_offset`.
     pub unsafe fn attach(region: Region, header_offset: usize) -> Result<Self, &'static str> {
         assert!(
-            header_offset % 64 == 0,
+            header_offset.is_multiple_of(64),
             "header_offset must be 64-byte aligned"
         );
         let header = unsafe { region.get::<TreiberSlabHeader>(header_offset) };

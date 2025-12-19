@@ -39,6 +39,12 @@ impl Region {
         self.len
     }
 
+    /// Returns true if the region has zero length.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
     /// Returns a pointer to offset `off` within the region.
     #[inline]
     pub fn offset(&self, off: usize) -> *mut u8 {
@@ -58,7 +64,7 @@ impl Region {
     #[inline]
     pub unsafe fn get<T>(&self, off: usize) -> &T {
         debug_assert!(off + size_of::<T>() <= self.len);
-        debug_assert!(off % align_of::<T>() == 0);
+        debug_assert!(off.is_multiple_of(align_of::<T>()));
         unsafe { &*(self.offset(off) as *const T) }
     }
 
@@ -68,9 +74,10 @@ impl Region {
     ///
     /// The offset must be aligned for `T` and within bounds.
     #[inline]
+    #[allow(clippy::mut_from_ref)]
     pub unsafe fn get_mut<T>(&self, off: usize) -> &mut T {
         debug_assert!(off + size_of::<T>() <= self.len);
-        debug_assert!(off % align_of::<T>() == 0);
+        debug_assert!(off.is_multiple_of(align_of::<T>()));
         unsafe { &mut *(self.offset(off) as *mut T) }
     }
 }
@@ -115,6 +122,12 @@ mod heap {
         #[inline]
         pub fn len(&self) -> usize {
             self.len
+        }
+
+        /// Returns true if the allocation is zero-length.
+        #[inline]
+        pub fn is_empty(&self) -> bool {
+            self.len == 0
         }
     }
 
