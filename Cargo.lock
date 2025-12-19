@@ -1582,6 +1582,7 @@ dependencies = [
  "js-sys",
  "libc",
  "parking_lot",
+ "shm-primitives",
  "static_assertions",
  "tokio",
  "tokio-tungstenite",

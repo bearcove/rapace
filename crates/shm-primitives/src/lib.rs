@@ -15,7 +15,9 @@ pub mod treiber;
 pub use region::HeapRegion;
 pub use region::Region;
 pub use slot::{SlotMeta, SlotState};
-pub use spsc::{PushResult, SpscConsumer, SpscProducer, SpscRing, SpscRingHeader};
+pub use spsc::{
+    PushResult, RingFull, SpscConsumer, SpscProducer, SpscRing, SpscRingHeader, SpscRingRaw,
+};
 pub use treiber::{AllocResult, FreeError, SlotError, SlotHandle, TreiberSlab, TreiberSlabHeader};
 
 #[cfg(all(test, feature = "loom"))]

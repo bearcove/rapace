@@ -29,6 +29,10 @@ use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 use crate::MsgDescHot;
 
+// Re-export SpscRingHeader as DescRingHeader for API compatibility
+pub use shm_primitives::SpscRingHeader as DescRingHeader;
+use shm_primitives::SpscRingRaw;
+
 /// Magic bytes identifying a rapace SHM segment.
 pub const MAGIC: [u8; 8] = *b"RAPACE\0\0";
 
@@ -161,86 +165,23 @@ impl SegmentHeader {
 // Descriptor Ring
 // =============================================================================
 
-/// SPSC descriptor ring header.
-///
-/// The ring uses a single-producer single-consumer design with cache-line
-/// aligned head/tail to avoid false sharing.
-///
-/// Layout:
-/// - visible_head on its own cache line (producer publishes)
-/// - tail on its own cache line (consumer advances)
-/// - capacity on its own cache line (immutable after init)
-/// - descriptors follow immediately after
-#[repr(C)]
-pub struct DescRingHeader {
-    /// Producer publication index (written by producer, read by consumer).
-    pub visible_head: AtomicU64,
-    _pad1: [u8; 56],
-
-    /// Consumer index (written by consumer, read by producer).
-    pub tail: AtomicU64,
-    _pad2: [u8; 56],
-
-    /// Ring capacity (power of 2, immutable after init).
-    pub capacity: u32,
-    _pad3: [u8; 60],
-}
-
+// DescRingHeader is now a type alias for shm_primitives::SpscRingHeader
+// (see import at top of file). The layout is identical (192 bytes).
 const _: () = assert!(core::mem::size_of::<DescRingHeader>() == 192);
-
-impl DescRingHeader {
-    /// Initialize a new ring header.
-    pub fn init(&mut self, capacity: u32) {
-        assert!(capacity.is_power_of_two(), "capacity must be power of 2");
-        self.visible_head = AtomicU64::new(0);
-        self._pad1 = [0; 56];
-        self.tail = AtomicU64::new(0);
-        self._pad2 = [0; 56];
-        self.capacity = capacity;
-        self._pad3 = [0; 60];
-    }
-
-    /// Returns the mask for index wrapping.
-    #[inline]
-    pub fn mask(&self) -> u64 {
-        self.capacity as u64 - 1
-    }
-
-    /// Check if the ring is empty.
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        let tail = self.tail.load(Ordering::Relaxed);
-        let head = self.visible_head.load(Ordering::Acquire);
-        tail >= head
-    }
-
-    /// Check if the ring is full (given producer's local head).
-    #[inline]
-    pub fn is_full(&self, local_head: u64) -> bool {
-        let tail = self.tail.load(Ordering::Acquire);
-        local_head.wrapping_sub(tail) >= self.capacity as u64
-    }
-
-    /// Get the number of items in the ring.
-    #[inline]
-    pub fn len(&self) -> usize {
-        let tail = self.tail.load(Ordering::Relaxed);
-        let head = self.visible_head.load(Ordering::Acquire);
-        head.saturating_sub(tail) as usize
-    }
-}
 
 /// A view into a descriptor ring in SHM.
 ///
 /// This provides safe access to the ring operations. The actual descriptors
 /// are stored immediately after the header in SHM.
+///
+/// Internally delegates to `shm_primitives::SpscRingRaw<MsgDescHot>` for
+/// the lock-free algorithm, keeping the rapace-specific API intact.
 pub struct DescRing {
-    header: *mut DescRingHeader,
-    descriptors: *mut MsgDescHot,
+    inner: SpscRingRaw<MsgDescHot>,
 }
 
-// SAFETY: DescRing is Send + Sync because it points to shared memory
-// that is synchronized via atomics.
+// SAFETY: DescRing is Send + Sync because it wraps SpscRingRaw which is
+// Send + Sync for Send types, and MsgDescHot is Send.
 unsafe impl Send for DescRing {}
 unsafe impl Sync for DescRing {}
 
@@ -254,27 +195,8 @@ impl DescRing {
     /// - The memory must remain valid for the lifetime of this `DescRing`.
     pub unsafe fn from_raw(header: *mut DescRingHeader, descriptors: *mut MsgDescHot) -> Self {
         Self {
-            header,
-            descriptors,
+            inner: unsafe { SpscRingRaw::from_raw(header, descriptors) },
         }
-    }
-
-    /// Get the ring header.
-    #[inline]
-    fn header(&self) -> &DescRingHeader {
-        // SAFETY: Caller guaranteed valid pointer in from_raw.
-        unsafe { &*self.header }
-    }
-
-    /// Get a mutable reference to a descriptor slot.
-    ///
-    /// # Safety
-    ///
-    /// Index must be < capacity.
-    #[inline]
-    unsafe fn desc_slot(&self, index: usize) -> *mut MsgDescHot {
-        // SAFETY: Caller guarantees index < capacity.
-        unsafe { self.descriptors.add(index) }
     }
 
     /// Enqueue a descriptor (producer side).
@@ -282,76 +204,38 @@ impl DescRing {
     /// `local_head` is producer-private (stack-local, not in SHM).
     /// On success, `local_head` is incremented.
     pub fn enqueue(&self, local_head: &mut u64, desc: &MsgDescHot) -> Result<(), RingError> {
-        let header = self.header();
-
-        if header.is_full(*local_head) {
-            return Err(RingError::Full);
-        }
-
-        let idx = (*local_head & header.mask()) as usize;
-
-        // SAFETY: idx < capacity (guaranteed by mask).
-        unsafe {
-            std::ptr::write(self.desc_slot(idx), *desc);
-        }
-
-        *local_head += 1;
-
-        // Publish: make the descriptor visible to consumer.
-        header.visible_head.store(*local_head, Ordering::Release);
-
-        Ok(())
+        self.inner
+            .enqueue(local_head, desc)
+            .map_err(|_| RingError::Full)
     }
 
     /// Dequeue a descriptor (consumer side).
     pub fn dequeue(&self) -> Option<MsgDescHot> {
-        let header = self.header();
-
-        let tail = header.tail.load(Ordering::Relaxed);
-        let visible = header.visible_head.load(Ordering::Acquire);
-
-        if tail >= visible {
-            return None;
-        }
-
-        let idx = (tail & header.mask()) as usize;
-
-        // SAFETY: idx < capacity (guaranteed by mask).
-        let desc = unsafe { std::ptr::read(self.desc_slot(idx)) };
-
-        // Advance tail.
-        header.tail.store(tail + 1, Ordering::Release);
-
-        Some(desc)
+        self.inner.dequeue()
     }
 
     /// Check if the ring is empty.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.header().is_empty()
+        self.inner.is_empty()
     }
 
     /// Get the capacity of the ring.
     #[inline]
     pub fn capacity(&self) -> u32 {
-        self.header().capacity
+        self.inner.capacity()
     }
 
     /// Get the ring status (for diagnostics).
     ///
     /// Returns a snapshot of the ring's head/tail pointers and derived metrics.
     pub fn ring_status(&self) -> RingStatus {
-        let header = self.header();
-        let visible_head = header.visible_head.load(Ordering::Acquire);
-        let tail = header.tail.load(Ordering::Acquire);
-        let capacity = header.capacity;
-        let len = visible_head.saturating_sub(tail) as u32;
-
+        let status = self.inner.status();
         RingStatus {
-            visible_head,
-            tail,
-            capacity,
-            len,
+            visible_head: status.visible_head,
+            tail: status.tail,
+            capacity: status.capacity,
+            len: status.len,
         }
     }
 }

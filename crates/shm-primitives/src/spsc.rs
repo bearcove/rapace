@@ -301,3 +301,138 @@ pub struct RingStatus {
     pub capacity: u32,
     pub len: u32,
 }
+
+// =============================================================================
+// SpscRingRaw - Raw pointer version for rapace-core compatibility
+// =============================================================================
+
+/// Error returned when the ring is full.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RingFull;
+
+/// A wait-free SPSC ring buffer operating on raw pointers.
+///
+/// This is the "raw" API that matches rapace-core's `DescRing` interface:
+/// - Constructed from raw pointers to header and entries
+/// - `enqueue` takes `&mut local_head` (caller-managed producer state)
+/// - `dequeue` is stateless on the caller side
+///
+/// Use this when you need to integrate with existing SHM layouts or when
+/// the `Region` abstraction doesn't fit your use case.
+pub struct SpscRingRaw<T> {
+    header: *mut SpscRingHeader,
+    entries: *mut T,
+}
+
+unsafe impl<T: Send> Send for SpscRingRaw<T> {}
+unsafe impl<T: Send> Sync for SpscRingRaw<T> {}
+
+impl<T: Copy> SpscRingRaw<T> {
+    /// Create a ring view from raw pointers.
+    ///
+    /// # Safety
+    ///
+    /// - `header` must point to a valid, initialized `SpscRingHeader`
+    /// - `entries` must point to `header.capacity` initialized `T` slots
+    /// - The memory must remain valid for the lifetime of this ring
+    /// - `entries` must be properly aligned for `T`
+    #[inline]
+    pub unsafe fn from_raw(header: *mut SpscRingHeader, entries: *mut T) -> Self {
+        Self { header, entries }
+    }
+
+    /// Get the ring header.
+    #[inline]
+    fn header(&self) -> &SpscRingHeader {
+        unsafe { &*self.header }
+    }
+
+    /// Get a pointer to an entry slot.
+    #[inline]
+    unsafe fn entry_ptr(&self, slot: usize) -> *mut T {
+        unsafe { self.entries.add(slot) }
+    }
+
+    /// Enqueue an entry (producer side).
+    ///
+    /// `local_head` is producer-private (stack-local, not in SHM).
+    /// On success, `local_head` is incremented.
+    ///
+    /// This matches rapace-core's `DescRing::enqueue` signature.
+    pub fn enqueue(&self, local_head: &mut u64, entry: &T) -> Result<(), RingFull> {
+        let header = self.header();
+        let capacity = header.capacity as u64;
+        let mask = header.mask();
+
+        let tail = header.tail.load(Ordering::Acquire);
+        if local_head.wrapping_sub(tail) >= capacity {
+            return Err(RingFull);
+        }
+
+        let slot = (*local_head & mask) as usize;
+        unsafe {
+            ptr::write(self.entry_ptr(slot), *entry);
+        }
+
+        *local_head = local_head.wrapping_add(1);
+        header.visible_head.store(*local_head, Ordering::Release);
+
+        Ok(())
+    }
+
+    /// Dequeue an entry (consumer side).
+    ///
+    /// This matches rapace-core's `DescRing::dequeue` signature.
+    pub fn dequeue(&self) -> Option<T> {
+        let header = self.header();
+
+        let tail = header.tail.load(Ordering::Relaxed);
+        let visible = header.visible_head.load(Ordering::Acquire);
+
+        if tail >= visible {
+            return None;
+        }
+
+        let mask = header.mask();
+        let slot = (tail & mask) as usize;
+        let entry = unsafe { ptr::read(self.entry_ptr(slot)) };
+
+        header.tail.store(tail.wrapping_add(1), Ordering::Release);
+
+        Some(entry)
+    }
+
+    /// Check if the ring is empty.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.header().is_empty()
+    }
+
+    /// Check if the ring is full (given producer's local head).
+    #[inline]
+    pub fn is_full(&self, local_head: u64) -> bool {
+        self.header().is_full(local_head)
+    }
+
+    /// Get the capacity of the ring.
+    #[inline]
+    pub fn capacity(&self) -> u32 {
+        self.header().capacity
+    }
+
+    /// Get the ring status (for diagnostics).
+    pub fn status(&self) -> RingStatus {
+        let header = self.header();
+        let visible_head = header.visible_head.load(Ordering::Acquire);
+        let tail = header.tail.load(Ordering::Acquire);
+        let capacity = header.capacity;
+        let len = visible_head.saturating_sub(tail) as u32;
+
+        RingStatus {
+            visible_head,
+            tail,
+            capacity,
+            len,
+        }
+    }
+}
