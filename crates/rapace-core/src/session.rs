@@ -264,6 +264,14 @@ impl RpcSession {
         ids
     }
 
+    fn has_pending(&self, channel_id: u32) -> bool {
+        self.pending.lock().contains_key(&channel_id)
+    }
+
+    fn has_tunnel(&self, channel_id: u32) -> bool {
+        self.tunnels.lock().contains_key(&channel_id)
+    }
+
     /// Register a dispatcher for incoming requests.
     ///
     /// The dispatcher receives the request frame and returns a response frame.
@@ -315,11 +323,22 @@ impl RpcSession {
         let waiter = self.pending.lock().remove(&channel_id);
         if let Some(tx) = waiter {
             // Waiter found - deliver the frame
+            tracing::info!(
+                channel_id,
+                msg_id = frame.frame.desc.msg_id,
+                method_id = frame.frame.desc.method_id,
+                flags = ?frame.frame.desc.flags,
+                payload_len = frame.payload_bytes().len(),
+                "try_route_to_pending: delivered to waiter"
+            );
             let _ = tx.send(frame);
             None
         } else {
             tracing::warn!(
                 channel_id,
+                msg_id = frame.frame.desc.msg_id,
+                method_id = frame.frame.desc.method_id,
+                flags = ?frame.frame.desc.flags,
                 pending = ?pending_snapshot,
                 "try_route_to_pending: no waiter for channel"
             );
@@ -382,6 +401,9 @@ impl RpcSession {
         if let Some(tx) = sender {
             tracing::debug!(
                 channel_id,
+                msg_id = frame.desc.msg_id,
+                method_id = frame.desc.method_id,
+                flags = ?flags,
                 payload_len = frame.payload_bytes().len(),
                 is_eos = flags.contains(FrameFlags::EOS),
                 is_error = flags.contains(FrameFlags::ERROR),
@@ -744,11 +766,15 @@ impl RpcSession {
             let channel_id = frame.desc.channel_id;
             let method_id = frame.desc.method_id;
             let flags = frame.desc.flags;
+            let has_tunnel = self.has_tunnel(channel_id);
+            let has_pending = self.has_pending(channel_id);
 
             tracing::debug!(
                 channel_id,
                 method_id,
                 ?flags,
+                has_tunnel,
+                has_pending,
                 payload_len = frame.payload_bytes().len(),
                 "RpcSession::run: received frame"
             );
