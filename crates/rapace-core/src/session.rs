@@ -305,12 +305,18 @@ impl RpcSession {
     /// Try to route a frame to a pending waiter.
     /// Returns true if the frame was consumed (waiter found), false otherwise.
     fn try_route_to_pending(&self, channel_id: u32, frame: ReceivedFrame) -> Option<ReceivedFrame> {
+        let pending_snapshot = self.pending_channel_ids();
         let waiter = self.pending.lock().remove(&channel_id);
         if let Some(tx) = waiter {
             // Waiter found - deliver the frame
             let _ = tx.send(frame);
             None
         } else {
+            tracing::warn!(
+                channel_id,
+                pending = ?pending_snapshot,
+                "try_route_to_pending: no waiter for channel"
+            );
             // No waiter - return frame for further processing
             Some(frame)
         }
