@@ -9,6 +9,7 @@ members = [
     "crates/rapace-introspection",
     "crates/rapace-registry",
     "crates/rapace-tracing",
+    "crates/shm-primitives",
     "crates/rapace-explorer",
     "crates/ur-taking-me-with-you",
     "demos/dashboard",
