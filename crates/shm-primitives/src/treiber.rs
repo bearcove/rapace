@@ -542,7 +542,7 @@ impl TreiberSlabRaw {
             index
         };
 
-        while current != FREE_LIST_END && free_list_len < slot_count + 1 {
+        while current != FREE_LIST_END && free_list_len < slot_count {
             free_list_len += 1;
             if current < slot_count {
                 current = unsafe { self.read_next_free(current) };

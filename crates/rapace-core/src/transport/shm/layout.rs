@@ -25,7 +25,7 @@
 //! └─────────────────────────────────────────────────────────────────────┘
 //! ```
 
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64};
 
 use crate::MsgDescHot;
 
@@ -37,14 +37,6 @@ pub use shm_primitives::{SlotMeta, SlotState};
 
 /// Sentinel value indicating end of free list.
 pub use shm_primitives::treiber::FREE_LIST_END;
-
-/// Unpack a free list head into (index, tag).
-#[inline]
-fn unpack_free_head(packed: u64) -> (u32, u32) {
-    let index = packed as u32;
-    let tag = (packed >> 32) as u32;
-    (index, tag)
-}
 
 /// Magic bytes identifying a rapace SHM segment.
 pub const MAGIC: [u8; 8] = *b"RAPACE\0\0";
@@ -363,17 +355,6 @@ impl DataSegment {
         unsafe { self.data_ptr(index) }
     }
 
-    /// Read the next_free link stored in the first 4 bytes of a slot's data.
-    ///
-    /// # Safety
-    ///
-    /// Index must be < slot_count and the slot must be in a free state.
-    #[inline]
-    unsafe fn get_slot_next_free(&self, index: u32) -> u32 {
-        let ptr = unsafe { self.data_ptr(index) as *const u32 };
-        unsafe { std::ptr::read_volatile(ptr) }
-    }
-
     /// Initialize the free list by linking all slots together.
     ///
     /// This should be called once when creating a new SHM segment.
@@ -541,7 +522,6 @@ impl DataSegment {
         let mut free = 0u32;
         let mut allocated = 0u32;
         let mut in_flight = 0u32;
-        let mut unknown = 0u32;
 
         for i in 0..slot_count {
             // SAFETY: i < slot_count
@@ -553,30 +533,15 @@ impl DataSegment {
             }
         }
 
-        // Count free list length to verify consistency
-        let mut free_list_len = 0u32;
-        let header = unsafe { &*self.header };
-        let mut current = {
-            let (index, _tag) = unpack_free_head(header.free_head.load(Ordering::Acquire));
-            index
-        };
-        while current != FREE_LIST_END && free_list_len < slot_count + 1 {
-            free_list_len += 1;
-            // SAFETY: current should be < slot_count if free list is consistent
-            if current < slot_count {
-                current = unsafe { self.get_slot_next_free(current) };
-            } else {
-                unknown += 1;
-                break;
-            }
-        }
+        // Use shm-primitives' free_count_approx for free list length
+        let free_list_len = self.inner.free_count_approx();
 
         SlotStatus {
             total: slot_count,
             free,
             allocated,
             in_flight,
-            unknown,
+            unknown: 0,
             free_list_len,
         }
     }
