@@ -150,6 +150,18 @@ impl ReceivedFrame {
     }
 }
 
+/// Log level for timeout errors.
+///
+/// Used by the `log_timeout` helper to distinguish between critical timeouts
+/// (logged as errors) and less critical ones (logged as warnings).
+#[derive(Debug, Clone, Copy)]
+enum TimeoutLogLevel {
+    /// Log at ERROR level - for critical timeouts
+    Error,
+    /// Log at WARN level - for less critical timeouts
+    Warn,
+}
+
 /// Type alias for a boxed async dispatch function.
 pub type BoxedDispatcher = Box<
     dyn Fn(Frame) -> Pin<Box<dyn Future<Output = Result<Frame, RpcError>> + Send>> + Send + Sync,
@@ -653,6 +665,58 @@ impl RpcSession {
         Ok(rx)
     }
 
+    /// Log a timeout error with method name lookup from the registry.
+    ///
+    /// This helper reduces code duplication by centralizing the logic for:
+    /// - Looking up method names from the global service registry
+    /// - Logging timeout errors with or without method name information
+    /// - Supporting different log levels (error vs warn)
+    fn log_timeout(channel_id: u32, method_id: u32, timeout_ms: u64, level: TimeoutLogLevel) {
+        let method_name = rapace_registry::ServiceRegistry::with_global(|reg| {
+            reg.method_by_id(rapace_registry::MethodId(method_id))
+                .map(|m| m.full_name.clone())
+        });
+
+        match level {
+            TimeoutLogLevel::Error => {
+                if let Some(method) = method_name {
+                    tracing::error!(
+                        channel_id,
+                        method = method.as_str(),
+                        method_id,
+                        timeout_ms,
+                        "RPC call timed out waiting for response"
+                    );
+                } else {
+                    tracing::error!(
+                        channel_id,
+                        method_id,
+                        timeout_ms,
+                        "RPC call timed out waiting for response"
+                    );
+                }
+            }
+            TimeoutLogLevel::Warn => {
+                if let Some(method) = method_name {
+                    tracing::warn!(
+                        channel_id,
+                        method = method.as_str(),
+                        method_id,
+                        timeout_ms,
+                        "RPC call timed out waiting for response"
+                    );
+                } else {
+                    tracing::warn!(
+                        channel_id,
+                        method_id,
+                        timeout_ms,
+                        "RPC call timed out waiting for response"
+                    );
+                }
+            }
+        }
+    }
+
     /// Send a request and wait for a response.
     ///
     /// # Here be dragons
@@ -755,28 +819,7 @@ impl RpcSession {
                 });
             }
             Err(_elapsed) => {
-                // Look up method name from registry for better error messages
-                let method_name = rapace_registry::ServiceRegistry::with_global(|reg| {
-                    reg.method_by_id(rapace_registry::MethodId(method_id))
-                        .map(|m| m.full_name.clone())
-                });
-
-                if let Some(method) = method_name {
-                    tracing::error!(
-                        channel_id,
-                        method = method.as_str(),
-                        method_id,
-                        timeout_ms,
-                        "RPC call timed out waiting for response"
-                    );
-                } else {
-                    tracing::error!(
-                        channel_id,
-                        method_id,
-                        timeout_ms,
-                        "RPC call timed out waiting for response"
-                    );
-                }
+                Self::log_timeout(channel_id, method_id, timeout_ms, TimeoutLogLevel::Error);
                 return Err(RpcError::DeadlineExceeded);
             }
         };
@@ -882,28 +925,7 @@ impl RpcSession {
                 return Err(RpcError::Transport(TransportError::Closed));
             }
             Err(_) => {
-                // Look up method name from registry for better error messages
-                let method_name = rapace_registry::ServiceRegistry::with_global(|reg| {
-                    reg.method_by_id(rapace_registry::MethodId(method_id))
-                        .map(|m| m.full_name.clone())
-                });
-
-                if let Some(method) = method_name {
-                    tracing::warn!(
-                        channel_id,
-                        method = method.as_str(),
-                        method_id,
-                        timeout_ms,
-                        "RPC call timed out waiting for response"
-                    );
-                } else {
-                    tracing::warn!(
-                        channel_id,
-                        method_id,
-                        timeout_ms,
-                        "RPC call timed out waiting for response"
-                    );
-                }
+                Self::log_timeout(channel_id, method_id, timeout_ms, TimeoutLogLevel::Warn);
                 return Err(RpcError::DeadlineExceeded);
             }
         };
