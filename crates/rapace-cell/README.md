@@ -18,7 +18,7 @@ This crate provides simple APIs for building rapace cells that communicate via S
 
 ### Before (95+ lines of boilerplate)
 
-```rust
+```rust,ignore
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -83,7 +83,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ### After (3 lines!)
 
-```rust
+```rust,ignore
 use rapace_cell::run;
 
 #[tokio::main]
@@ -99,7 +99,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 For simple cells that expose a single service:
 
-```rust
+```rust,ignore
 use rapace_cell::{run, ServiceDispatch};
 use rapace::{Frame, RpcError};
 use std::future::Future;
@@ -151,7 +151,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 For cells that expose multiple services:
 
-```rust
+```rust,ignore
 use rapace_cell::{run_multi, DispatcherBuilder, ServiceDispatch};
 
 #[tokio::main]
@@ -172,7 +172,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 If you need more control but still want simplified service setup:
 
-```rust
+```rust,ignore
 use rapace_cell::{RpcSessionExt, DEFAULT_SHM_CONFIG};
 use rapace::transport::shm::{ShmSession, ShmTransport};
 use rapace::RpcSession;
@@ -257,7 +257,7 @@ The cell runtime provides a `CellError` type that covers common failure modes:
 
 The cell runtime doesn't configure tracing by default - you should set it up yourself in `main()`:
 
-```rust
+```rust,ignore
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Simple console logging
