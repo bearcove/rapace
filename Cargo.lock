@@ -106,28 +106,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-stream"
-version = "0.3.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b5a71a6f37880a80d1d7f19efd781e4b5de42c88f0722cc13bcb6cc2cfe8476"
-dependencies = [
- "async-stream-impl",
- "futures-core",
- "pin-project-lite",
-]
-
-[[package]]
-name = "async-stream-impl"
-version = "0.3.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7c24de15d275a1ecfd47a380fb4d5ec9bfe0933f309ed5e705b775596a3574d"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -608,18 +586,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "enum_dispatch"
-version = "0.3.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa18ce2bc66555b3218614519ac839ddb759a7d6720732f979ef8d13be147ecd"
-dependencies = [
- "once_cell",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -999,27 +965,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f90f7dce0722e95104fcb095585910c0977252f286e354b5e3bd38902cd99988"
 
 [[package]]
-name = "futures-timeout"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc766541fbac66e9c9b53a92623c38e9a22768a4bd6a0c49a0b564b0126474e2"
-dependencies = [
- "futures",
- "futures-timer",
- "pin-project",
-]
-
-[[package]]
-name = "futures-timer"
-version = "3.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f288b0a4f20f9a56b5d1da57e2227c661b7b16168e2f72365f57b63326e29b24"
-dependencies = [
- "gloo-timers 0.2.6",
- "send_wrapper",
-]
-
-[[package]]
 name = "futures-util"
 version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1098,18 +1043,6 @@ dependencies = [
  "fallible-iterator",
  "indexmap",
  "stable_deref_trait",
-]
-
-[[package]]
-name = "gloo-timers"
-version = "0.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b995a66bb87bebce9a0f4a95aed01daca4872c050bfcb21653361c03bc35e5c"
-dependencies = [
- "futures-channel",
- "futures-core",
- "js-sys",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -1749,26 +1682,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 
 [[package]]
-name = "pin-project"
-version = "1.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "677f1add503faace112b9f1373e43e9e054bfdd22ff1a63c1bc485eaec6a6a8a"
-dependencies = [
- "pin-project-internal",
-]
-
-[[package]]
-name = "pin-project-internal"
-version = "1.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e918e4ff8c4549eb882f14b3a4bc8c8bc93de829416eacf579f1207a8fbf861"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "pin-project-lite"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1942,6 +1855,7 @@ dependencies = [
  "rapace-registry",
  "tokio",
  "tokio-stream",
+ "tokio-test-lite",
  "tracing",
  "web-time",
 ]
@@ -1992,6 +1906,7 @@ dependencies = [
  "rapace-registry",
  "rapace-tracing",
  "tokio",
+ "tokio-test-lite",
  "tracing",
  "tracing-subscriber",
  "ur-taking-me-with-you",
@@ -2002,16 +1917,13 @@ name = "rapace-core"
 version = "0.5.0"
 dependencies = [
  "allocator-api2",
- "async-stream",
  "axum",
  "bitflags 2.10.0",
  "bytes",
- "enum_dispatch",
  "facet 0.34.0 (git+https://github.com/facet-rs/facet?branch=main)",
  "facet-format-postcard",
  "futures",
- "futures-timeout",
- "gloo-timers 0.3.0",
+ "gloo-timers",
  "js-sys",
  "libc",
  "object-pool",
@@ -2020,6 +1932,7 @@ dependencies = [
  "shm-primitives",
  "static_assertions",
  "tokio",
+ "tokio-test-lite",
  "tokio-tungstenite",
  "tracing",
  "wasm-bindgen",
@@ -2052,6 +1965,7 @@ dependencies = [
  "rapace",
  "tokio",
  "tokio-stream",
+ "tokio-test-lite",
  "tracing-subscriber",
 ]
 
@@ -2088,6 +2002,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "tokio-test-lite",
  "tower-service",
 ]
 
@@ -2103,6 +2018,7 @@ dependencies = [
  "rapace",
  "reqwest",
  "tokio",
+ "tokio-test-lite",
  "tracing",
  "tracing-subscriber",
 ]
@@ -2114,6 +2030,7 @@ dependencies = [
  "rapace",
  "rapace-registry",
  "tokio",
+ "tokio-test-lite",
 ]
 
 [[package]]
@@ -2155,6 +2072,7 @@ dependencies = [
  "libc",
  "rapace",
  "tokio",
+ "tokio-test-lite",
 ]
 
 [[package]]
@@ -2178,6 +2096,7 @@ dependencies = [
  "rapace",
  "rapace-tracing",
  "tokio",
+ "tokio-test-lite",
  "tracing",
  "tracing-subscriber",
 ]
@@ -2369,12 +2288,6 @@ name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
-
-[[package]]
-name = "send_wrapper"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f638d531eccd6e23b980caf34876660d38e265409d8e99b397ab71eb3612fad0"
 
 [[package]]
 name = "serde"
@@ -2722,6 +2635,16 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
+]
+
+[[package]]
+name = "tokio-test-lite"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43d510187ff54d4baba7a36d605a79a666ed9a1f07e2cff088bbfd87354d5227"
+dependencies = [
+ "proc-macro2",
+ "quote",
 ]
 
 [[package]]
