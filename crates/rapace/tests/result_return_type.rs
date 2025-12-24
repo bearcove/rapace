@@ -1,7 +1,6 @@
 //! Regression test for issue #55: Result<T, E> as return type
 //! https://github.com/bearcove/rapace/issues/55
 
-use rapace::prelude::*;
 use rapace::{RpcSession, Transport};
 use std::sync::Arc;
 

@@ -648,7 +648,7 @@ dependencies = [
 [[package]]
 name = "facet"
 version = "0.34.0"
-source = "git+https://github.com/facet-rs/facet?branch=main#cacc6d28cee4bc3bc9ccf7c7238fea4fbb3d2e4b"
+source = "git+https://github.com/facet-rs/facet?branch=main#c4b47e7ae91b86663e1e1f667d20894214dbebde"
 dependencies = [
  "autocfg",
  "facet-core 0.34.0 (git+https://github.com/facet-rs/facet?branch=main)",
@@ -684,7 +684,7 @@ dependencies = [
 [[package]]
 name = "facet-core"
 version = "0.34.0"
-source = "git+https://github.com/facet-rs/facet?branch=main#cacc6d28cee4bc3bc9ccf7c7238fea4fbb3d2e4b"
+source = "git+https://github.com/facet-rs/facet?branch=main#c4b47e7ae91b86663e1e1f667d20894214dbebde"
 dependencies = [
  "autocfg",
  "camino",
@@ -703,7 +703,7 @@ dependencies = [
 [[package]]
 name = "facet-format"
 version = "0.34.0"
-source = "git+https://github.com/facet-rs/facet?branch=main#cacc6d28cee4bc3bc9ccf7c7238fea4fbb3d2e4b"
+source = "git+https://github.com/facet-rs/facet?branch=main#c4b47e7ae91b86663e1e1f667d20894214dbebde"
 dependencies = [
  "cranelift",
  "cranelift-jit",
@@ -730,7 +730,7 @@ dependencies = [
 [[package]]
 name = "facet-format-postcard"
 version = "0.34.0"
-source = "git+https://github.com/facet-rs/facet?branch=main#cacc6d28cee4bc3bc9ccf7c7238fea4fbb3d2e4b"
+source = "git+https://github.com/facet-rs/facet?branch=main#c4b47e7ae91b86663e1e1f667d20894214dbebde"
 dependencies = [
  "facet-core 0.34.0 (git+https://github.com/facet-rs/facet?branch=main)",
  "facet-format 0.34.0 (git+https://github.com/facet-rs/facet?branch=main)",
@@ -753,7 +753,7 @@ dependencies = [
 [[package]]
 name = "facet-macro-parse"
 version = "0.34.0"
-source = "git+https://github.com/facet-rs/facet?branch=main#cacc6d28cee4bc3bc9ccf7c7238fea4fbb3d2e4b"
+source = "git+https://github.com/facet-rs/facet?branch=main#c4b47e7ae91b86663e1e1f667d20894214dbebde"
 dependencies = [
  "facet-macro-types 0.34.0 (git+https://github.com/facet-rs/facet?branch=main)",
  "proc-macro2",
@@ -773,7 +773,7 @@ dependencies = [
 [[package]]
 name = "facet-macro-types"
 version = "0.34.0"
-source = "git+https://github.com/facet-rs/facet?branch=main#cacc6d28cee4bc3bc9ccf7c7238fea4fbb3d2e4b"
+source = "git+https://github.com/facet-rs/facet?branch=main#c4b47e7ae91b86663e1e1f667d20894214dbebde"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -793,7 +793,7 @@ dependencies = [
 [[package]]
 name = "facet-macros"
 version = "0.34.0"
-source = "git+https://github.com/facet-rs/facet?branch=main#cacc6d28cee4bc3bc9ccf7c7238fea4fbb3d2e4b"
+source = "git+https://github.com/facet-rs/facet?branch=main#c4b47e7ae91b86663e1e1f667d20894214dbebde"
 dependencies = [
  "facet-macros-impl 0.34.0 (git+https://github.com/facet-rs/facet?branch=main)",
 ]
@@ -809,7 +809,7 @@ dependencies = [
 [[package]]
 name = "facet-macros-impl"
 version = "0.34.0"
-source = "git+https://github.com/facet-rs/facet?branch=main#cacc6d28cee4bc3bc9ccf7c7238fea4fbb3d2e4b"
+source = "git+https://github.com/facet-rs/facet?branch=main#c4b47e7ae91b86663e1e1f667d20894214dbebde"
 dependencies = [
  "facet-macro-parse 0.34.0 (git+https://github.com/facet-rs/facet?branch=main)",
  "facet-macro-types 0.34.0 (git+https://github.com/facet-rs/facet?branch=main)",
@@ -835,7 +835,7 @@ dependencies = [
 [[package]]
 name = "facet-reflect"
 version = "0.34.0"
-source = "git+https://github.com/facet-rs/facet?branch=main#cacc6d28cee4bc3bc9ccf7c7238fea4fbb3d2e4b"
+source = "git+https://github.com/facet-rs/facet?branch=main#c4b47e7ae91b86663e1e1f667d20894214dbebde"
 dependencies = [
  "facet-core 0.34.0 (git+https://github.com/facet-rs/facet?branch=main)",
  "miette",
@@ -853,7 +853,7 @@ dependencies = [
 [[package]]
 name = "facet-solver"
 version = "0.34.0"
-source = "git+https://github.com/facet-rs/facet?branch=main#cacc6d28cee4bc3bc9ccf7c7238fea4fbb3d2e4b"
+source = "git+https://github.com/facet-rs/facet?branch=main#c4b47e7ae91b86663e1e1f667d20894214dbebde"
 dependencies = [
  "facet-core 0.34.0 (git+https://github.com/facet-rs/facet?branch=main)",
  "facet-reflect 0.34.0 (git+https://github.com/facet-rs/facet?branch=main)",
