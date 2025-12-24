@@ -677,43 +677,31 @@ impl RpcSession {
                 .map(|m| m.full_name.clone())
         });
 
+        // Macro to eliminate duplication between error and warn branches
+        macro_rules! log_at_level {
+            ($level:ident) => {
+                if let Some(method) = method_name {
+                    tracing::$level!(
+                        channel_id,
+                        method = method.as_str(),
+                        method_id,
+                        timeout_ms,
+                        "RPC call timed out waiting for response"
+                    );
+                } else {
+                    tracing::$level!(
+                        channel_id,
+                        method_id,
+                        timeout_ms,
+                        "RPC call timed out waiting for response"
+                    );
+                }
+            };
+        }
+
         match level {
-            TimeoutLogLevel::Error => {
-                if let Some(method) = method_name {
-                    tracing::error!(
-                        channel_id,
-                        method = method.as_str(),
-                        method_id,
-                        timeout_ms,
-                        "RPC call timed out waiting for response"
-                    );
-                } else {
-                    tracing::error!(
-                        channel_id,
-                        method_id,
-                        timeout_ms,
-                        "RPC call timed out waiting for response"
-                    );
-                }
-            }
-            TimeoutLogLevel::Warn => {
-                if let Some(method) = method_name {
-                    tracing::warn!(
-                        channel_id,
-                        method = method.as_str(),
-                        method_id,
-                        timeout_ms,
-                        "RPC call timed out waiting for response"
-                    );
-                } else {
-                    tracing::warn!(
-                        channel_id,
-                        method_id,
-                        timeout_ms,
-                        "RPC call timed out waiting for response"
-                    );
-                }
-            }
+            TimeoutLogLevel::Error => log_at_level!(error),
+            TimeoutLogLevel::Warn => log_at_level!(warn),
         }
     }
 
