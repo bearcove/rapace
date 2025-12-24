@@ -23,6 +23,7 @@ members = [
     "demos/tracing-over-rapace",
     "demos/http-tunnel",
     "demos/service-registry-simple",
+    "test-external-service",
     "xtask",
 ]
 exclude = ["fuzz"]
