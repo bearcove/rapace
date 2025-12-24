@@ -55,21 +55,15 @@ impl ServiceDispatch for TracingConfigService {
         &[TRACING_CONFIG_METHOD_ID_SET_FILTER]
     }
 
-    fn dispatch(
+    async fn dispatch(
         &self,
         method_id: u32,
         frame: rapace::Frame,
         buffer_pool: &BufferPool,
-    ) -> std::pin::Pin<
-        Box<
-            dyn std::future::Future<Output = Result<rapace::Frame, rapace::RpcError>>
-                + Send
-                + 'static,
-        >,
-    > {
+    ) -> Result<rapace::Frame, rapace::RpcError> {
         let server = self.0.clone();
         let buffer_pool = buffer_pool.clone();
         // Frame is now owned - no copying needed!
-        Box::pin(async move { server.dispatch(method_id, &frame, &buffer_pool).await })
+        server.dispatch(method_id, &frame, &buffer_pool).await
     }
 }

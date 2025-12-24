@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 
+use std::collections::HashSet;
 use std::error::Error as StdError;
 use std::future::Future;
 use std::path::PathBuf;
@@ -18,6 +19,9 @@ pub use lifecycle::{CellLifecycle, CellLifecycleClient, CellLifecycleServer, Rea
 
 pub mod tracing_setup;
 pub use tracing_setup::TracingConfigService;
+
+#[cfg(feature = "introspection")]
+use rapace_introspection::{DefaultServiceIntrospection, ServiceIntrospectionServer};
 
 #[cfg(unix)]
 use rapace::transport::shm::{Doorbell, HubPeer};
@@ -109,51 +113,117 @@ impl From<TransportError> for CellError {
 }
 
 /// Trait for service servers that can be dispatched
-pub trait ServiceDispatch: Send + Sync + 'static {
-    /// Returns the method IDs that this service handles.
-    ///
-    /// This is used by the dispatcher to build an O(1) lookup table at registration time,
-    /// avoiding the need to try each service in sequence at dispatch time.
-    fn method_ids(&self) -> &'static [u32];
+pub use rapace::rapace_core::ServiceDispatch;
 
-    /// Dispatch a method call to this service
-    fn dispatch(
+// Wrap the generated server to implement ServiceDispatch
+#[cfg(feature = "introspection")]
+pub struct IntrospectionDispatcher(Arc<ServiceIntrospectionServer<DefaultServiceIntrospection>>);
+
+#[cfg(feature = "introspection")]
+impl ServiceDispatch for IntrospectionDispatcher {
+    fn method_ids(&self) -> &'static [u32] {
+        use rapace_introspection::{
+            SERVICE_INTROSPECTION_METHOD_ID_DESCRIBE_SERVICE,
+            SERVICE_INTROSPECTION_METHOD_ID_HAS_METHOD,
+            SERVICE_INTROSPECTION_METHOD_ID_LIST_SERVICES,
+        };
+        &[
+            SERVICE_INTROSPECTION_METHOD_ID_LIST_SERVICES,
+            SERVICE_INTROSPECTION_METHOD_ID_DESCRIBE_SERVICE,
+            SERVICE_INTROSPECTION_METHOD_ID_HAS_METHOD,
+        ]
+    }
+
+    async fn dispatch(
         &self,
         method_id: u32,
         frame: Frame,
         buffer_pool: &BufferPool,
-    ) -> Pin<Box<dyn Future<Output = Result<Frame, RpcError>> + Send + 'static>>;
+    ) -> Result<Frame, RpcError> {
+        self.0.dispatch(method_id, &frame, buffer_pool).await
+    }
 }
 
-/// Builder for creating multi-service dispatchers
-pub struct DispatcherBuilder {
-    services: std::collections::HashMap<u32, Arc<dyn ServiceDispatch>>,
+/// Type-level stack for services (similar to Tower's Layer Stack)
+pub struct DispatcherBuilder<S> {
+    stack: S,
+    method_ids: HashSet<u32>, // Just for collision detection
 }
 
-impl DispatcherBuilder {
+pub struct ServiceStack<Head, Tail> {
+    head: Arc<Head>,
+    tail: Tail,
+}
+
+pub struct Identity;
+
+impl ServiceDispatch for Identity {
+    fn method_ids(&self) -> &'static [u32] {
+        &[]
+    }
+
+    async fn dispatch(
+        &self,
+        _method_id: u32,
+        _frame: Frame,
+        _buffer_pool: &BufferPool,
+    ) -> Result<Frame, RpcError> {
+        Err(RpcError::NotFound)
+    }
+}
+
+impl<Head, Tail> ServiceDispatch for ServiceStack<Head, Tail>
+where
+    Head: ServiceDispatch,
+    Tail: ServiceDispatch,
+{
+    fn method_ids(&self) -> &'static [u32] {
+        self.head.method_ids()
+    }
+
+    async fn dispatch(
+        &self,
+        method_id: u32,
+        frame: Frame,
+        buffer_pool: &BufferPool,
+    ) -> Result<Frame, RpcError> {
+        // Check if this service handles the method
+        if self.head.method_ids().contains(&method_id) {
+            self.head.dispatch(method_id, frame, buffer_pool).await
+        } else {
+            // Try next service in stack
+            self.tail.dispatch(method_id, frame, buffer_pool).await
+        }
+    }
+}
+
+impl DispatcherBuilder<Identity> {
     /// Create a new dispatcher builder
     pub fn new() -> Self {
         Self {
-            services: std::collections::HashMap::new(),
+            stack: Identity,
+            method_ids: HashSet::new(),
         }
     }
+}
 
+impl<S> DispatcherBuilder<S> {
     /// Add a service to the dispatcher
     ///
-    /// The service's method IDs are registered for O(1) dispatch lookup.
+    /// The service's method IDs are registered for collision detection.
     ///
     /// # Panics
     ///
     /// Panics if any method_id from this service is already registered by another service.
     /// This ensures that method ID collisions are caught at cell startup rather than
     /// silently routing calls to the wrong service.
-    pub fn add_service<S>(mut self, service: S) -> Self
-    where
-        S: ServiceDispatch,
-    {
-        let service = Arc::new(service);
+    pub fn add_service<T: ServiceDispatch>(
+        mut self,
+        service: T,
+    ) -> DispatcherBuilder<ServiceStack<T, S>> {
+        // Check for duplicate method IDs
         for &method_id in service.method_ids() {
-            if let Some(_existing) = self.services.insert(method_id, service.clone()) {
+            if self.method_ids.contains(&method_id) {
                 // Method ID collision detected - this is a fatal configuration error
                 // Look up method name from registry for better diagnostics
                 let method_info = rapace_registry::ServiceRegistry::with_global(|reg| {
@@ -171,8 +241,16 @@ impl DispatcherBuilder {
                     method_desc
                 );
             }
+            self.method_ids.insert(method_id);
         }
-        self
+
+        DispatcherBuilder {
+            stack: ServiceStack {
+                head: Arc::new(service),
+                tail: self.stack,
+            },
+            method_ids: self.method_ids,
+        }
     }
 
     /// Add service introspection to this cell.
@@ -192,50 +270,16 @@ impl DispatcherBuilder {
     /// }).await?;
     /// ```
     #[cfg(feature = "introspection")]
-    pub fn with_introspection(self) -> Self {
-        use rapace_introspection::{DefaultServiceIntrospection, ServiceIntrospectionServer};
-
+    pub fn with_introspection(self) -> DispatcherBuilder<ServiceStack<IntrospectionDispatcher, S>> {
         let introspection = DefaultServiceIntrospection::new();
         let server = Arc::new(ServiceIntrospectionServer::new(introspection));
-
-        // Wrap the generated server to implement ServiceDispatch
-        struct IntrospectionDispatcher(
-            Arc<ServiceIntrospectionServer<DefaultServiceIntrospection>>,
-        );
-
-        impl ServiceDispatch for IntrospectionDispatcher {
-            fn method_ids(&self) -> &'static [u32] {
-                use rapace_introspection::{
-                    SERVICE_INTROSPECTION_METHOD_ID_DESCRIBE_SERVICE,
-                    SERVICE_INTROSPECTION_METHOD_ID_HAS_METHOD,
-                    SERVICE_INTROSPECTION_METHOD_ID_LIST_SERVICES,
-                };
-                &[
-                    SERVICE_INTROSPECTION_METHOD_ID_LIST_SERVICES,
-                    SERVICE_INTROSPECTION_METHOD_ID_DESCRIBE_SERVICE,
-                    SERVICE_INTROSPECTION_METHOD_ID_HAS_METHOD,
-                ]
-            }
-
-            fn dispatch(
-                &self,
-                method_id: u32,
-                frame: Frame,
-                buffer_pool: &BufferPool,
-            ) -> Pin<Box<dyn Future<Output = Result<Frame, RpcError>> + Send + 'static>>
-            {
-                let buffer_pool = buffer_pool.clone();
-                let server = self.0.clone();
-                Box::pin(async move { server.dispatch(method_id, &frame, &buffer_pool).await })
-            }
-        }
 
         self.add_service(IntrospectionDispatcher(server))
     }
 
     /// Build the dispatcher function
     ///
-    /// Dispatch is O(1) via HashMap lookup - no iteration or frame copying needed.
+    /// Dispatch walks the service stack until a handler is found.
     #[allow(clippy::type_complexity)]
     pub fn build(
         self,
@@ -243,19 +287,21 @@ impl DispatcherBuilder {
     ) -> impl Fn(Frame) -> Pin<Box<dyn Future<Output = Result<Frame, RpcError>> + Send>>
     + Send
     + Sync
-    + 'static {
-        let services = Arc::new(self.services);
+    + 'static
+    where
+        S: ServiceDispatch + 'static,
+    {
+        let stack = Arc::new(self.stack);
         move |request: Frame| {
-            let services = services.clone();
+            let stack = stack.clone();
             let buffer_pool = buffer_pool.clone();
             Box::pin(async move {
                 let method_id = request.desc.method_id;
                 let channel_id = request.desc.channel_id;
                 let msg_id = request.desc.msg_id;
 
-                // O(1) lookup - no iteration, no frame copying
-                if let Some(service) = services.get(&method_id) {
-                    let mut response = service.dispatch(method_id, request, &buffer_pool).await?;
+                // Walk the stack until we find a handler
+                if let Ok(mut response) = stack.dispatch(method_id, request, &buffer_pool).await {
                     response.desc.channel_id = channel_id;
                     response.desc.msg_id = msg_id;
                     return Ok(response);
@@ -285,7 +331,7 @@ impl DispatcherBuilder {
     }
 }
 
-impl Default for DispatcherBuilder {
+impl Default for DispatcherBuilder<Identity> {
     fn default() -> Self {
         Self::new()
     }
@@ -819,9 +865,10 @@ async fn ready_handshake_with_backoff(
 ///     Ok(())
 /// }
 /// ```
-pub async fn run_multi<F>(builder_fn: F) -> Result<(), CellError>
+pub async fn run_multi<F, S>(builder_fn: F) -> Result<(), CellError>
 where
-    F: FnOnce(DispatcherBuilder) -> DispatcherBuilder,
+    F: FnOnce(DispatcherBuilder<Identity>) -> DispatcherBuilder<S>,
+    S: ServiceDispatch + 'static,
 {
     run_multi_with_config(builder_fn, DEFAULT_SHM_CONFIG).await
 }
@@ -829,12 +876,13 @@ where
 /// Run a multi-service cell with custom SHM configuration
 ///
 /// This automatically sets up rapace-tracing to forward logs to the host.
-pub async fn run_multi_with_config<F>(
+pub async fn run_multi_with_config<F, S>(
     builder_fn: F,
     config: ShmSessionConfig,
 ) -> Result<(), CellError>
 where
-    F: FnOnce(DispatcherBuilder) -> DispatcherBuilder,
+    F: FnOnce(DispatcherBuilder<Identity>) -> DispatcherBuilder<S>,
+    S: ServiceDispatch + 'static,
 {
     let setup = setup_cell(config).await?;
 
@@ -1005,30 +1053,20 @@ macro_rules! run_cell_with_session {
 #[macro_export]
 macro_rules! cell_service {
     ($server_type:ty, $impl_type:ty) => {
-        struct CellService(std::sync::Arc<$server_type>);
+        pub struct CellService(std::sync::Arc<$server_type>);
 
         impl $crate::ServiceDispatch for CellService {
             fn method_ids(&self) -> &'static [u32] {
                 <$server_type>::METHOD_IDS
             }
 
-            fn dispatch(
+            async fn dispatch(
                 &self,
                 method_id: u32,
                 frame: $crate::Frame,
                 buffer_pool: &$crate::BufferPool,
-            ) -> std::pin::Pin<
-                Box<
-                    dyn std::future::Future<
-                            Output = std::result::Result<$crate::Frame, $crate::RpcError>,
-                        > + Send
-                        + 'static,
-                >,
-            > {
-                let server = self.0.clone();
-                let buffer_pool = buffer_pool.clone();
-                // Frame is now owned - no copying needed!
-                Box::pin(async move { server.dispatch(method_id, &frame, &buffer_pool).await })
+            ) -> std::result::Result<$crate::Frame, $crate::RpcError> {
+                self.0.dispatch(method_id, &frame, buffer_pool).await
             }
         }
 

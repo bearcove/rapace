@@ -38,3 +38,20 @@ pub use futures::StreamExt;
 
 // Re-export try_stream for use by macro-generated streaming clients
 pub use async_stream::try_stream;
+
+/// Trait for service servers that can be dispatched
+pub trait ServiceDispatch: Send + Sync + 'static {
+    /// Returns the method IDs that this service handles.
+    ///
+    /// This is used by the dispatcher to build an O(1) lookup table at registration time,
+    /// avoiding the need to try each service in sequence at dispatch time.
+    fn method_ids(&self) -> &'static [u32];
+
+    /// Dispatch a method call to this service
+    fn dispatch(
+        &self,
+        method_id: u32,
+        frame: Frame,
+        buffer_pool: &BufferPool,
+    ) -> impl Future<Output = Result<Frame, RpcError>> + Send;
+}

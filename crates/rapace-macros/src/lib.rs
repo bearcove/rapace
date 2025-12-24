@@ -406,6 +406,26 @@ fn generate_service(input: &ParsedTrait) -> Result<TokenStream2, MacroError> {
             service: S,
         }
 
+        impl<S: #trait_name + Send + Sync + 'static> ::#rapace_crate::rapace_core::ServiceDispatch  for #server_name<S> {
+            /// Returns the method IDs that this service handles.
+            ///
+            /// This is used by the dispatcher to build an O(1) lookup table at registration time,
+            /// avoiding the need to try each service in sequence at dispatch time.
+            fn method_ids(&self) -> &'static [u32] {
+                &Self::METHOD_IDS
+            }
+
+            /// Dispatch a method call to this service
+            async fn dispatch(
+                &self,
+                method_id: u32,
+                frame: ::#rapace_crate::Frame,
+                buffer_pool: &::#rapace_crate::BufferPool,
+            ) -> Result<::#rapace_crate::Frame, ::#rapace_crate::RpcError> {
+                #server_name::<S>::dispatch(self, method_id, &frame, buffer_pool).await
+            }
+        }
+
         impl<S: #trait_name + Send + Sync + 'static> #server_name<S> {
             /// All method IDs for this service, for use with `cell_service!` and `DispatcherBuilder`.
             ///
@@ -529,6 +549,7 @@ fn generate_service(input: &ParsedTrait) -> Result<TokenStream2, MacroError> {
                             ::#rapace_crate::rapace_core::RpcError::Transport(_) => (::#rapace_crate::rapace_core::ErrorCode::Internal as u32, "transport error".into()),
                             ::#rapace_crate::rapace_core::RpcError::Cancelled => (::#rapace_crate::rapace_core::ErrorCode::Cancelled as u32, "cancelled".into()),
                             ::#rapace_crate::rapace_core::RpcError::DeadlineExceeded => (::#rapace_crate::rapace_core::ErrorCode::DeadlineExceeded as u32, "deadline exceeded".into()),
+                            ::#rapace_crate::rapace_core::RpcError::NotFound => (::#rapace_crate::rapace_core::ErrorCode::NotFound as u32, "not found".into()),
                             ::#rapace_crate::rapace_core::RpcError::Serialize(e) => (::#rapace_crate::rapace_core::ErrorCode::Internal as u32, ::std::format!("serialize error: {}", e)),
                             ::#rapace_crate::rapace_core::RpcError::Deserialize(e) => (::#rapace_crate::rapace_core::ErrorCode::Internal as u32, ::std::format!("deserialize error: {}", e)),
                         };
@@ -670,6 +691,7 @@ fn generate_service(input: &ParsedTrait) -> Result<TokenStream2, MacroError> {
                                     RpcError::Transport(_) => (ErrorCode::Internal as u32, "transport error".into()),
                                     RpcError::Cancelled => (ErrorCode::Cancelled as u32, "cancelled".into()),
                                     RpcError::DeadlineExceeded => (ErrorCode::DeadlineExceeded as u32, "deadline exceeded".into()),
+                                    RpcError::NotFound => (ErrorCode::NotFound as u32, "not found".into()),
                                     RpcError::Serialize(e) => (ErrorCode::Internal as u32, format!("serialize error: {}", e)),
                                     RpcError::Deserialize(e) => (ErrorCode::Internal as u32, format!("deserialize error: {}", e)),
                                 };
@@ -1229,6 +1251,7 @@ fn generate_streaming_dispatch_arm_server_streaming(
                             #rapace_crate::rapace_core::RpcError::Transport(_) => (#rapace_crate::rapace_core::ErrorCode::Internal as u32, "transport error".into()),
                             #rapace_crate::rapace_core::RpcError::Cancelled => (#rapace_crate::rapace_core::ErrorCode::Cancelled as u32, "cancelled".into()),
                             #rapace_crate::rapace_core::RpcError::DeadlineExceeded => (#rapace_crate::rapace_core::ErrorCode::DeadlineExceeded as u32, "deadline exceeded".into()),
+                            #rapace_crate::rapace_core::RpcError::NotFound => (#rapace_crate::rapace_core::ErrorCode::NotFound as u32, "not found".into()),
                             #rapace_crate::rapace_core::RpcError::Serialize(e) => (#rapace_crate::rapace_core::ErrorCode::Internal as u32, format!("serialize error: {}", e)),
                             #rapace_crate::rapace_core::RpcError::Deserialize(e) => (#rapace_crate::rapace_core::ErrorCode::Internal as u32, format!("deserialize error: {}", e)),
                         };

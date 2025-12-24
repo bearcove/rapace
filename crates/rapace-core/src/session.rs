@@ -1118,6 +1118,9 @@ impl RpcSession {
                                 RpcError::Cancelled => {
                                     (ErrorCode::Cancelled as u32, "cancelled".into())
                                 }
+                                RpcError::NotFound => {
+                                    (ErrorCode::NotFound as u32, "not found".into())
+                                }
                                 RpcError::DeadlineExceeded => (
                                     ErrorCode::DeadlineExceeded as u32,
                                     "deadline exceeded".into(),

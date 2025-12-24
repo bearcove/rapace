@@ -165,6 +165,7 @@ impl AsyncRead for TunnelStream {
                         RpcError::DeadlineExceeded => {
                             (std::io::ErrorKind::TimedOut, "deadline exceeded".into())
                         }
+                        RpcError::NotFound => (std::io::ErrorKind::NotFound, "not found".into()),
                         RpcError::Serialize(e) => (
                             std::io::ErrorKind::InvalidData,
                             format!("serialize error: {}", e),

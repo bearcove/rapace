@@ -382,6 +382,7 @@ pub enum RpcError {
     },
     Cancelled,
     DeadlineExceeded,
+    NotFound,
     /// Serialization error - contains error message
     Serialize(String),
     /// Deserialization error - contains error message
@@ -395,6 +396,7 @@ impl fmt::Display for RpcError {
             Self::Status { code, message } => write!(f, "{code}: {message}"),
             Self::Cancelled => write!(f, "cancelled"),
             Self::DeadlineExceeded => write!(f, "deadline exceeded"),
+            Self::NotFound => write!(f, "identity reached"),
             Self::Serialize(msg) => write!(f, "could not serialize to postcard: {msg}"),
             Self::Deserialize(msg) => write!(f, "could not deserialize from postcard: {msg}"),
         }

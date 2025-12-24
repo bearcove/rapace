@@ -88,7 +88,9 @@ fn test_multi_service_dispatcher() {
         use super::*;
         rapace_cell::cell_service!(ServiceAServer<ServiceAImpl>, ServiceAImpl);
 
-        pub fn build_dispatcher(builder: DispatcherBuilder) -> DispatcherBuilder {
+        pub fn build_dispatcher<S>(
+            builder: DispatcherBuilder<S>,
+        ) -> DispatcherBuilder<ServiceStack<CellService, S>> {
             builder.add_service(CellService::from(ServiceAImpl))
         }
     }
@@ -97,7 +99,9 @@ fn test_multi_service_dispatcher() {
         use super::*;
         rapace_cell::cell_service!(ServiceBServer<ServiceBImpl>, ServiceBImpl);
 
-        pub fn build_dispatcher(builder: DispatcherBuilder) -> DispatcherBuilder {
+        pub fn build_dispatcher<S>(
+            builder: DispatcherBuilder<S>,
+        ) -> DispatcherBuilder<ServiceStack<CellService, S>> {
             builder.add_service(CellService::from(ServiceBImpl))
         }
     }
@@ -127,7 +131,9 @@ async fn test_multi_service_dispatch_e2e() -> Result<(), Box<dyn std::error::Err
         use super::*;
         rapace_cell::cell_service!(ServiceAServer<ServiceAImpl>, ServiceAImpl);
 
-        pub fn build_dispatcher(builder: DispatcherBuilder) -> DispatcherBuilder {
+        pub fn build_dispatcher<S>(
+            builder: DispatcherBuilder<S>,
+        ) -> DispatcherBuilder<ServiceStack<CellService, S>> {
             builder.add_service(CellService::from(ServiceAImpl))
         }
     }
@@ -136,7 +142,9 @@ async fn test_multi_service_dispatch_e2e() -> Result<(), Box<dyn std::error::Err
         use super::*;
         rapace_cell::cell_service!(ServiceBServer<ServiceBImpl>, ServiceBImpl);
 
-        pub fn build_dispatcher(builder: DispatcherBuilder) -> DispatcherBuilder {
+        pub fn build_dispatcher<S>(
+            builder: DispatcherBuilder<S>,
+        ) -> DispatcherBuilder<ServiceStack<CellService, S>> {
             builder.add_service(CellService::from(ServiceBImpl))
         }
     }
