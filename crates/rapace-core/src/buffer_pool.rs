@@ -75,7 +75,7 @@ impl BufferPool {
         reusable.clear();
 
         PooledBuf {
-            inner: reusable,
+            inner: PooledBufInner::Pooled(reusable),
             pool_buffer_size: self.buffer_size,
         }
     }
@@ -96,9 +96,19 @@ impl Default for BufferPool {
 ///
 /// This type wraps an `object-pool` `Reusable` and provides transparent access to the
 /// underlying `Vec<u8>` through `Deref` and `DerefMut` traits.
+///
+/// For oversized data that exceeds the pool's buffer size, this type can hold an
+/// unpooled `Vec<u8>` directly, avoiding unnecessary copying and pool pressure.
 pub struct PooledBuf {
-    inner: object_pool::ReusableOwned<Vec<u8>>,
+    inner: PooledBufInner,
     pool_buffer_size: usize,
+}
+
+enum PooledBufInner {
+    /// Normal case: buffer from the pool
+    Pooled(object_pool::ReusableOwned<Vec<u8>>),
+    /// Overflow case: unpooled Vec for oversized data
+    Unpooled(Vec<u8>),
 }
 
 impl PooledBuf {
@@ -112,9 +122,39 @@ impl PooledBuf {
         buf
     }
 
+    /// Create an unpooled buffer from a Vec.
+    ///
+    /// This is used for oversized data that exceeds the pool's buffer size.
+    /// The Vec will not be returned to the pool when dropped.
+    pub fn from_vec_unpooled(vec: Vec<u8>, pool_buffer_size: usize) -> Self {
+        Self {
+            inner: PooledBufInner::Unpooled(vec),
+            pool_buffer_size,
+        }
+    }
+
     /// Get the pool's buffer size (not the current length).
     pub fn pool_buffer_size(&self) -> usize {
         self.pool_buffer_size
+    }
+
+    /// Convert this pooled buffer into a `Bytes` with zero-copy.
+    ///
+    /// The returned `Bytes` holds a reference to the pooled buffer's data. When the `Bytes`
+    /// is dropped, the underlying buffer is automatically returned to the pool.
+    ///
+    /// This is a zero-copy operation - the buffer is not cloned, only the ownership
+    /// is transferred to a ref-counted wrapper.
+    pub fn into_bytes(self) -> bytes::Bytes {
+        // Wrap the PooledBuf in an Arc and then in PooledBufOwner for AsRef<[u8]>.
+        // When all Bytes clones are dropped, the Arc refcount reaches 0, dropping the
+        // PooledBuf and returning the buffer to the pool.
+        bytes::Bytes::from_owner(PooledBufOwner(Arc::new(self)))
+    }
+
+    /// Returns true if this buffer is using pool storage, false if unpooled.
+    pub fn is_pooled(&self) -> bool {
+        matches!(self.inner, PooledBufInner::Pooled(_))
     }
 }
 
@@ -122,28 +162,51 @@ impl Deref for PooledBuf {
     type Target = Vec<u8>;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        match &self.inner {
+            PooledBufInner::Pooled(buf) => buf,
+            PooledBufInner::Unpooled(vec) => vec,
+        }
     }
 }
 
 impl DerefMut for PooledBuf {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        match &mut self.inner {
+            PooledBufInner::Pooled(buf) => buf,
+            PooledBufInner::Unpooled(vec) => vec,
+        }
     }
 }
 
 impl AsRef<[u8]> for PooledBuf {
     fn as_ref(&self) -> &[u8] {
-        self.inner.as_slice()
+        match &self.inner {
+            PooledBufInner::Pooled(buf) => buf.as_slice(),
+            PooledBufInner::Unpooled(vec) => vec.as_slice(),
+        }
+    }
+}
+
+/// Wrapper for Arc<PooledBuf> that implements AsRef<[u8]> for use with Bytes::from_owner.
+struct PooledBufOwner(Arc<PooledBuf>);
+
+impl AsRef<[u8]> for PooledBufOwner {
+    fn as_ref(&self) -> &[u8] {
+        &self.0[..]
     }
 }
 
 impl std::fmt::Debug for PooledBuf {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (len, capacity, is_pooled) = match &self.inner {
+            PooledBufInner::Pooled(buf) => (buf.len(), buf.capacity(), true),
+            PooledBufInner::Unpooled(vec) => (vec.len(), vec.capacity(), false),
+        };
         f.debug_struct("PooledBuf")
-            .field("len", &self.inner.len())
-            .field("capacity", &self.inner.capacity())
+            .field("len", &len)
+            .field("capacity", &capacity)
             .field("pool_buffer_size", &self.pool_buffer_size)
+            .field("is_pooled", &is_pooled)
             .finish()
     }
 }
@@ -222,5 +285,52 @@ mod tests {
         buf3.extend_from_slice(b"new");
         assert_eq!(&buf3[..], b"new");
         assert_eq!(buf3.len(), 3, "Should only contain new data, not old data");
+    }
+
+    #[test]
+    fn test_into_bytes_zero_copy() {
+        let pool = BufferPool::new();
+        let mut buf = pool.get();
+        buf.extend_from_slice(b"hello world");
+
+        // Convert to Bytes
+        let bytes = buf.into_bytes();
+        assert_eq!(&bytes[..], b"hello world");
+
+        // Cloning Bytes is cheap (ref-counted)
+        let bytes2 = bytes.clone();
+        assert_eq!(&bytes2[..], b"hello world");
+
+        // Both Bytes point to the same underlying data
+        assert_eq!(bytes.as_ptr(), bytes2.as_ptr());
+    }
+
+    #[test]
+    fn test_into_bytes_pool_return() {
+        // Create a pool and track its size
+        let pool = BufferPool::new();
+
+        // Create a buffer and convert to Bytes
+        let bytes = {
+            let mut buf = pool.get();
+            buf.extend_from_slice(b"test data");
+            buf.into_bytes()
+        };
+
+        assert_eq!(&bytes[..], b"test data");
+
+        // Clone the Bytes (increments refcount)
+        let bytes2 = bytes.clone();
+
+        // Drop the first Bytes (decrements refcount, but buffer not returned yet)
+        drop(bytes);
+        assert_eq!(&bytes2[..], b"test data");
+
+        // Drop the last Bytes (refcount goes to 0, buffer returns to pool)
+        drop(bytes2);
+
+        // Get a new buffer from the pool - should reuse the returned buffer
+        let buf2 = pool.get();
+        assert_eq!(buf2.len(), 0, "Reused buffer should be empty");
     }
 }

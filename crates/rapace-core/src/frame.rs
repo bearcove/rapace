@@ -60,6 +60,24 @@ impl Payload {
     pub fn is_inline(&self) -> bool {
         matches!(self, Payload::Inline)
     }
+
+    /// Convert the payload into `Bytes`, avoiding copies where possible.
+    ///
+    /// For `Payload::Bytes`, this is a zero-copy move. For `Payload::Pooled`,
+    /// uses zero-copy conversion that returns the buffer to pool when dropped.
+    /// For inline payloads, we copy from the descriptor.
+    pub fn into_bytes(self, desc: &MsgDescHot) -> Bytes {
+        match self {
+            Payload::Inline => Bytes::copy_from_slice(desc.inline_payload()),
+            Payload::Owned(vec) => Bytes::from(vec),
+            Payload::Bytes(bytes) => bytes,
+            // Zero-copy: buffer returns to pool when all Bytes clones are dropped
+            Payload::Pooled(buf) => buf.into_bytes(),
+            #[cfg(feature = "shm")]
+            // Shared memory must be copied because the guard will be dropped
+            Payload::Shm(guard) => Bytes::copy_from_slice(guard.as_ref()),
+        }
+    }
 }
 
 /// Owned frame for sending, receiving, or routing.
@@ -147,5 +165,12 @@ impl Frame {
             desc: self.desc,
             payload: Payload::Owned(self.payload_bytes().to_vec()),
         }
+    }
+
+    /// Convert the frame's payload into `Bytes`, consuming the frame.
+    ///
+    /// This avoids copies for `Payload::Bytes`, `Payload::Owned`, and `Payload::Pooled` variants.
+    pub fn into_payload_bytes(self) -> Bytes {
+        self.payload.into_bytes(&self.desc)
     }
 }
