@@ -82,7 +82,10 @@ impl TunnelHost {
                     }
                     Ok(n) => {
                         tunnel_metrics_a.record_send(n);
-                        if let Err(e) = session_a.send_chunk(channel_id, buf[..n].to_vec()).await {
+                        if let Err(e) = session_a
+                            .send_chunk(channel_id, buf[..n].to_vec().into())
+                            .await
+                        {
                             tracing::debug!(channel_id, error = %e, "tunnel send error");
                             break;
                         }
