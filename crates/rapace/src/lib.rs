@@ -244,10 +244,8 @@ impl PooledWriter {
     /// Convert this writer into a PooledBuf, handling overflow if needed
     fn into_pooled_buf(self, pool: &rapace_core::BufferPool) -> rapace_core::PooledBuf {
         if let Some(overflow) = self.overflow {
-            // We overflowed - copy the data into a fresh pooled buffer
-            let mut buf = pool.get();
-            buf.extend_from_slice(&overflow);
-            buf
+            // We overflowed - wrap the Vec directly without copying
+            rapace_core::PooledBuf::from_vec_unpooled(overflow, pool.buffer_size())
         } else {
             // No overflow - return the original buffer
             self.buf
@@ -422,5 +420,49 @@ mod tests {
         let deserialized: SmallPayload = facet_postcard::from_slice(&buf).unwrap();
         assert_eq!(deserialized.id, 123);
         assert_eq!(deserialized.data, vec![1, 2, 3, 4, 5]);
+    }
+
+    #[test]
+    fn test_postcard_to_pooled_buf_uses_unpooled_for_overflow() {
+        use facet::Facet;
+
+        #[derive(Facet)]
+        struct LargePayload {
+            data: Vec<u8>,
+        }
+
+        // Create a small buffer pool (8KB buffers)
+        let pool = BufferPool::with_capacity(4, 8 * 1024);
+
+        // Create a payload larger than the buffer size (16KB)
+        let payload = LargePayload {
+            data: vec![42u8; 16 * 1024],
+        };
+
+        // Serialize the oversized payload
+        let result = postcard_to_pooled_buf(&pool, &payload);
+        assert!(
+            result.is_ok(),
+            "Should successfully serialize oversized payload"
+        );
+
+        let buf = result.unwrap();
+
+        // Verify the buffer is unpooled (since it overflowed)
+        assert!(
+            !buf.is_pooled(),
+            "Oversized payload should use unpooled storage"
+        );
+
+        // Verify we got the data
+        assert!(
+            buf.len() > 8 * 1024,
+            "Buffer should contain the large payload"
+        );
+
+        // Verify we can deserialize it back
+        let deserialized: LargePayload = facet_postcard::from_slice(&buf).unwrap();
+        assert_eq!(deserialized.data.len(), 16 * 1024);
+        assert_eq!(deserialized.data[0], 42);
     }
 }
