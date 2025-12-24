@@ -148,4 +148,23 @@ impl Frame {
             payload: Payload::Owned(self.payload_bytes().to_vec()),
         }
     }
+
+    /// Convert the frame's payload to `Bytes`.
+    ///
+    /// This consumes the frame and efficiently converts its payload:
+    /// - `Payload::Bytes`: Zero-copy (just moves the Bytes)
+    /// - `Payload::Pooled`: Zero-copy (converts to Bytes with pool return on drop)
+    /// - `Payload::Inline`: Copies the inline data into a new Bytes
+    /// - `Payload::Owned`: Converts the Vec to Bytes (zero-copy)
+    /// - `Payload::Shm`: Copies the shared memory data into a new Bytes
+    pub fn into_payload_bytes(self) -> Bytes {
+        match self.payload {
+            Payload::Inline => Bytes::copy_from_slice(self.desc.inline_payload()),
+            Payload::Owned(vec) => Bytes::from(vec),
+            Payload::Bytes(bytes) => bytes,
+            Payload::Pooled(buf) => buf.into_bytes(),
+            #[cfg(feature = "shm")]
+            Payload::Shm(guard) => Bytes::copy_from_slice(guard.as_ref()),
+        }
+    }
 }

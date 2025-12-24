@@ -140,17 +140,23 @@ impl AsyncRead for TunnelStream {
                 Poll::Ready(Ok(()))
             }
             Poll::Ready(Some(chunk)) => {
+                // Extract metadata before consuming the chunk
+                let is_eos = chunk.is_eos();
+                let is_error = chunk.is_error();
+                let payload_len = chunk.payload_bytes().len();
+
                 if !self.logged_first_read {
                     self.logged_first_read = true;
                     tracing::debug!(
                         channel_id = self.channel_id,
-                        payload_len = chunk.payload_bytes().len(),
-                        is_eos = chunk.is_eos(),
-                        is_error = chunk.is_error(),
+                        payload_len,
+                        is_eos,
+                        is_error,
                         "tunnel read first chunk"
                     );
                 }
-                if chunk.is_error() {
+
+                if is_error {
                     let err = parse_error_payload(chunk.payload_bytes());
                     let (kind, msg) = match err {
                         RpcError::Status { code, message } => {
@@ -177,8 +183,7 @@ impl AsyncRead for TunnelStream {
                     return Poll::Ready(Err(std::io::Error::new(kind, msg)));
                 }
 
-                let payload = chunk.payload_bytes();
-                if chunk.is_eos() && payload.is_empty() {
+                if is_eos && payload_len == 0 {
                     self.read_eof = true;
                     if !self.logged_read_eof {
                         self.logged_read_eof = true;
@@ -190,8 +195,10 @@ impl AsyncRead for TunnelStream {
                     return Poll::Ready(Ok(()));
                 }
 
-                self.read_buf = Bytes::copy_from_slice(payload);
-                self.read_eos_after_buf = chunk.is_eos();
+                // Zero-copy conversion: for pooled buffers, this avoids copying and
+                // automatically returns the buffer to the pool when all Bytes clones are dropped.
+                self.read_buf = chunk.into_payload_bytes();
+                self.read_eos_after_buf = is_eos;
 
                 // Recurse once to copy into ReadBuf.
                 self.poll_read(cx, buf)
