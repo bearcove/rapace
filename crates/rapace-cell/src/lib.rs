@@ -178,6 +178,8 @@ where
     Tail: ServiceDispatch,
 {
     fn method_ids(&self) -> &'static [u32] {
+        // For stack traversal, we don't need to combine all method_ids
+        // Each level checks its own head.method_ids()
         self.head.method_ids()
     }
 
@@ -301,31 +303,41 @@ impl<S> DispatcherBuilder<S> {
                 let msg_id = request.desc.msg_id;
 
                 // Walk the stack until we find a handler
-                if let Ok(mut response) = stack.dispatch(method_id, request, &buffer_pool).await {
-                    response.desc.channel_id = channel_id;
-                    response.desc.msg_id = msg_id;
-                    return Ok(response);
-                }
-
-                // No service handles this method - use registry for better error message
-                let error_msg = rapace_registry::ServiceRegistry::with_global(|reg| {
-                    if let Some(method) = reg.method_by_id(rapace_registry::MethodId(method_id)) {
-                        format!(
-                            "Method '{}' (id={}) exists in registry but is not implemented by any service in this cell",
-                            method.full_name, method_id
-                        )
-                    } else {
-                        format!(
-                            "Unknown method_id: {} (not registered in global registry)",
-                            method_id
-                        )
+                match stack.dispatch(method_id, request, &buffer_pool).await {
+                    Ok(mut response) => {
+                        response.desc.channel_id = channel_id;
+                        response.desc.msg_id = msg_id;
+                        Ok(response)
                     }
-                });
+                    Err(RpcError::NotFound) => {
+                        // Only treat NotFound as "method not implemented"
+                        // Other errors (serialization, etc.) should propagate
+                        let error_msg = rapace_registry::ServiceRegistry::with_global(|reg| {
+                            if let Some(method) =
+                                reg.method_by_id(rapace_registry::MethodId(method_id))
+                            {
+                                format!(
+                                    "Method '{}' (id={}) exists in registry but is not implemented by any service in this cell",
+                                    method.full_name, method_id
+                                )
+                            } else {
+                                format!(
+                                    "Unknown method_id: {} (not registered in global registry)",
+                                    method_id
+                                )
+                            }
+                        });
 
-                Err(RpcError::Status {
-                    code: rapace::ErrorCode::Unimplemented,
-                    message: error_msg,
-                })
+                        Err(RpcError::Status {
+                            code: rapace::ErrorCode::Unimplemented,
+                            message: error_msg,
+                        })
+                    }
+                    Err(other_error) => {
+                        // Propagate other errors (serialization, transport, etc.)
+                        Err(other_error)
+                    }
+                }
             })
         }
     }
