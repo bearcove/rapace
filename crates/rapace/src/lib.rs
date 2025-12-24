@@ -229,6 +229,12 @@ struct PooledWriter {
 
 impl PooledWriter {
     fn new(buf: rapace_core::PooledBuf) -> Self {
+        // Debug assertion: pooled buffer should have capacity
+        debug_assert!(
+            buf.capacity() > 0,
+            "PooledBuf should have non-zero capacity, got {}",
+            buf.capacity()
+        );
         Self {
             buf,
             overflow: None,
