@@ -183,6 +183,9 @@ impl AsyncRead for TunnelStream {
                     return Poll::Ready(Err(std::io::Error::new(kind, msg)));
                 }
 
+                let payload_len = chunk.payload_bytes().len();
+                let is_eos = chunk.is_eos();
+
                 if is_eos && payload_len == 0 {
                     self.read_eof = true;
                     if !self.logged_read_eof {
@@ -245,7 +248,9 @@ impl AsyncWrite for TunnelStream {
             tracing::debug!(channel_id, payload_len = data.len(), "tunnel first write");
         }
         let session = self.session.clone();
-        let bytes = data.to_vec();
+        // Use Bytes::copy_from_slice to get a ref-counted buffer instead of Vec.
+        // This avoids allocation on every write when the buffer is cloned.
+        let bytes = Bytes::copy_from_slice(data);
         let len = bytes.len();
         self.pending_send = Some(Box::pin(async move {
             session.send_chunk(channel_id, bytes).await
