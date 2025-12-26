@@ -1,4 +1,4 @@
-# Zero-Copy Deserialization with `self_cell`
+# Zero-Copy Deserialization with `ManuallyDrop` and Facet Variance Checking
 
 > Design exploration for [#47](https://github.com/bearcove/rapace/issues/47)
 
@@ -151,8 +151,8 @@ let result = self.service.my_method(request).await;
 
 **With zero-copy (for types with lifetime):**
 ```rust
-let owned = OwnedMessage::<MyRequest<'_>>::try_new(frame, |f| {
-    facet_format_postcard::from_slice(f.payload_bytes())
+let owned = OwnedMessage::<MyRequest<'static>>::try_new(frame, |payload| {
+    facet_format_postcard::from_slice(payload)
 })?;
 let result = self.service.my_method(&*owned).await;
 // Frame + deserialized value dropped together after call
@@ -168,8 +168,8 @@ Ok(response)
 
 **With zero-copy:**
 ```rust
-let owned = OwnedMessage::<MyResponse<'_>>::try_new(frame, |f| {
-    facet_format_postcard::from_slice(f.payload_bytes())
+let owned = OwnedMessage::<MyResponse<'static>>::try_new(frame, |payload| {
+    facet_format_postcard::from_slice(payload)
 })?;
 Ok(owned)
 ```
@@ -252,7 +252,7 @@ Transport
 Frame { desc, payload: Bytes/Pooled/Shm }
     │
     ▼
-OwnedMessage::try_new(frame, |f| from_slice(f.payload_bytes()))
+OwnedMessage::try_new(frame, |payload| from_slice(payload))
     │
     ▼
 OwnedMessage<Request<'static>>
@@ -273,7 +273,7 @@ RPC call
 Wait for response Frame
     │
     ▼
-OwnedMessage::try_new(frame, |f| from_slice(f.payload_bytes()))
+OwnedMessage::try_new(frame, |payload| from_slice(payload))
     │
     ▼
 Return OwnedMessage<Response<'static>> to caller
@@ -353,8 +353,8 @@ quote! {
 
 // For borrowing types (has lifetime)
 quote! {
-    let owned = OwnedMessage::<#ty>::try_new(frame, |f| {
-        facet_format_postcard::from_slice(f.payload_bytes())
+    let owned = OwnedMessage::<#ty>::try_new(frame, |payload| {
+        facet_format_postcard::from_slice(payload)
     })?;
     self.service.#method_name(&*owned).await
 }
@@ -371,8 +371,8 @@ quote! {
 
 // For borrowing response types
 quote! {
-    let owned = OwnedMessage::<#return_type>::try_new(response, |f| {
-        facet_format_postcard::from_slice(f.payload_bytes())
+    let owned = OwnedMessage::<#return_type>::try_new(response, |payload| {
+        facet_format_postcard::from_slice(payload)
     })?;
     Ok(owned)
 }
@@ -410,6 +410,32 @@ Inline payload    → 16 bytes in cache-line descriptor (smallest messages)
 
 5. **Optionally migrate internal types** (`ControlPayload`, `CloseReason`) to
    use borrowing - this is lower priority since control frames are infrequent
+
+## Current Status: Blocked on facet-format-postcard
+
+**UPDATE**: The `OwnedMessage<T>` infrastructure is implemented and ready, but
+facet-format-postcard doesn't yet support deserialization of borrowed types
+(`&'a [u8]`, `Cow<'a, str>`, `&'a str`).
+
+When attempting to deserialize borrowed types, facet-format-postcard fails with:
+```
+[Tier-2 JIT] Shape not compatible
+ReflectError(Operation failed on shape &[u8]: push_smart_ptr can only be called on compatible types)
+```
+
+### What's Ready
+- `OwnedMessage<T>` type with proper drop ordering
+- Runtime covariance check via `(T::SHAPE.variance)(T::SHAPE).can_shrink()`
+- Macro detection of lifetime parameters in types
+- Integration tests (ignored until upstream support)
+
+### What's Blocked
+- End-to-end zero-copy deserialization
+- Server-side request borrowing
+- Client-side response borrowing
+
+Once facet-format-postcard adds borrowed type support, remove the `#[ignore]`
+attributes from tests in `crates/rapace/tests/zero_copy_deser.rs`.
 
 ## Open Questions
 
