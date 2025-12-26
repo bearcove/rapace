@@ -37,7 +37,7 @@ impl BrowserDemoHarness {
         let ws_transport = WebSocketTransport::connect(&url)
             .await
             .map_err(transport_err)?;
-        let transport = Transport::WebSocket(ws_transport);
+        let transport = AnyTransport::new(ws_transport);
         let session = Arc::new(RpcSession::with_channel_start(transport, 2));
 
         // Keep the session pump alive.
