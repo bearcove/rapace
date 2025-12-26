@@ -2,7 +2,6 @@
 
 [![Coverage Status](https://coveralls.io/repos/github/facet-rs/rapace/badge.svg?branch=main)](https://coveralls.io/github/facet-rs/facet?branch=main)
 [![crates.io](https://img.shields.io/crates/v/rapace.svg)](https://crates.io/crates/rapace)
-[![npm version](https://img.shields.io/npm/v/@bearcove/rapace.svg)](https://www.npmjs.com/package/@bearcove/rapace)
 [![documentation](https://docs.rs/rapace/badge.svg)](https://docs.rs/rapace)
 [![MIT/Apache-2.0 licensed](https://img.shields.io/crates/l/rapace.svg)](./LICENSE)
 [![Discord](https://img.shields.io/discord/1379550208551026748?logo=discord&label=discord)](https://discord.gg/JhD7CwCJ8F)

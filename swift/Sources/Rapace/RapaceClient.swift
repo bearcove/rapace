@@ -121,10 +121,6 @@ public actor RapaceClient {
                     result = Array(respFrame[payloadStart..<payloadEnd])
                 }
 
-                // Debug: log the response
-                let respHex = result.map { String(format: "%02x", $0) }.joined(separator: " ")
-                print("[RapaceClient] response msgId=\(msgId) payload (\(result.count) bytes): [\(respHex)]")
-
                 continuation.resume(returning: .success(result))
 
             } catch {
@@ -148,10 +144,6 @@ public actor RapaceClient {
         nextMsgId += 1
         let channelId = nextChannelId
         nextChannelId += 1
-
-        // Debug: log the call
-        let reqHex = requestPayload.map { String(format: "%02x", $0) }.joined(separator: " ")
-        print("[RapaceClient] call msgId=\(msgId) methodId=0x\(String(methodId, radix: 16)), request=[\(reqHex)]")
 
         // Build the request descriptor
         var desc = MsgDescHot()
