@@ -240,3 +240,7 @@ jobs:
       - name: Build
         working-directory: swift
         run: swift build
+
+      - name: Test
+        working-directory: swift
+        run: swift test

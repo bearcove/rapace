@@ -58,5 +58,13 @@ let package = Package(
             name: "StressTest",
             dependencies: ["Rapace", "Postcard", "GeneratedTest"]
         ),
+        .testTarget(
+            name: "PostcardTests",
+            dependencies: ["Postcard"]
+        ),
+        .testTarget(
+            name: "RapaceTests",
+            dependencies: ["Rapace"]
+        ),
     ]
 )
