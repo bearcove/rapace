@@ -1,5 +1,4 @@
 use crate::MsgDescHot;
-use bytes::Bytes;
 
 /// Size of MsgDescHot in bytes (must be 64).
 const DESC_SIZE: usize = 64;
@@ -15,7 +14,8 @@ fn bytes_to_desc(bytes: &[u8; DESC_SIZE]) -> MsgDescHot {
 
 #[cfg(not(target_arch = "wasm32"))]
 mod native {
-    use super::{Bytes, DESC_SIZE, bytes_to_desc, desc_to_bytes};
+    use super::{DESC_SIZE, bytes_to_desc, desc_to_bytes};
+    use bytes::Bytes;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
 
