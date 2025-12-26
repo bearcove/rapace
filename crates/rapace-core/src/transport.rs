@@ -29,7 +29,7 @@ use crate::{BufferPool, Frame, TransportError};
 /// }
 ///
 /// // Or use AnyTransport when you need type erasure
-/// let transport: AnyTransport = ShmTransport::new(session).into();
+/// let transport = AnyTransport::new(ShmTransport::new(session));
 /// ```
 pub trait Transport: Send + Sync + Clone + 'static {
     /// Send a frame over this transport.
@@ -130,10 +130,11 @@ impl<T: Transport> DynTransport for T {
 ///
 /// // Create from any concrete transport
 /// let shm = ShmTransport::new(session);
-/// let transport: AnyTransport = shm.into();
+/// let transport = AnyTransport::new(shm);
 ///
-/// // Or use the explicit constructor
-/// let transport = AnyTransport::new(MemTransport::pair().0);
+/// // Or use helper constructors
+/// let transport = AnyTransport::shm(session);
+/// let (transport_a, transport_b) = AnyTransport::mem_pair();
 ///
 /// // Use like any other transport
 /// transport.send_frame(frame).await?;
