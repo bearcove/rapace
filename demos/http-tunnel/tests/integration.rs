@@ -65,17 +65,11 @@ async fn test_hello_endpoint() {
     let (host_transport, plugin_transport) = AnyTransport::mem_pair();
 
     // Start plugin (even channel IDs)
-    let plugin_session: Arc<Session> = Arc::new(RpcSession::with_channel_start(
-        AnyTransport::new(plugin_transport),
-        2,
-    ));
+    let plugin_session = Arc::new(RpcSession::with_channel_start(plugin_transport, 2));
     let _plugin_metrics = start_plugin(plugin_session, http_port).await;
 
     // Start host (odd channel IDs)
-    let host_session: Arc<Session> = Arc::new(RpcSession::with_channel_start(
-        AnyTransport::new(host_transport),
-        1,
-    ));
+    let host_session = Arc::new(RpcSession::with_channel_start(host_transport, 1));
     let host = start_host(host_session).await;
 
     // Start a mini TCP proxy server for the test
