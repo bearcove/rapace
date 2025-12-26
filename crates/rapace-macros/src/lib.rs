@@ -1183,11 +1183,25 @@ fn select_stream_item_type(inner: TokenStream2) -> Option<TokenStream2> {
 /// Returns true if the type contains `'a`, `'_`, `'static`, or any other lifetime.
 /// This is used to detect types that can borrow from the input buffer for zero-copy
 /// deserialization.
+///
+/// Note: We distinguish lifetimes from character literals by checking that `'` is
+/// followed by an identifier (e.g., `'a`, `'static`) or `_`.
 fn type_has_lifetime(ty: &TokenStream2) -> bool {
-    for tt in ty.clone().into_iter() {
+    let mut iter = ty.clone().into_iter().peekable();
+    while let Some(tt) = iter.next() {
         match &tt {
             // Check for lifetime: 'a, '_, 'static, etc.
-            TokenTree::Punct(p) if p.as_char() == '\'' => return true,
+            // Must be followed by an identifier to distinguish from char literals like 'c'
+            TokenTree::Punct(p) if p.as_char() == '\'' => {
+                if let Some(next) = iter.peek() {
+                    match next {
+                        TokenTree::Ident(_) => return true,
+                        // Underscore lifetime '_
+                        TokenTree::Punct(p2) if p2.as_char() == '_' => return true,
+                        _ => {}
+                    }
+                }
+            }
             // Recursively check inside groups (parentheses, brackets, braces)
             TokenTree::Group(g) => {
                 if type_has_lifetime(&g.stream()) {

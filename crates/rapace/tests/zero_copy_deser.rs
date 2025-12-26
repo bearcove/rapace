@@ -182,8 +182,8 @@ fn test_owned_message_with_owned_type() {
     assert_eq!(frame.payload_bytes().len(), bytes.len());
 }
 
-// This test verifies that the type_has_lifetime detection in the macro works correctly.
-// Types without lifetimes should NOT trigger the zero-copy path.
+// This test verifies that owned types (without lifetime parameters) can still be
+// deserialized directly without using OwnedMessage.
 #[test]
 fn test_owned_type_still_works() {
     let original = OwnedResponse {

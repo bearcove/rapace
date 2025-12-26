@@ -89,11 +89,22 @@ impl<T: 'static + facet::Facet<'static>> OwnedMessage<T> {
         frame: Frame,
         builder: impl FnOnce(&'static [u8]) -> Result<T, E>,
     ) -> Result<Self, E> {
-        // Runtime check for covariance using facet's variance tracking
+        // Runtime check for covariance using facet's variance tracking.
+        // Covariance means: if T<'long> works, T<'short> also works (lifetime can shrink).
+        // This is required because we create a fake 'static slice that actually has
+        // a shorter lifetime tied to the OwnedMessage.
         let variance = (T::SHAPE.variance)(T::SHAPE);
         assert!(
             variance.can_shrink(),
-            "OwnedMessage requires T to be covariant (can_shrink), but {:?} has variance {:?}",
+            "OwnedMessage<T> requires T to be covariant (lifetime can shrink safely).\n\
+             \n\
+             Covariant types contain only shared/read-only borrows:\n\
+             - &'a T, Cow<'a, T>, Box<T>, Vec<T> where T is covariant\n\
+             \n\
+             Non-covariant types contain mutable or contravariant positions:\n\
+             - &'a mut T, fn(&'a T), Cell<&'a T>\n\
+             \n\
+             Type {:?} has variance {:?}",
             T::SHAPE.id,
             variance
         );
