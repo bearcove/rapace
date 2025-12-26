@@ -16,6 +16,13 @@ struct BytesOnly<'a> {
     count: u32,
 }
 
+/// A type with just Cow<str> - no raw slices.
+#[derive(Debug, PartialEq, facet::Facet)]
+struct CowOnly<'a> {
+    message: Cow<'a, str>,
+    count: u32,
+}
+
 /// A type with a lifetime that can borrow from the input.
 #[derive(Debug, PartialEq, facet::Facet)]
 struct BorrowingResponse<'a> {
@@ -40,7 +47,7 @@ fn make_frame(payload: &[u8]) -> Frame {
 }
 
 #[test]
-#[ignore = "facet-format-postcard doesn't yet support borrowed types"]
+#[ignore = "facet-format-postcard doesn't yet support borrowed types - see facet-rs/facet#1474"]
 fn test_owned_message_with_borrowing_type() {
     // Serialize a borrowing response
     let original = BorrowingResponse {
@@ -66,7 +73,7 @@ fn test_owned_message_with_borrowing_type() {
 }
 
 #[test]
-#[ignore = "facet-format-postcard doesn't yet support borrowed types"]
+#[ignore = "facet-format-postcard doesn't yet support borrowed types - see facet-rs/facet#1474"]
 fn test_owned_message_recovers_frame() {
     let original = BorrowingResponse {
         message: Cow::Borrowed("test"),
@@ -88,7 +95,7 @@ fn test_owned_message_recovers_frame() {
 }
 
 #[test]
-#[ignore = "facet-format-postcard doesn't yet support borrowed types"]
+#[ignore = "facet-format-postcard doesn't yet support borrowed types - see facet-rs/facet#1474"]
 fn test_owned_message_debug() {
     let original = BorrowingResponse {
         message: Cow::Borrowed("debug test"),
@@ -110,7 +117,7 @@ fn test_owned_message_debug() {
 
 /// Test with just &'a [u8] to see if basic borrowed slices work.
 #[test]
-#[ignore = "facet-format-postcard doesn't yet support borrowed types"]
+#[ignore = "facet-format-postcard doesn't yet support borrowed types - see facet-rs/facet#1474"]
 fn test_bytes_only() {
     let original = BytesOnly {
         data: b"hello bytes",
@@ -128,6 +135,28 @@ fn test_bytes_only() {
 
     assert_eq!(owned.data, b"hello bytes");
     assert_eq!(owned.count, 42);
+}
+
+/// Test with just Cow<'a, str> to see if Cow works.
+#[test]
+#[ignore = "facet-format-postcard doesn't yet support borrowed types - see facet-rs/facet#1474"]
+fn test_cow_only() {
+    let original = CowOnly {
+        message: Cow::Borrowed("hello cow"),
+        count: 99,
+    };
+
+    let bytes = rapace::facet_format_postcard::to_vec(&original).expect("serialize");
+    let frame = make_frame(&bytes);
+
+    // Deserialize using OwnedMessage
+    let owned: OwnedMessage<CowOnly<'static>> = OwnedMessage::try_new(frame, |payload| {
+        rapace::facet_format_postcard::from_slice(payload)
+    })
+    .expect("deserialize");
+
+    assert_eq!(&*owned.message, "hello cow");
+    assert_eq!(owned.count, 99);
 }
 
 /// Test OwnedMessage infrastructure with an owned type.
