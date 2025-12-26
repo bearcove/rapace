@@ -411,31 +411,20 @@ Inline payload    → 16 bytes in cache-line descriptor (smallest messages)
 5. **Optionally migrate internal types** (`ControlPayload`, `CloseReason`) to
    use borrowing - this is lower priority since control frames are infrequent
 
-## Current Status: Blocked on facet-format-postcard
+## Current Status: Working
 
-**UPDATE**: The `OwnedMessage<T>` infrastructure is implemented and ready, but
-facet-format-postcard doesn't yet support deserialization of borrowed types
-(`&'a [u8]`, `Cow<'a, str>`, `&'a str`).
+Zero-copy deserialization is fully functional with facet-format-postcard (as of
+[facet-rs/facet#1475](https://github.com/facet-rs/facet/pull/1475)).
 
-When attempting to deserialize borrowed types, facet-format-postcard fails with:
-```
-[Tier-2 JIT] Shape not compatible
-ReflectError(Operation failed on shape &[u8]: push_smart_ptr can only be called on compatible types)
-```
-
-### What's Ready
+### What's Implemented
 - `OwnedMessage<T>` type with proper drop ordering
 - Runtime covariance check via `(T::SHAPE.variance)(T::SHAPE).can_shrink()`
 - Macro detection of lifetime parameters in types
-- Integration tests (ignored until upstream support)
+- Client-side response deserialization with zero-copy
+- Integration tests for `Cow<'a, str>`, `&'a [u8]`, and combined types
 
-### What's Blocked
-- End-to-end zero-copy deserialization
-- Server-side request borrowing
-- Client-side response borrowing
-
-Once facet-format-postcard adds borrowed type support, remove the `#[ignore]`
-attributes from tests in `crates/rapace/tests/zero_copy_deser.rs`.
+### Still TODO
+- Server-side request borrowing (requires trait signature changes)
 
 ## Open Questions
 
