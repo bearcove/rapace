@@ -227,9 +227,9 @@ jobs:
         working-directory: typescript
         run: pnpm build
 
-      - name: Test
+      - name: Test (unit tests only - integration tested in browser-test job)
         working-directory: typescript
-        run: pnpm test
+        run: pnpm test:unit
 
   swift:
     name: Swift
