@@ -5,14 +5,14 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use rapace::{AnyTransport, RpcSession};
+use rapace::{AnyTransport, RpcSession, Session};
 
 use rapace_http_tunnel::{
     GlobalTunnelMetrics, TcpTunnelImpl, TunnelHost, create_tunnel_dispatcher, run_http_server,
 };
 
 /// Helper to start the plugin side (HTTP server + tunnel service).
-async fn start_plugin(session: Arc<RpcSession>, http_port: u16) -> Arc<GlobalTunnelMetrics> {
+async fn start_plugin(session: Arc<Session>, http_port: u16) -> Arc<GlobalTunnelMetrics> {
     let metrics = Arc::new(GlobalTunnelMetrics::new());
 
     // Create the tunnel service
@@ -46,7 +46,7 @@ async fn start_plugin(session: Arc<RpcSession>, http_port: u16) -> Arc<GlobalTun
 }
 
 /// Helper to start the host side (tunnel client).
-async fn start_host(session: Arc<RpcSession>) -> Arc<TunnelHost> {
+async fn start_host(session: Arc<Session>) -> Arc<TunnelHost> {
     // Spawn demux loop
     let session_clone = session.clone();
     tokio::spawn(async move {
@@ -65,11 +65,17 @@ async fn test_hello_endpoint() {
     let (host_transport, plugin_transport) = AnyTransport::mem_pair();
 
     // Start plugin (even channel IDs)
-    let plugin_session = Arc::new(RpcSession::with_channel_start(plugin_transport, 2));
+    let plugin_session: Arc<Session> = Arc::new(RpcSession::with_channel_start(
+        AnyTransport::new(plugin_transport),
+        2,
+    ));
     let _plugin_metrics = start_plugin(plugin_session, http_port).await;
 
     // Start host (odd channel IDs)
-    let host_session = Arc::new(RpcSession::with_channel_start(host_transport, 1));
+    let host_session: Arc<Session> = Arc::new(RpcSession::with_channel_start(
+        AnyTransport::new(host_transport),
+        1,
+    ));
     let host = start_host(host_session).await;
 
     // Start a mini TCP proxy server for the test
