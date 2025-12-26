@@ -39,7 +39,7 @@ impl BrowserDemoHarness {
             .await
             .map_err(transport_err)?;
         let transport = AnyTransport::new(ws_transport);
-        let session: Arc<Session> = Arc::new(Session::with_channel_start(transport, 2));
+        let session = Arc::new(Session::with_channel_start(transport, 2));
 
         // Keep the session pump alive.
         let session_for_task = session.clone();

@@ -62,7 +62,7 @@ pub use rapace_core::{
 /// use std::sync::Arc;
 ///
 /// // Type-erased session (runtime polymorphism)
-/// let session: Arc<Session> = Arc::new(Session::new(AnyTransport::new(transport)));
+/// let session = Arc::new(Session::new(AnyTransport::new(transport)));
 ///
 /// // Or be explicit with the type
 /// let session: Arc<RpcSession<AnyTransport>> = Arc::new(RpcSession::new(AnyTransport::new(transport)));
