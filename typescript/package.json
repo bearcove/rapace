@@ -22,8 +22,8 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "test": "node --test --import tsx 'src/**/*.test.ts'",
-    "test:unit": "SKIP_INTEGRATION=1 node --test --import tsx 'src/**/*.test.ts'",
+    "test": "node --test --import tsx src/postcard/varint.test.ts src/rapace/frame.test.ts src/rapace/method-id.test.ts src/integration.test.ts",
+    "test:unit": "SKIP_INTEGRATION=1 node --test --import tsx src/postcard/varint.test.ts src/rapace/frame.test.ts src/rapace/method-id.test.ts",
     "test:integration": "./scripts/integration-test.sh",
     "test:browser": "npx playwright test",
     "serve:test": "node scripts/serve-test.mjs",
@@ -50,12 +50,13 @@
   "license": "(MIT OR Apache-2.0)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bearcove/rapace-typescript.git"
+    "url": "git+https://github.com/bearcove/rapace.git",
+    "directory": "typescript"
   },
   "bugs": {
-    "url": "https://github.com/bearcove/rapace-typescript/issues"
+    "url": "https://github.com/bearcove/rapace/issues"
   },
-  "homepage": "https://github.com/bearcove/rapace-typescript#readme",
+  "homepage": "https://github.com/bearcove/rapace/tree/main/typescript#readme",
   "devDependencies": {
     "@playwright/test": "^1.57.0",
     "@types/node": "^22.0.0",
