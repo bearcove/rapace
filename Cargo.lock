@@ -1962,7 +1962,7 @@ dependencies = [
 
 [[package]]
 name = "rapace"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "facet 0.34.0 (git+https://github.com/facet-rs/facet?branch=main)",
  "facet-core 0.34.0 (git+https://github.com/facet-rs/facet?branch=main)",
@@ -1993,7 +1993,7 @@ dependencies = [
 
 [[package]]
 name = "rapace-browser-tests-client"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "console_error_panic_hook",
  "futures",
@@ -2007,7 +2007,7 @@ dependencies = [
 
 [[package]]
 name = "rapace-browser-tests-proto"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "facet 0.34.0 (git+https://github.com/facet-rs/facet?branch=main)",
  "rapace",
@@ -2015,7 +2015,7 @@ dependencies = [
 
 [[package]]
 name = "rapace-browser-tests-server"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "rapace",
  "rapace-browser-tests-proto",
@@ -2028,7 +2028,7 @@ dependencies = [
 
 [[package]]
 name = "rapace-cell"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "facet 0.34.0 (git+https://github.com/facet-rs/facet?branch=main)",
  "libc",
@@ -2045,7 +2045,7 @@ dependencies = [
 
 [[package]]
 name = "rapace-core"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "allocator-api2",
  "axum",
@@ -2103,7 +2103,7 @@ dependencies = [
 
 [[package]]
 name = "rapace-explorer"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "facet 0.34.0 (git+https://github.com/facet-rs/facet?branch=main)",
  "rapace",
@@ -2111,7 +2111,7 @@ dependencies = [
 
 [[package]]
 name = "rapace-http"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "facet 0.34.0 (git+https://github.com/facet-rs/facet?branch=main)",
  "rapace",
@@ -2158,7 +2158,7 @@ dependencies = [
 
 [[package]]
 name = "rapace-introspection"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "rapace",
  "rapace-registry",
@@ -2168,7 +2168,7 @@ dependencies = [
 
 [[package]]
 name = "rapace-macros"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "facet-cargo-toml",
  "heck 0.4.1",
@@ -2181,7 +2181,7 @@ dependencies = [
 
 [[package]]
 name = "rapace-registry"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "facet 0.34.0 (git+https://github.com/facet-rs/facet?branch=main)",
  "facet-core 0.34.0 (git+https://github.com/facet-rs/facet?branch=main)",
@@ -2211,7 +2211,7 @@ dependencies = [
 
 [[package]]
 name = "rapace-tracing"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "facet 0.34.0 (git+https://github.com/facet-rs/facet?branch=main)",
  "parking_lot",
@@ -2538,7 +2538,7 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "shm-primitives"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "loom",
 ]
@@ -2695,7 +2695,7 @@ dependencies = [
 
 [[package]]
 name = "test-external-service"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "rapace",
  "rapace-cell",
