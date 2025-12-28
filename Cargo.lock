@@ -1944,6 +1944,7 @@ dependencies = [
  "libc",
  "object-pool",
  "parking_lot",
+ "rapace-protocol",
  "rapace-registry",
  "shm-primitives",
  "static_assertions",

@@ -4,31 +4,14 @@
 
 use facet::Facet;
 
-/// Reasons for closing a channel.
-///
-/// Spec: `[impl core.close.close-channel-semantics]` - CloseChannel signals sender freed state.
-#[derive(Debug, Clone, PartialEq, Eq, Facet)]
-#[repr(u8)]
-pub enum CloseReason {
-    /// Normal completion.
-    Normal,
-    /// Error occurred.
-    Error(String),
-}
+// Re-export control verb constants from rapace-protocol
+pub use rapace_protocol::control_verb as control_method;
 
-/// Reasons for cancelling a channel.
-///
-/// Spec: `[impl core.cancel.behavior]` - receivers MUST stop work, discard data, wake waiters.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Facet)]
-#[repr(u8)]
-pub enum CancelReason {
-    /// Client requested cancellation.
-    ClientCancel,
-    /// Deadline exceeded.
-    DeadlineExceeded,
-    /// Resource exhausted.
-    ResourceExhausted,
-}
+// Re-export spec-compliant types from rapace-protocol
+pub use rapace_protocol::{
+    AttachTo, CancelChannel, CancelReason, ChannelKind, CloseChannel, CloseReason, Direction,
+    GoAway, GoAwayReason, GrantCredits, Hello, Limits, MethodInfo, OpenChannel, Ping, Pong, Role,
+};
 
 /// Control channel payloads (channel 0).
 ///
@@ -45,6 +28,9 @@ pub enum CancelReason {
 /// - 5: Ping
 /// - 6: Pong
 /// - 7: GoAway
+///
+/// This enum provides a unified type for control payloads used in the session layer.
+/// For wire-format types, see the individual structs re-exported from `rapace_protocol`.
 #[derive(Debug, Clone, Facet)]
 #[repr(u8)]
 pub enum ControlPayload {
@@ -84,28 +70,4 @@ pub enum ControlPayload {
     ///
     /// Spec: `[impl core.ping.semantics]` - MUST echo the same payload.
     Pong { payload: [u8; 8] },
-}
-
-/// Control method IDs (used in `method_id` field for channel 0).
-///
-/// Spec: `[impl core.control.verb-selector]` - control verbs table.
-/// Spec: `[impl core.control.unknown-reserved]` - unknown 0-99 = protocol error.
-/// Spec: `[impl core.control.unknown-extension]` - unknown 100+ = ignore silently.
-pub mod control_method {
-    /// Hello (handshake).
-    pub const HELLO: u32 = 0;
-    /// Open a new channel.
-    pub const OPEN_CHANNEL: u32 = 1;
-    /// Close a channel gracefully.
-    pub const CLOSE_CHANNEL: u32 = 2;
-    /// Cancel a channel (abort).
-    pub const CANCEL_CHANNEL: u32 = 3;
-    /// Grant flow control credits.
-    pub const GRANT_CREDITS: u32 = 4;
-    /// Liveness probe.
-    pub const PING: u32 = 5;
-    /// Response to Ping.
-    pub const PONG: u32 = 6;
-    /// Graceful shutdown.
-    pub const GO_AWAY: u32 = 7;
 }
