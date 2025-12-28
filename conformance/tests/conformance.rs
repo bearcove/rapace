@@ -1,0 +1,81 @@
+//! Conformance tests using libtest-mimic.
+//!
+//! This test harness discovers all conformance tests from the binary
+//! and runs them as individual Rust tests.
+
+use libtest_mimic::{Arguments, Failed, Trial};
+use std::process::Command;
+
+fn main() {
+    let args = Arguments::from_args();
+
+    // Get the path to the conformance binary
+    let conformance_bin = env!("CARGO_BIN_EXE_rapace-conformance");
+
+    // List all tests from the binary
+    let output = Command::new(conformance_bin)
+        .args(["--list", "--format", "json"])
+        .output()
+        .expect("failed to run conformance binary");
+
+    if !output.status.success() {
+        eprintln!(
+            "Failed to list tests: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        std::process::exit(1);
+    }
+
+    let tests: Vec<serde_json::Value> =
+        serde_json::from_slice(&output.stdout).expect("failed to parse test list");
+
+    // Create a Trial for each test
+    let trials: Vec<Trial> = tests
+        .into_iter()
+        .map(|test| {
+            let name = test["name"].as_str().unwrap().to_string();
+            let _rules: Vec<String> = test["rules"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|r| r.as_str().unwrap().to_string())
+                .collect();
+
+            let bin_path = conformance_bin.to_string();
+
+            // Structural tests (frame.*, error.*) don't need stdin/stdout
+            // They just validate constants and can run directly
+            let is_structural = name.starts_with("frame.") || name.starts_with("error.");
+
+            Trial::test(name.clone(), move || {
+                if is_structural {
+                    run_structural_test(&bin_path, &name)
+                } else {
+                    // For now, skip interactive tests that need a peer
+                    // These will be run by actual implementations
+                    Err(Failed::from("skipped: requires peer implementation"))
+                }
+            })
+            .with_ignored_flag(!is_structural) // Mark interactive tests as ignored
+        })
+        .collect();
+
+    libtest_mimic::run(&args, trials).exit();
+}
+
+fn run_structural_test(bin_path: &str, test_name: &str) -> Result<(), Failed> {
+    let output = Command::new(bin_path)
+        .args(["--case", test_name, "--format", "json"])
+        .output()
+        .map_err(|e| Failed::from(format!("failed to run test: {}", e)))?;
+
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout)
+        .map_err(|e| Failed::from(format!("failed to parse result: {}", e)))?;
+
+    if result["passed"].as_bool() == Some(true) {
+        Ok(())
+    } else {
+        let error = result["error"].as_str().unwrap_or("unknown error");
+        Err(Failed::from(error.to_string()))
+    }
+}

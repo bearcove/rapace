@@ -25,6 +25,7 @@ members = [
     "demos/http-tunnel",
     "test-external-service",
     "xtask",
+    "conformance",
 ]
 exclude = ["fuzz"]
 
