@@ -4,16 +4,35 @@
 //! Tests are organized by the spec document they validate.
 
 pub mod call;
+pub mod cancel;
 pub mod channel;
 pub mod control;
 pub mod error;
+pub mod flow;
 pub mod frame;
 pub mod handshake;
+pub mod method;
+pub mod stream;
+pub mod transport;
+pub mod tunnel;
 
 use crate::testcase::TestResult;
 
 /// All test categories.
-pub const CATEGORIES: &[&str] = &["handshake", "frame", "channel", "call", "control", "error"];
+pub const CATEGORIES: &[&str] = &[
+    "handshake",
+    "frame",
+    "channel",
+    "call",
+    "control",
+    "error",
+    "cancel",
+    "flow",
+    "stream",
+    "tunnel",
+    "transport",
+    "method",
+];
 
 /// Run a test case by fully-qualified name (e.g., "handshake.valid_hello_exchange").
 pub fn run(name: &str) -> TestResult {
@@ -34,6 +53,12 @@ pub fn run(name: &str) -> TestResult {
         "call" => call::run(test_name),
         "control" => control::run(test_name),
         "error" => error::run(test_name),
+        "cancel" => cancel::run(test_name),
+        "flow" => flow::run(test_name),
+        "stream" => stream::run(test_name),
+        "tunnel" => tunnel::run(test_name),
+        "transport" => transport::run(test_name),
+        "method" => method::run(test_name),
         _ => TestResult::fail(format!("unknown category: {}", category)),
     }
 }
@@ -66,6 +91,30 @@ pub fn list_all() -> Vec<(String, Vec<&'static str>)> {
         all.push((format!("error.{}", name), rules.to_vec()));
     }
 
+    for (name, rules) in cancel::list() {
+        all.push((format!("cancel.{}", name), rules.to_vec()));
+    }
+
+    for (name, rules) in flow::list() {
+        all.push((format!("flow.{}", name), rules.to_vec()));
+    }
+
+    for (name, rules) in stream::list() {
+        all.push((format!("stream.{}", name), rules.to_vec()));
+    }
+
+    for (name, rules) in tunnel::list() {
+        all.push((format!("tunnel.{}", name), rules.to_vec()));
+    }
+
+    for (name, rules) in transport::list() {
+        all.push((format!("transport.{}", name), rules.to_vec()));
+    }
+
+    for (name, rules) in method::list() {
+        all.push((format!("method.{}", name), rules.to_vec()));
+    }
+
     all
 }
 
@@ -78,6 +127,12 @@ pub fn list_category(category: &str) -> Vec<(String, Vec<&'static str>)> {
         "call" => call::list(),
         "control" => control::list(),
         "error" => error::list(),
+        "cancel" => cancel::list(),
+        "flow" => flow::list(),
+        "stream" => stream::list(),
+        "tunnel" => tunnel::list(),
+        "transport" => transport::list(),
+        "method" => method::list(),
         _ => return Vec::new(),
     };
 

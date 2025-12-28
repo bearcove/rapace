@@ -43,9 +43,17 @@ fn main() {
 
             let bin_path = conformance_bin.to_string();
 
-            // Structural tests (frame.*, error.*) don't need stdin/stdout
-            // They just validate constants and can run directly
-            let is_structural = name.starts_with("frame.") || name.starts_with("error.");
+            // Structural tests don't need stdin/stdout - they just validate constants
+            // Interactive tests (handshake, channel, call, control) need a peer
+            let is_structural = name.starts_with("frame.")
+                || name.starts_with("error.")
+                || name.starts_with("flow.")
+                || name.starts_with("stream.")
+                || name.starts_with("tunnel.")
+                || name.starts_with("transport.")
+                || name.starts_with("method.")
+                || name.starts_with("cancel.deadline_field")
+                || name.starts_with("cancel.reason_values");
 
             Trial::test(name.clone(), move || {
                 if is_structural {
