@@ -1,4 +1,4 @@
 spec {
    name "rapace"
-   rules_url "https://rapace.bearcove.eu/_rules.json"
+   rules_file "../../docs/public/_rules.json"
 }
