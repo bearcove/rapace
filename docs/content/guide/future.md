@@ -3,7 +3,7 @@ title = "Future directions"
 description = "Ideas rapace might enable later"
 +++
 
-This page is about possible uses of rapace that do not exist yet, but are interesting to think about.
+This page lists features and directions that are not yet implemented but are interesting to explore.
 
 ## Plugin reloads
 
@@ -25,16 +25,21 @@ Another idea is to treat rapace as a way to mutate state at a distance in a cont
 
 The existing pieces (service traits, facet‑based schemas, postcard encoding, frames, channels) are all oriented around sending typed messages. A future layer could interpret some of those messages as patches or transactional updates to long‑lived objects, whether they live in the same machine or on the other end of a network connection.
 
-## Code generation for other languages
+## Server generation for non-Rust languages
 
-Even though rapace is very Rust‑centric internally, the information you’d need to talk to it from other languages already exists: service traits, facet‑derived shapes for request/response types, and the registry that ties method IDs to those shapes.
+The current code generators produce **client** bindings for Swift and TypeScript. Server-side bindings (handling incoming requests, dispatching to implementations) are not yet generated for non-Rust languages.
 
-One possible direction is to treat a rapace service crate as a build‑time dependency from some other project (for example a Svelte or React frontend, or a non‑Rust backend), and run a code generator that:
+For many use cases this is fine — Rust is the natural choice for high-performance server implementations. But there are scenarios where you might want:
 
-- loads the Rust service definitions and registry;
-- walks the facet shapes for each request/response type;
-- emits client code in another language that speaks the same postcard‑encoded protocol over a chosen transport (WebSocket, stream, etc.).
+- A TypeScript server running in Node.js or Deno
+- A Swift server for iOS/macOS services that accept connections from Rust clients
 
-The main missing piece today is a stable way to reflect over traits, methods, and their argument/return types at build time. The type‑level part is already in place via facet; the function/method‑level part would need some extra machinery. In principle, though, nothing about rapace requires the client to be written in Rust, as long as it can match the framing rules and the facet/postcard encoding.
+The pieces are in place (the registry has all type shapes, the spec defines the protocol), but the generators don't yet emit server scaffolding.
 
-None of this is designed or implemented yet; this page just sketches the kind of directions rapace was written to leave open.
+## Bidirectional streaming
+
+The protocol supports bidirectional STREAM channels (both sides can send items), but the Rust implementation and code generators don't fully expose this yet. The spec defines it; implementing it is a matter of wiring up the APIs.
+
+## Go and Java implementations
+
+The [Language Mappings](/spec/language-mappings/) spec defines how types map to Go and Java, but no code generators exist yet. The TypeScript and Swift generators provide a template for how to build them.
