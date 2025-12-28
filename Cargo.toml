@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "rust/rapace",
     "rust/rapace-core",
+    "rust/rapace-protocol",
     "rust/rapace-http",
     "rust/rapace-macros",
     "rust/rapace-cell",
@@ -40,6 +41,7 @@ repository = "https://github.com/bearcove/rapace"
 # Internal crates
 rapace = { path = "rust/rapace", version = "0.5.0" }
 rapace-core = { path = "rust/rapace-core", version = "0.5.0" }
+rapace-protocol = { path = "rust/rapace-protocol", version = "0.5.0" }
 rapace-http = { path = "rust/rapace-http", version = "0.5.0" }
 rapace-macros = { path = "rust/rapace-macros", version = "0.5.0" }
 rapace-registry = { path = "rust/rapace-registry", version = "0.5.0" }
