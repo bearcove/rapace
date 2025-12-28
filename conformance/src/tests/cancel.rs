@@ -47,7 +47,7 @@ fn do_handshake(peer: &mut Peer) -> Result<(), String> {
 // =============================================================================
 // cancel.idempotent
 // =============================================================================
-// Rules: r[cancel.idempotent], r[core.cancel.idempotent]
+// Rules: [verify cancel.idempotent], [verify core.cancel.idempotent]
 //
 // Multiple CancelChannel messages for the same channel are harmless.
 
@@ -109,7 +109,7 @@ pub fn cancel_idempotent(peer: &mut Peer) -> TestResult {
                 TestResult::pass()
             } else if f.desc.method_id == control_verb::GO_AWAY {
                 TestResult::fail(
-                    "r[cancel.idempotent]: duplicate CancelChannel caused GoAway".to_string(),
+                    "[verify cancel.idempotent]: duplicate CancelChannel caused GoAway".to_string(),
                 )
             } else {
                 TestResult::pass() // Some other response, probably fine
@@ -123,7 +123,7 @@ pub fn cancel_idempotent(peer: &mut Peer) -> TestResult {
 // =============================================================================
 // cancel.propagation
 // =============================================================================
-// Rules: r[core.cancel.propagation]
+// Rules: [verify core.cancel.propagation]
 //
 // Canceling a CALL channel should cancel attached STREAM/TUNNEL channels.
 
@@ -136,7 +136,7 @@ pub fn cancel_propagation(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // cancel.deadline_field
 // =============================================================================
-// Rules: r[cancel.deadline.field]
+// Rules: [verify cancel.deadline.field]
 //
 // deadline_ns field in MsgDescHot should be honored.
 
@@ -147,7 +147,7 @@ pub fn deadline_field(_peer: &mut Peer) -> TestResult {
     // Default should be NO_DEADLINE
     if desc.deadline_ns != NO_DEADLINE {
         return TestResult::fail(format!(
-            "r[cancel.deadline.field]: default deadline should be NO_DEADLINE, got {:#X}",
+            "[verify cancel.deadline.field]: default deadline should be NO_DEADLINE, got {:#X}",
             desc.deadline_ns
         ));
     }
@@ -156,7 +156,7 @@ pub fn deadline_field(_peer: &mut Peer) -> TestResult {
     desc.deadline_ns = 1_000_000_000; // 1 second from epoch
     if desc.deadline_ns != 1_000_000_000 {
         return TestResult::fail(
-            "r[cancel.deadline.field]: deadline not set correctly".to_string(),
+            "[verify cancel.deadline.field]: deadline not set correctly".to_string(),
         );
     }
 
@@ -166,7 +166,7 @@ pub fn deadline_field(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // cancel.reason_values
 // =============================================================================
-// Rules: r[core.cancel.behavior]
+// Rules: [verify core.cancel.behavior]
 //
 // CancelReason enum should have correct values.
 
@@ -191,7 +191,7 @@ pub fn reason_values(_peer: &mut Peer) -> TestResult {
     for (actual, expected, name) in checks {
         if actual != expected {
             return TestResult::fail(format!(
-                "r[core.cancel.behavior]: CancelReason::{} should be {}, got {}",
+                "[verify core.cancel.behavior]: CancelReason::{} should be {}, got {}",
                 name, expected, actual
             ));
         }

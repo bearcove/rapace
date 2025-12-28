@@ -49,7 +49,7 @@ fn do_handshake(peer: &mut Peer) -> Result<(), String> {
 // =============================================================================
 // control.flag_set_on_channel_zero
 // =============================================================================
-// Rules: r[core.control.flag-set]
+// Rules: [verify core.control.flag-set]
 //
 // CONTROL flag must be set on channel 0.
 
@@ -66,7 +66,7 @@ pub fn flag_set_on_channel_zero(peer: &mut Peer) -> TestResult {
 
     if frame.desc.flags & flags::CONTROL == 0 {
         return TestResult::fail(
-            "r[core.control.flag-set]: CONTROL flag not set on channel 0 frame".to_string(),
+            "[verify core.control.flag-set]: CONTROL flag not set on channel 0 frame".to_string(),
         );
     }
 
@@ -76,7 +76,7 @@ pub fn flag_set_on_channel_zero(peer: &mut Peer) -> TestResult {
 // =============================================================================
 // control.flag_clear_on_other_channels
 // =============================================================================
-// Rules: r[core.control.flag-clear]
+// Rules: [verify core.control.flag-clear]
 //
 // CONTROL flag must NOT be set on channels other than 0.
 
@@ -101,12 +101,13 @@ pub fn flag_clear_on_other_channels(peer: &mut Peer) -> TestResult {
 
         if frame.desc.channel_id != 0 && frame.desc.flags & flags::CONTROL != 0 {
             return TestResult::fail(
-                "r[core.control.flag-clear]: CONTROL flag set on non-zero channel".to_string(),
+                "[verify core.control.flag-clear]: CONTROL flag set on non-zero channel"
+                    .to_string(),
             );
         }
     } else if frame.desc.flags & flags::CONTROL != 0 {
         return TestResult::fail(
-            "r[core.control.flag-clear]: CONTROL flag set on non-zero channel".to_string(),
+            "[verify core.control.flag-clear]: CONTROL flag set on non-zero channel".to_string(),
         );
     }
 
@@ -116,7 +117,7 @@ pub fn flag_clear_on_other_channels(peer: &mut Peer) -> TestResult {
 // =============================================================================
 // control.ping_pong
 // =============================================================================
-// Rules: r[core.ping.semantics]
+// Rules: [verify core.ping.semantics]
 //
 // Receiver must respond to Ping with Pong echoing the payload.
 
@@ -160,7 +161,7 @@ pub fn ping_pong(peer: &mut Peer) -> TestResult {
 
     if frame.desc.method_id != control_verb::PONG {
         return TestResult::fail(format!(
-            "r[core.ping.semantics]: expected Pong (method_id=6), got {}",
+            "[verify core.ping.semantics]: expected Pong (method_id=6), got {}",
             frame.desc.method_id
         ));
     }
@@ -172,7 +173,7 @@ pub fn ping_pong(peer: &mut Peer) -> TestResult {
 
     if pong.payload != ping.payload {
         return TestResult::fail(format!(
-            "r[core.ping.semantics]: Pong payload {:?} doesn't match Ping {:?}",
+            "[verify core.ping.semantics]: Pong payload {:?} doesn't match Ping {:?}",
             pong.payload, ping.payload
         ));
     }
@@ -183,7 +184,7 @@ pub fn ping_pong(peer: &mut Peer) -> TestResult {
 // =============================================================================
 // control.unknown_reserved_verb
 // =============================================================================
-// Rules: r[core.control.unknown-reserved]
+// Rules: [verify core.control.unknown-reserved]
 //
 // Unknown control verb in 0-99 range should trigger GoAway.
 
@@ -212,7 +213,7 @@ pub fn unknown_reserved_verb(peer: &mut Peer) -> TestResult {
                 TestResult::pass()
             } else {
                 TestResult::fail(format!(
-                    "r[core.control.unknown-reserved]: expected GoAway, got method_id={}",
+                    "[verify core.control.unknown-reserved]: expected GoAway, got method_id={}",
                     f.desc.method_id
                 ))
             }
@@ -228,7 +229,7 @@ pub fn unknown_reserved_verb(peer: &mut Peer) -> TestResult {
 // =============================================================================
 // control.unknown_extension_verb
 // =============================================================================
-// Rules: r[core.control.unknown-extension]
+// Rules: [verify core.control.unknown-extension]
 //
 // Unknown control verb in 100+ range should be ignored silently.
 
@@ -278,13 +279,13 @@ pub fn unknown_extension_verb(peer: &mut Peer) -> TestResult {
                 TestResult::pass()
             } else {
                 TestResult::fail(
-                    "r[core.control.unknown-extension]: expected connection to stay open"
+                    "[verify core.control.unknown-extension]: expected connection to stay open"
                         .to_string(),
                 )
             }
         }
         Err(e) => TestResult::fail(format!(
-            "r[core.control.unknown-extension]: connection closed unexpectedly: {}",
+            "[verify core.control.unknown-extension]: connection closed unexpectedly: {}",
             e
         )),
     }
@@ -293,7 +294,7 @@ pub fn unknown_extension_verb(peer: &mut Peer) -> TestResult {
 // =============================================================================
 // control.goaway_last_channel_id
 // =============================================================================
-// Rules: r[core.goaway.last-channel-id]
+// Rules: [verify core.goaway.last-channel-id]
 //
 // GoAway.last_channel_id indicates highest channel ID sender will process.
 

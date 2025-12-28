@@ -51,7 +51,7 @@ fn do_handshake(peer: &mut Peer) -> Result<(), String> {
 // =============================================================================
 // call.one_req_one_resp
 // =============================================================================
-// Rules: r[core.call.one-req-one-resp]
+// Rules: [verify core.call.one-req-one-resp]
 //
 // CALL channel carries exactly one request and one response.
 
@@ -97,13 +97,13 @@ pub fn one_req_one_resp(peer: &mut Peer) -> TestResult {
     // Request MUST have DATA | EOS
     if frame.desc.flags & flags::DATA == 0 {
         return TestResult::fail(
-            "r[core.call.request.flags]: request missing DATA flag".to_string(),
+            "[verify core.call.request.flags]: request missing DATA flag".to_string(),
         );
     }
 
     if frame.desc.flags & flags::EOS == 0 {
         return TestResult::fail(
-            "r[core.call.request.flags]: request missing EOS flag".to_string(),
+            "[verify core.call.request.flags]: request missing EOS flag".to_string(),
         );
     }
 
@@ -117,9 +117,9 @@ pub fn one_req_one_resp(peer: &mut Peer) -> TestResult {
     let payload = facet_format_postcard::to_vec(&result).expect("failed to encode CallResult");
 
     let mut desc = MsgDescHot::new();
-    desc.msg_id = frame.desc.msg_id; // Echo msg_id per r[core.call.response.msg-id]
+    desc.msg_id = frame.desc.msg_id; // Echo msg_id per [verify core.call.response.msg-id]
     desc.channel_id = channel_id;
-    desc.method_id = frame.desc.method_id; // Echo method_id per r[core.call.response.method-id]
+    desc.method_id = frame.desc.method_id; // Echo method_id per [verify core.call.response.method-id]
     desc.flags = flags::DATA | flags::EOS | flags::RESPONSE;
 
     let resp_frame = if payload.len() <= INLINE_PAYLOAD_SIZE {
@@ -138,7 +138,7 @@ pub fn one_req_one_resp(peer: &mut Peer) -> TestResult {
 // =============================================================================
 // call.request_flags
 // =============================================================================
-// Rules: r[core.call.request.flags]
+// Rules: [verify core.call.request.flags]
 //
 // Request frames must have DATA | EOS.
 
@@ -163,7 +163,7 @@ pub fn request_flags(peer: &mut Peer) -> TestResult {
         let expected = flags::DATA | flags::EOS;
         if frame.desc.flags & expected != expected {
             return TestResult::fail(format!(
-                "r[core.call.request.flags]: request flags {:#b} missing DATA|EOS ({:#b})",
+                "[verify core.call.request.flags]: request flags {:#b} missing DATA|EOS ({:#b})",
                 frame.desc.flags, expected
             ));
         }
@@ -175,7 +175,7 @@ pub fn request_flags(peer: &mut Peer) -> TestResult {
 // =============================================================================
 // call.response_flags
 // =============================================================================
-// Rules: r[core.call.response.flags]
+// Rules: [verify core.call.response.flags]
 //
 // Response frames must have DATA | EOS | RESPONSE.
 
@@ -187,7 +187,7 @@ pub fn response_flags(_peer: &mut Peer) -> TestResult {
     // Just verify the constants
     if expected != 0b0010_0000_0101 {
         return TestResult::fail(format!(
-            "r[core.call.response.flags]: expected flags {:#b}, computed {:#b}",
+            "[verify core.call.response.flags]: expected flags {:#b}, computed {:#b}",
             0b0010_0000_0101, expected
         ));
     }
@@ -198,7 +198,7 @@ pub fn response_flags(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // call.response_msg_id_echo
 // =============================================================================
-// Rules: r[core.call.response.msg-id], r[frame.msg-id.call-echo]
+// Rules: [verify core.call.response.msg-id], [verify frame.msg-id.call-echo]
 //
 // Response must echo request's msg_id.
 
@@ -259,7 +259,7 @@ pub fn response_msg_id_echo(peer: &mut Peer) -> TestResult {
 // =============================================================================
 // call.error_flag_match
 // =============================================================================
-// Rules: r[core.call.error.flag-match], r[error.flag.match]
+// Rules: [verify core.call.error.flag-match], [verify error.flag.match]
 //
 // ERROR flag must match status.code != 0.
 
@@ -316,7 +316,7 @@ pub fn error_flag_match(peer: &mut Peer) -> TestResult {
 // =============================================================================
 // call.unknown_method
 // =============================================================================
-// Rules: r[core.method-id.unknown-method]
+// Rules: [verify core.method-id.unknown-method]
 //
 // Unknown method_id should return UNIMPLEMENTED.
 

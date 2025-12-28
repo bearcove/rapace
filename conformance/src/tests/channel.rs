@@ -52,7 +52,7 @@ fn do_handshake(peer: &mut Peer) -> Result<(), String> {
 // =============================================================================
 // channel.id_zero_reserved
 // =============================================================================
-// Rules: r[core.channel.id.zero-reserved]
+// Rules: [verify core.channel.id.zero-reserved]
 //
 // Channel 0 is reserved for control messages.
 
@@ -95,7 +95,7 @@ pub fn id_zero_reserved(peer: &mut Peer) -> TestResult {
                 TestResult::pass()
             } else {
                 TestResult::fail(
-                    "r[core.channel.id.zero-reserved]: expected CancelChannel for channel 0"
+                    "[verify core.channel.id.zero-reserved]: expected CancelChannel for channel 0"
                         .to_string(),
                 )
             }
@@ -108,7 +108,7 @@ pub fn id_zero_reserved(peer: &mut Peer) -> TestResult {
 // =============================================================================
 // channel.parity_initiator_odd
 // =============================================================================
-// Rules: r[core.channel.id.parity.initiator]
+// Rules: [verify core.channel.id.parity.initiator]
 //
 // Initiator must use odd channel IDs.
 
@@ -137,7 +137,7 @@ pub fn parity_initiator_odd(peer: &mut Peer) -> TestResult {
         // Initiator should use odd channel IDs
         if open.channel_id.is_multiple_of(2) {
             return TestResult::fail(format!(
-                "r[core.channel.id.parity.initiator]: initiator used even channel ID {}",
+                "[verify core.channel.id.parity.initiator]: initiator used even channel ID {}",
                 open.channel_id
             ));
         }
@@ -151,7 +151,7 @@ pub fn parity_initiator_odd(peer: &mut Peer) -> TestResult {
 // =============================================================================
 // channel.parity_acceptor_even
 // =============================================================================
-// Rules: r[core.channel.id.parity.acceptor]
+// Rules: [verify core.channel.id.parity.acceptor]
 //
 // Acceptor must use even channel IDs.
 
@@ -195,7 +195,7 @@ pub fn parity_acceptor_even(peer: &mut Peer) -> TestResult {
         Ok(Some(f)) => {
             if f.desc.channel_id == 0 && f.desc.method_id == control_verb::CANCEL_CHANNEL {
                 TestResult::fail(
-                    "r[core.channel.id.parity.acceptor]: acceptor's even channel ID was rejected"
+                    "[verify core.channel.id.parity.acceptor]: acceptor's even channel ID was rejected"
                         .to_string(),
                 )
             } else {
@@ -210,7 +210,7 @@ pub fn parity_acceptor_even(peer: &mut Peer) -> TestResult {
 // =============================================================================
 // channel.open_required_before_data
 // =============================================================================
-// Rules: r[core.channel.open]
+// Rules: [verify core.channel.open]
 //
 // Channels must be opened before sending data.
 
@@ -242,7 +242,7 @@ pub fn open_required_before_data(peer: &mut Peer) -> TestResult {
                 TestResult::pass()
             } else {
                 TestResult::fail(
-                    "r[core.channel.open]: expected rejection for data on unopened channel"
+                    "[verify core.channel.open]: expected rejection for data on unopened channel"
                         .to_string(),
                 )
             }
@@ -255,7 +255,7 @@ pub fn open_required_before_data(peer: &mut Peer) -> TestResult {
 // =============================================================================
 // channel.kind_immutable
 // =============================================================================
-// Rules: r[core.channel.kind]
+// Rules: [verify core.channel.kind]
 //
 // Channel kind must not change after open.
 // (This is hard to test directly - kind is set at open time)

@@ -9,7 +9,7 @@ use crate::testcase::TestResult;
 // =============================================================================
 // frame.descriptor_size
 // =============================================================================
-// Rules: r[frame.desc.size], r[frame.desc.sizeof]
+// Rules: [verify frame.desc.size], [verify frame.desc.sizeof]
 //
 // Validates that descriptors are exactly 64 bytes.
 
@@ -17,7 +17,7 @@ pub fn descriptor_size(_peer: &mut Peer) -> TestResult {
     // This is a structural test - just verify our types
     if std::mem::size_of::<MsgDescHot>() != 64 {
         return TestResult::fail(format!(
-            "r[frame.desc.sizeof]: MsgDescHot is {} bytes, expected 64",
+            "[verify frame.desc.sizeof]: MsgDescHot is {} bytes, expected 64",
             std::mem::size_of::<MsgDescHot>()
         ));
     }
@@ -27,14 +27,14 @@ pub fn descriptor_size(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // frame.inline_payload_max
 // =============================================================================
-// Rules: r[frame.payload.inline]
+// Rules: [verify frame.payload.inline]
 //
 // Inline payloads must be ≤16 bytes.
 
 pub fn inline_payload_max(_peer: &mut Peer) -> TestResult {
     if INLINE_PAYLOAD_SIZE != 16 {
         return TestResult::fail(format!(
-            "r[frame.payload.inline]: INLINE_PAYLOAD_SIZE is {}, expected 16",
+            "[verify frame.payload.inline]: INLINE_PAYLOAD_SIZE is {}, expected 16",
             INLINE_PAYLOAD_SIZE
         ));
     }
@@ -44,14 +44,14 @@ pub fn inline_payload_max(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // frame.sentinel_inline
 // =============================================================================
-// Rules: r[frame.sentinel.values]
+// Rules: [verify frame.sentinel.values]
 //
 // payload_slot = 0xFFFFFFFF means inline.
 
 pub fn sentinel_inline(_peer: &mut Peer) -> TestResult {
     if INLINE_PAYLOAD_SLOT != 0xFFFFFFFF {
         return TestResult::fail(format!(
-            "r[frame.sentinel.values]: INLINE_PAYLOAD_SLOT is {:#X}, expected 0xFFFFFFFF",
+            "[verify frame.sentinel.values]: INLINE_PAYLOAD_SLOT is {:#X}, expected 0xFFFFFFFF",
             INLINE_PAYLOAD_SLOT
         ));
     }
@@ -61,14 +61,14 @@ pub fn sentinel_inline(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // frame.sentinel_no_deadline
 // =============================================================================
-// Rules: r[frame.sentinel.values]
+// Rules: [verify frame.sentinel.values]
 //
 // deadline_ns = 0xFFFFFFFFFFFFFFFF means no deadline.
 
 pub fn sentinel_no_deadline(_peer: &mut Peer) -> TestResult {
     if NO_DEADLINE != 0xFFFFFFFFFFFFFFFF {
         return TestResult::fail(format!(
-            "r[frame.sentinel.values]: NO_DEADLINE is {:#X}, expected 0xFFFFFFFFFFFFFFFF",
+            "[verify frame.sentinel.values]: NO_DEADLINE is {:#X}, expected 0xFFFFFFFFFFFFFFFF",
             NO_DEADLINE
         ));
     }
@@ -78,7 +78,7 @@ pub fn sentinel_no_deadline(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // frame.encoding_little_endian
 // =============================================================================
-// Rules: r[frame.desc.encoding]
+// Rules: [verify frame.desc.encoding]
 //
 // Descriptor fields must be little-endian.
 
@@ -92,19 +92,23 @@ pub fn encoding_little_endian(_peer: &mut Peer) -> TestResult {
 
     // Check msg_id (bytes 0-7, little-endian)
     if bytes[0..8] != [0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01] {
-        return TestResult::fail("r[frame.desc.encoding]: msg_id not little-endian".to_string());
+        return TestResult::fail(
+            "[verify frame.desc.encoding]: msg_id not little-endian".to_string(),
+        );
     }
 
     // Check channel_id (bytes 8-11)
     if bytes[8..12] != [0x14, 0x13, 0x12, 0x11] {
         return TestResult::fail(
-            "r[frame.desc.encoding]: channel_id not little-endian".to_string(),
+            "[verify frame.desc.encoding]: channel_id not little-endian".to_string(),
         );
     }
 
     // Check method_id (bytes 12-15)
     if bytes[12..16] != [0x24, 0x23, 0x22, 0x21] {
-        return TestResult::fail("r[frame.desc.encoding]: method_id not little-endian".to_string());
+        return TestResult::fail(
+            "[verify frame.desc.encoding]: method_id not little-endian".to_string(),
+        );
     }
 
     TestResult::pass()

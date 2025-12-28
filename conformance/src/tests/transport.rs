@@ -9,7 +9,7 @@ use crate::testcase::TestResult;
 // =============================================================================
 // transport.ordering_single
 // =============================================================================
-// Rules: r[transport.ordering.single]
+// Rules: [verify transport.ordering.single]
 //
 // Frames on a single channel are delivered in order.
 
@@ -21,7 +21,7 @@ pub fn ordering_single(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // transport.ordering_channel
 // =============================================================================
-// Rules: r[transport.ordering.channel]
+// Rules: [verify transport.ordering.channel]
 //
 // No ordering guarantees across different channels.
 
@@ -33,7 +33,7 @@ pub fn ordering_channel(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // transport.reliable_delivery
 // =============================================================================
-// Rules: r[transport.reliable.delivery]
+// Rules: [verify transport.reliable.delivery]
 //
 // Transport provides reliable delivery.
 
@@ -45,7 +45,7 @@ pub fn reliable_delivery(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // transport.framing_boundaries
 // =============================================================================
-// Rules: r[transport.framing.boundaries]
+// Rules: [verify transport.framing.boundaries]
 //
 // Frame boundaries are preserved.
 
@@ -57,7 +57,7 @@ pub fn framing_boundaries(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // transport.framing_no_coalesce
 // =============================================================================
-// Rules: r[transport.framing.no-coalesce]
+// Rules: [verify transport.framing.no-coalesce]
 //
 // Frames must not be coalesced.
 
@@ -69,7 +69,7 @@ pub fn framing_no_coalesce(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // transport.stream_length
 // =============================================================================
-// Rules: r[transport.stream.length-match]
+// Rules: [verify transport.stream.length-match]
 //
 // For stream transports, payload_len must match actual bytes.
 
@@ -80,7 +80,7 @@ pub fn stream_length_match(_peer: &mut Peer) -> TestResult {
 
     if desc.payload_len != 100 {
         return TestResult::fail(
-            "r[transport.stream.length-match]: payload_len not set correctly".to_string(),
+            "[verify transport.stream.length-match]: payload_len not set correctly".to_string(),
         );
     }
 
@@ -90,7 +90,7 @@ pub fn stream_length_match(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // transport.stream_max_length
 // =============================================================================
-// Rules: r[transport.stream.max-length]
+// Rules: [verify transport.stream.max-length]
 //
 // Maximum payload length is implementation-defined but at least 64KB.
 
@@ -101,7 +101,7 @@ pub fn stream_max_length(_peer: &mut Peer) -> TestResult {
 
     if desc.payload_len != 1024 * 1024 {
         return TestResult::fail(
-            "r[transport.stream.max-length]: large payload_len not supported".to_string(),
+            "[verify transport.stream.max-length]: large payload_len not supported".to_string(),
         );
     }
 
@@ -111,7 +111,7 @@ pub fn stream_max_length(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // transport.shutdown_orderly
 // =============================================================================
-// Rules: r[transport.shutdown.orderly]
+// Rules: [verify transport.shutdown.orderly]
 //
 // Orderly shutdown via GoAway.
 
@@ -135,7 +135,7 @@ pub fn shutdown_orderly(_peer: &mut Peer) -> TestResult {
     };
 
     if decoded.reason != GoAwayReason::Shutdown || decoded.last_channel_id != 100 {
-        return TestResult::fail("r[transport.shutdown.orderly]: GoAway roundtrip failed");
+        return TestResult::fail("[verify transport.shutdown.orderly]: GoAway roundtrip failed");
     }
 
     TestResult::pass()

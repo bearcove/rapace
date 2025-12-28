@@ -9,7 +9,7 @@ use crate::testcase::TestResult;
 // =============================================================================
 // method.algorithm
 // =============================================================================
-// Rules: r[core.method-id.algorithm]
+// Rules: [verify core.method-id.algorithm]
 //
 // Method IDs use FNV-1a hash folded to 32 bits.
 
@@ -20,7 +20,8 @@ pub fn algorithm(_peer: &mut Peer) -> TestResult {
 
     if id1 != id2 {
         return TestResult::fail(
-            "r[core.method-id.algorithm]: method ID computation not deterministic".to_string(),
+            "[verify core.method-id.algorithm]: method ID computation not deterministic"
+                .to_string(),
         );
     }
 
@@ -28,7 +29,7 @@ pub fn algorithm(_peer: &mut Peer) -> TestResult {
     let id3 = compute_method_id("Test", "bar");
     if id1 == id3 {
         return TestResult::fail(
-            "r[core.method-id.algorithm]: different methods produced same ID".to_string(),
+            "[verify core.method-id.algorithm]: different methods produced same ID".to_string(),
         );
     }
 
@@ -38,7 +39,7 @@ pub fn algorithm(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // method.input_format
 // =============================================================================
-// Rules: r[core.method-id.input-format]
+// Rules: [verify core.method-id.input-format]
 //
 // Method ID input is "ServiceName.MethodName".
 
@@ -49,7 +50,7 @@ pub fn input_format(_peer: &mut Peer) -> TestResult {
     // The ID should be non-zero (zero is reserved)
     if id == 0 {
         return TestResult::fail(
-            "r[core.method-id.input-format]: method ID should not be 0".to_string(),
+            "[verify core.method-id.input-format]: method ID should not be 0".to_string(),
         );
     }
 
@@ -59,7 +60,7 @@ pub fn input_format(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // method.zero_reserved
 // =============================================================================
-// Rules: r[core.method-id.zero-reserved]
+// Rules: [verify core.method-id.zero-reserved]
 //
 // method_id = 0 is reserved for control/stream/tunnel.
 
@@ -79,7 +80,7 @@ pub fn zero_reserved(_peer: &mut Peer) -> TestResult {
         let id = compute_method_id(service, method);
         if id == 0 {
             return TestResult::fail(format!(
-                "r[core.method-id.zero-reserved]: {}.{} produced reserved ID 0",
+                "[verify core.method-id.zero-reserved]: {}.{} produced reserved ID 0",
                 service, method
             ));
         }
@@ -91,7 +92,7 @@ pub fn zero_reserved(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // method.collision_detection
 // =============================================================================
-// Rules: r[core.method-id.collision-detection]
+// Rules: [verify core.method-id.collision-detection]
 //
 // Implementations should detect method ID collisions at startup.
 
@@ -104,7 +105,7 @@ pub fn collision_detection(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // method.fnv1a_properties
 // =============================================================================
-// Rules: r[core.method-id.algorithm]
+// Rules: [verify core.method-id.algorithm]
 //
 // Verify FNV-1a properties: avalanche effect, bit distribution.
 
@@ -121,7 +122,7 @@ pub fn fnv1a_properties(_peer: &mut Peer) -> TestResult {
     // Allow anywhere from 4-28 bits (out of 32) to be different
     if diff < 4 {
         return TestResult::fail(format!(
-            "r[core.method-id.algorithm]: poor avalanche - only {} bits differ",
+            "[verify core.method-id.algorithm]: poor avalanche - only {} bits differ",
             diff
         ));
     }

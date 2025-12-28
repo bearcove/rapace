@@ -19,60 +19,60 @@ use facet::Facet;
 // =============================================================================
 
 /// Sentinel value indicating payload is inline.
-/// Spec: `r[frame.sentinel.values]`
+/// Spec: `[impl frame.sentinel.values]`
 pub const INLINE_PAYLOAD_SLOT: u32 = 0xFFFFFFFF;
 
 /// Sentinel value indicating no deadline.
-/// Spec: `r[frame.sentinel.values]`
+/// Spec: `[impl frame.sentinel.values]`
 pub const NO_DEADLINE: u64 = 0xFFFFFFFFFFFFFFFF;
 
 /// Size of inline payload in bytes.
-/// Spec: `r[frame.payload.inline]`
+/// Spec: `[impl frame.payload.inline]`
 pub const INLINE_PAYLOAD_SIZE: usize = 16;
 
 /// Hot-path message descriptor (64 bytes).
-/// Spec: `r[frame.desc.size]`
+/// Spec: `[impl frame.desc.size]`
 #[derive(Clone, Copy, Debug, Default)]
 #[repr(C, align(64))]
 pub struct MsgDescHot {
     // Identity (16 bytes)
     /// Unique message ID per connection, monotonically increasing.
-    /// Spec: `r[frame.msg-id.scope]`
+    /// Spec: `[impl frame.msg-id.scope]`
     pub msg_id: u64,
     /// Logical channel (0 = control channel).
-    /// Spec: `r[core.channel.id.zero-reserved]`
+    /// Spec: `[impl core.channel.id.zero-reserved]`
     pub channel_id: u32,
     /// Method identifier (FNV-1a hash) or control verb for channel 0.
-    /// Spec: `r[core.method-id.algorithm]`
+    /// Spec: `[impl core.method-id.algorithm]`
     pub method_id: u32,
 
     // Payload location (16 bytes)
     /// Slot index for SHM, or `INLINE_PAYLOAD_SLOT` for inline.
-    /// Spec: `r[frame.sentinel.values]`
+    /// Spec: `[impl frame.sentinel.values]`
     pub payload_slot: u32,
     /// Generation counter for ABA safety (SHM only).
-    /// Spec: `r[frame.shm.slot-guard]`
+    /// Spec: `[impl frame.shm.slot-guard]`
     pub payload_generation: u32,
     /// Byte offset within slot (typically 0).
     pub payload_offset: u32,
     /// Payload length in bytes.
-    /// Spec: `r[frame.payload.empty]`
+    /// Spec: `[impl frame.payload.empty]`
     pub payload_len: u32,
 
     // Flow control & timing (16 bytes)
     /// Frame flags.
-    /// Spec: `r[core.flags.reserved]`
+    /// Spec: `[impl core.flags.reserved]`
     pub flags: u32,
     /// Credits being granted to peer (valid if `CREDITS` flag set).
-    /// Spec: `r[core.flow.credit-semantics]`
+    /// Spec: `[impl core.flow.credit-semantics]`
     pub credit_grant: u32,
     /// Absolute deadline in nanoseconds since epoch.
-    /// Spec: `r[frame.sentinel.values]`
+    /// Spec: `[impl frame.sentinel.values]`
     pub deadline_ns: u64,
 
     // Inline payload (16 bytes)
     /// When `payload_slot == INLINE_PAYLOAD_SLOT`, payload lives here.
-    /// Spec: `r[frame.payload.inline]`
+    /// Spec: `[impl frame.payload.inline]`
     pub inline_payload: [u8; INLINE_PAYLOAD_SIZE],
 }
 
@@ -97,7 +97,7 @@ impl MsgDescHot {
     }
 
     /// Encode descriptor to bytes (little-endian).
-    /// Spec: `r[frame.desc.encoding]`
+    /// Spec: `[impl frame.desc.encoding]`
     pub fn to_bytes(&self) -> [u8; 64] {
         let mut buf = [0u8; 64];
         buf[0..8].copy_from_slice(&self.msg_id.to_le_bytes());
@@ -115,7 +115,7 @@ impl MsgDescHot {
     }
 
     /// Decode descriptor from bytes (little-endian).
-    /// Spec: `r[frame.desc.encoding]`
+    /// Spec: `[impl frame.desc.encoding]`
     pub fn from_bytes(buf: &[u8; 64]) -> Self {
         Self {
             msg_id: u64::from_le_bytes(buf[0..8].try_into().unwrap()),
@@ -160,28 +160,28 @@ pub mod flags {
     /// Frame carries payload data.
     pub const DATA: u32 = 0b0000_0001;
     /// Control message (channel 0 only).
-    /// Spec: `r[core.control.flag-set]`, `r[core.control.flag-clear]`
+    /// Spec: `[impl core.control.flag-set]`, `[impl core.control.flag-clear]`
     pub const CONTROL: u32 = 0b0000_0010;
     /// End of stream (half-close).
-    /// Spec: `r[core.eos.after-send]`
+    /// Spec: `[impl core.eos.after-send]`
     pub const EOS: u32 = 0b0000_0100;
     /// Reserved (do not use).
     pub const _RESERVED_08: u32 = 0b0000_1000;
     /// Error response.
-    /// Spec: `r[core.call.error.flags]`
+    /// Spec: `[impl core.call.error.flags]`
     pub const ERROR: u32 = 0b0001_0000;
     /// Priority hint (maps to priority 192).
-    /// Spec: `r[core.flags.high-priority]`
+    /// Spec: `[impl core.flags.high-priority]`
     pub const HIGH_PRIORITY: u32 = 0b0010_0000;
     /// Contains credit grant.
-    /// Spec: `r[core.flow.credit-semantics]`
+    /// Spec: `[impl core.flow.credit-semantics]`
     pub const CREDITS: u32 = 0b0100_0000;
     /// Reserved (do not use).
     pub const _RESERVED_80: u32 = 0b1000_0000;
     /// Fire-and-forget (no response expected).
     pub const NO_REPLY: u32 = 0b0001_0000_0000;
     /// This is a response frame.
-    /// Spec: `r[core.call.response.flags]`
+    /// Spec: `[impl core.call.response.flags]`
     pub const RESPONSE: u32 = 0b0010_0000_0000;
 }
 
@@ -218,7 +218,7 @@ pub mod control_verb {
 pub const PROTOCOL_VERSION_1_0: u32 = 0x00010000;
 
 /// Connection role.
-/// Spec: `r[handshake.role.validation]`
+/// Spec: `[impl handshake.role.validation]`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Facet)]
 #[repr(u8)]
 pub enum Role {
@@ -229,7 +229,7 @@ pub enum Role {
 }
 
 /// Feature bits for capability negotiation.
-/// Spec: `r[handshake.features.required]`
+/// Spec: `[impl handshake.features.required]`
 pub mod features {
     /// Supports STREAM/TUNNEL channels attached to calls.
     pub const ATTACHED_STREAMS: u64 = 1 << 0;
@@ -267,41 +267,41 @@ impl Default for Limits {
 }
 
 /// Method registry entry.
-/// Spec: `r[handshake.registry.validation]`
+/// Spec: `[impl handshake.registry.validation]`
 #[derive(Debug, Clone, PartialEq, Eq, Facet)]
 pub struct MethodInfo {
     /// Method identifier (FNV-1a hash).
-    /// Spec: `r[core.method-id.algorithm]`
+    /// Spec: `[impl core.method-id.algorithm]`
     pub method_id: u32,
     /// Structural signature hash (BLAKE3).
-    /// Spec: `r[handshake.sig-hash.blake3]`
+    /// Spec: `[impl handshake.sig-hash.blake3]`
     pub sig_hash: [u8; 32],
     /// Human-readable name for debugging.
     pub name: Option<String>,
 }
 
 /// Hello message for handshake.
-/// Spec: `r[handshake.required]`
+/// Spec: `[impl handshake.required]`
 #[derive(Debug, Clone, PartialEq, Eq, Facet)]
 pub struct Hello {
     /// Protocol version.
-    /// Spec: `r[handshake.version.major]`, `r[handshake.version.minor]`
+    /// Spec: `[impl handshake.version.major]`, `[impl handshake.version.minor]`
     pub protocol_version: u32,
     /// Connection role.
-    /// Spec: `r[handshake.role.validation]`
+    /// Spec: `[impl handshake.role.validation]`
     pub role: Role,
     /// Features the peer MUST support.
-    /// Spec: `r[handshake.features.required]`
+    /// Spec: `[impl handshake.features.required]`
     pub required_features: u64,
     /// Features the peer supports.
     pub supported_features: u64,
     /// Advertised limits.
     pub limits: Limits,
     /// Method registry.
-    /// Spec: `r[handshake.registry.validation]`
+    /// Spec: `[impl handshake.registry.validation]`
     pub methods: Vec<MethodInfo>,
     /// Extension parameters.
-    /// Spec: `r[handshake.params.unknown]`
+    /// Spec: `[impl handshake.params.unknown]`
     pub params: Vec<(String, Vec<u8>)>,
 }
 
@@ -327,7 +327,7 @@ impl Default for Hello {
 // =============================================================================
 
 /// Channel kind.
-/// Spec: `r[core.channel.kind]`
+/// Spec: `[impl core.channel.kind]`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Facet)]
 #[repr(u8)]
 pub enum ChannelKind {
@@ -352,30 +352,30 @@ pub enum Direction {
 }
 
 /// Attachment info for STREAM/TUNNEL channels.
-/// Spec: `r[core.channel.open.attach-required]`
+/// Spec: `[impl core.channel.open.attach-required]`
 #[derive(Debug, Clone, PartialEq, Eq, Facet)]
 pub struct AttachTo {
     /// The parent CALL channel.
     pub call_channel_id: u32,
     /// Port identifier from method signature.
-    /// Spec: `r[core.stream.port-id-assignment]`
+    /// Spec: `[impl core.stream.port-id-assignment]`
     pub port_id: u32,
     /// Direction.
     pub direction: Direction,
 }
 
 /// OpenChannel control message.
-/// Spec: `r[core.channel.open]`
+/// Spec: `[impl core.channel.open]`
 #[derive(Debug, Clone, PartialEq, Eq, Facet)]
 pub struct OpenChannel {
     /// The new channel's ID.
-    /// Spec: `r[core.channel.id.allocation]`
+    /// Spec: `[impl core.channel.id.allocation]`
     pub channel_id: u32,
     /// Channel kind.
-    /// Spec: `r[core.channel.kind]`
+    /// Spec: `[impl core.channel.kind]`
     pub kind: ChannelKind,
     /// Attachment for STREAM/TUNNEL.
-    /// Spec: `r[core.channel.open.attach-required]`
+    /// Spec: `[impl core.channel.open.attach-required]`
     pub attach: Option<AttachTo>,
     /// Metadata (tracing, auth, etc.).
     pub metadata: Vec<(String, Vec<u8>)>,
@@ -388,7 +388,7 @@ pub struct OpenChannel {
 // =============================================================================
 
 /// Reason for closing a channel.
-/// Spec: `r[core.close.close-channel-semantics]`
+/// Spec: `[impl core.close.close-channel-semantics]`
 #[derive(Debug, Clone, PartialEq, Eq, Facet)]
 #[repr(u8)]
 pub enum CloseReason {
@@ -399,7 +399,7 @@ pub enum CloseReason {
 }
 
 /// Reason for canceling a channel.
-/// Spec: `r[core.cancel.behavior]`
+/// Spec: `[impl core.cancel.behavior]`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Facet)]
 #[repr(u8)]
 pub enum CancelReason {
@@ -427,7 +427,7 @@ pub struct CloseChannel {
 }
 
 /// CancelChannel control message.
-/// Spec: `r[core.cancel.idempotent]`
+/// Spec: `[impl core.cancel.idempotent]`
 #[derive(Debug, Clone, PartialEq, Eq, Facet)]
 pub struct CancelChannel {
     /// The channel to cancel.
@@ -441,7 +441,7 @@ pub struct CancelChannel {
 // =============================================================================
 
 /// GrantCredits control message.
-/// Spec: `r[core.flow.credit-additive]`
+/// Spec: `[impl core.flow.credit-additive]`
 #[derive(Debug, Clone, PartialEq, Eq, Facet)]
 pub struct GrantCredits {
     /// The channel receiving credits.
@@ -455,7 +455,7 @@ pub struct GrantCredits {
 // =============================================================================
 
 /// Ping control message.
-/// Spec: `r[core.ping.semantics]`
+/// Spec: `[impl core.ping.semantics]`
 #[derive(Debug, Clone, PartialEq, Eq, Facet)]
 pub struct Ping {
     /// Opaque payload that must be echoed in Pong.
@@ -463,7 +463,7 @@ pub struct Ping {
 }
 
 /// Pong control message.
-/// Spec: `r[core.ping.semantics]`
+/// Spec: `[impl core.ping.semantics]`
 #[derive(Debug, Clone, PartialEq, Eq, Facet)]
 pub struct Pong {
     /// Echoed payload from Ping.
@@ -489,7 +489,7 @@ pub enum GoAwayReason {
 }
 
 /// GoAway control message.
-/// Spec: `r[core.goaway.last-channel-id]`, `r[core.goaway.after-send]`
+/// Spec: `[impl core.goaway.last-channel-id]`, `[impl core.goaway.after-send]`
 #[derive(Debug, Clone, PartialEq, Eq, Facet)]
 pub struct GoAway {
     /// Reason for shutdown.
@@ -507,7 +507,7 @@ pub struct GoAway {
 // =============================================================================
 
 /// RPC status.
-/// Spec: `r[error.status.success]`, `r[error.status.error]`
+/// Spec: `[impl error.status.success]`, `[impl error.status.error]`
 #[derive(Debug, Clone, PartialEq, Eq, Facet)]
 pub struct Status {
     /// Error code (0 = OK).
@@ -544,7 +544,7 @@ impl Status {
 }
 
 /// CallResult envelope.
-/// Spec: `r[core.call.result.envelope]`
+/// Spec: `[impl core.call.result.envelope]`
 #[derive(Debug, Clone, PartialEq, Eq, Facet)]
 pub struct CallResult {
     /// Status (success or error).
@@ -615,7 +615,7 @@ pub mod error_code {
 // =============================================================================
 
 /// Compute method ID using FNV-1a hash.
-/// Spec: `r[core.method-id.algorithm]`
+/// Spec: `[impl core.method-id.algorithm]`
 pub fn compute_method_id(service_name: &str, method_name: &str) -> u32 {
     const FNV_OFFSET: u64 = 0xcbf29ce484222325;
     const FNV_PRIME: u64 = 0x100000001b3;

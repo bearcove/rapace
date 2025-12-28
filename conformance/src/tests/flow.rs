@@ -9,7 +9,7 @@ use crate::testcase::TestResult;
 // =============================================================================
 // flow.credit_additive
 // =============================================================================
-// Rules: r[core.flow.credit-additive]
+// Rules: [verify core.flow.credit-additive]
 //
 // Credits from multiple GrantCredits messages are additive.
 
@@ -32,7 +32,9 @@ pub fn credit_additive(_peer: &mut Peer) -> TestResult {
     };
 
     if decoded.channel_id != 5 || decoded.bytes != 1024 {
-        return TestResult::fail("r[core.flow.credit-additive]: GrantCredits roundtrip failed");
+        return TestResult::fail(
+            "[verify core.flow.credit-additive]: GrantCredits roundtrip failed",
+        );
     }
 
     TestResult::pass()
@@ -41,7 +43,7 @@ pub fn credit_additive(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // flow.credit_in_flags
 // =============================================================================
-// Rules: r[core.flow.credit-semantics]
+// Rules: [verify core.flow.credit-semantics]
 //
 // The CREDITS flag indicates credit_grant field is valid.
 
@@ -49,7 +51,7 @@ pub fn credit_in_flags(_peer: &mut Peer) -> TestResult {
     // Verify CREDITS flag value
     if flags::CREDITS != 0b0100_0000 {
         return TestResult::fail(format!(
-            "r[core.flow.credit-semantics]: CREDITS flag should be 0x40, got {:#X}",
+            "[verify core.flow.credit-semantics]: CREDITS flag should be 0x40, got {:#X}",
             flags::CREDITS
         ));
     }
@@ -60,7 +62,7 @@ pub fn credit_in_flags(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // flow.eos_no_credits
 // =============================================================================
-// Rules: r[core.flow.eos-no-credits]
+// Rules: [verify core.flow.eos-no-credits]
 //
 // EOS-only frames don't consume credits.
 
@@ -70,7 +72,7 @@ pub fn eos_no_credits(_peer: &mut Peer) -> TestResult {
     // We can only verify the flag values here
     if flags::EOS != 0b0000_0100 {
         return TestResult::fail(format!(
-            "r[core.flow.eos-no-credits]: EOS flag should be 0x04, got {:#X}",
+            "[verify core.flow.eos-no-credits]: EOS flag should be 0x04, got {:#X}",
             flags::EOS
         ));
     }
@@ -81,7 +83,7 @@ pub fn eos_no_credits(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // flow.infinite_credit
 // =============================================================================
-// Rules: r[core.flow.infinite-credit]
+// Rules: [verify core.flow.infinite-credit]
 //
 // Credit value 0xFFFFFFFF means unlimited.
 
@@ -95,7 +97,8 @@ pub fn infinite_credit(_peer: &mut Peer) -> TestResult {
 
     if desc.credit_grant != 0xFFFFFFFF {
         return TestResult::fail(
-            "r[core.flow.infinite-credit]: infinite credit sentinel not set correctly".to_string(),
+            "[verify core.flow.infinite-credit]: infinite credit sentinel not set correctly"
+                .to_string(),
         );
     }
 

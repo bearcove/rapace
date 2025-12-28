@@ -9,7 +9,7 @@ use crate::testcase::TestResult;
 // =============================================================================
 // handshake.valid_hello_exchange
 // =============================================================================
-// Rules: r[handshake.required], r[handshake.ordering]
+// Rules: [verify handshake.required], [verify handshake.ordering]
 //
 // The peer acts as ACCEPTOR. The implementation (INITIATOR) should:
 // 1. Send a valid Hello
@@ -26,20 +26,20 @@ pub fn valid_hello_exchange(peer: &mut Peer) -> TestResult {
     // Validate it's a Hello on channel 0
     if frame.desc.channel_id != 0 {
         return TestResult::fail(format!(
-            "r[handshake.ordering]: first frame must be on channel 0, got {}",
+            "[verify handshake.ordering]: first frame must be on channel 0, got {}",
             frame.desc.channel_id
         ));
     }
 
     if frame.desc.flags & flags::CONTROL == 0 {
         return TestResult::fail(
-            "r[core.control.flag-set]: Hello must have CONTROL flag set".to_string(),
+            "[verify core.control.flag-set]: Hello must have CONTROL flag set".to_string(),
         );
     }
 
     if frame.desc.method_id != control_verb::HELLO {
         return TestResult::fail(format!(
-            "r[handshake.ordering]: first frame must be Hello (method_id=0), got {}",
+            "[verify handshake.ordering]: first frame must be Hello (method_id=0), got {}",
             frame.desc.method_id
         ));
     }
@@ -49,7 +49,7 @@ pub fn valid_hello_exchange(peer: &mut Peer) -> TestResult {
         Ok(h) => h,
         Err(e) => {
             return TestResult::fail(format!(
-                "r[core.control.payload-encoding]: failed to decode Hello: {}",
+                "[verify core.control.payload-encoding]: failed to decode Hello: {}",
                 e
             ));
         }
@@ -58,7 +58,7 @@ pub fn valid_hello_exchange(peer: &mut Peer) -> TestResult {
     // Validate Hello contents
     if hello.role != Role::Initiator {
         return TestResult::fail(format!(
-            "r[handshake.role.validation]: initiator must declare Role::Initiator, got {:?}",
+            "[verify handshake.role.validation]: initiator must declare Role::Initiator, got {:?}",
             hello.role
         ));
     }
@@ -67,7 +67,7 @@ pub fn valid_hello_exchange(peer: &mut Peer) -> TestResult {
     let major = hello.protocol_version >> 16;
     if major != 1 {
         return TestResult::fail(format!(
-            "r[handshake.version.major]: expected major version 1, got {}",
+            "[verify handshake.version.major]: expected major version 1, got {}",
             major
         ));
     }
@@ -110,7 +110,7 @@ pub fn valid_hello_exchange(peer: &mut Peer) -> TestResult {
 // =============================================================================
 // handshake.missing_hello
 // =============================================================================
-// Rules: r[handshake.first-frame], r[handshake.failure]
+// Rules: [verify handshake.first-frame], [verify handshake.failure]
 //
 // The peer acts as ACCEPTOR. If implementation sends non-Hello first frame,
 // peer should detect the violation.
@@ -139,7 +139,7 @@ pub fn missing_hello(peer: &mut Peer) -> TestResult {
     // Send CloseChannel with error
     let close = CloseChannel {
         channel_id: 0,
-        reason: CloseReason::Error("r[handshake.first-frame]: expected Hello".to_string()),
+        reason: CloseReason::Error("[verify handshake.first-frame]: expected Hello".to_string()),
     };
 
     let payload = facet_format_postcard::to_vec(&close).expect("failed to encode CloseChannel");
@@ -164,7 +164,7 @@ pub fn missing_hello(peer: &mut Peer) -> TestResult {
 // =============================================================================
 // handshake.version_mismatch
 // =============================================================================
-// Rules: r[handshake.version.major]
+// Rules: [verify handshake.version.major]
 //
 // Peer sends Hello with incompatible major version.
 // Implementation should reject/close.
@@ -220,7 +220,7 @@ pub fn version_mismatch(peer: &mut Peer) -> TestResult {
                 TestResult::pass()
             } else {
                 TestResult::fail(format!(
-                    "r[handshake.version.major]: expected close after version mismatch, got frame with method_id={}",
+                    "[verify handshake.version.major]: expected close after version mismatch, got frame with method_id={}",
                     f.desc.method_id
                 ))
             }
@@ -232,7 +232,7 @@ pub fn version_mismatch(peer: &mut Peer) -> TestResult {
 // =============================================================================
 // handshake.role_conflict
 // =============================================================================
-// Rules: r[handshake.role.validation]
+// Rules: [verify handshake.role.validation]
 //
 // Peer sends Hello claiming to be INITIATOR (same as implementation).
 // Implementation should reject.
@@ -285,7 +285,8 @@ pub fn role_conflict(peer: &mut Peer) -> TestResult {
                 TestResult::pass()
             } else {
                 TestResult::fail(
-                    "r[handshake.role.validation]: expected close after role conflict".to_string(),
+                    "[verify handshake.role.validation]: expected close after role conflict"
+                        .to_string(),
                 )
             }
         }
@@ -296,7 +297,7 @@ pub fn role_conflict(peer: &mut Peer) -> TestResult {
 // =============================================================================
 // handshake.required_features_missing
 // =============================================================================
-// Rules: r[handshake.features.required]
+// Rules: [verify handshake.features.required]
 //
 // Peer requires a feature the implementation doesn't support.
 
@@ -361,7 +362,7 @@ pub fn required_features_missing(peer: &mut Peer) -> TestResult {
                 TestResult::pass()
             } else {
                 TestResult::fail(
-                    "r[handshake.features.required]: expected close when required features missing"
+                    "[verify handshake.features.required]: expected close when required features missing"
                         .to_string(),
                 )
             }
@@ -373,7 +374,7 @@ pub fn required_features_missing(peer: &mut Peer) -> TestResult {
 // =============================================================================
 // handshake.method_registry_duplicate
 // =============================================================================
-// Rules: r[handshake.registry.no-duplicates]
+// Rules: [verify handshake.registry.no-duplicates]
 //
 // Peer sends Hello with duplicate method_id in registry.
 
@@ -436,7 +437,7 @@ pub fn method_registry_duplicate(peer: &mut Peer) -> TestResult {
                 TestResult::pass()
             } else {
                 TestResult::fail(
-                    "r[handshake.registry.no-duplicates]: expected close on duplicate method_id"
+                    "[verify handshake.registry.no-duplicates]: expected close on duplicate method_id"
                         .to_string(),
                 )
             }
@@ -448,7 +449,7 @@ pub fn method_registry_duplicate(peer: &mut Peer) -> TestResult {
 // =============================================================================
 // handshake.method_registry_zero
 // =============================================================================
-// Rules: r[handshake.registry.no-zero]
+// Rules: [verify handshake.registry.no-zero]
 //
 // Peer sends Hello with method_id=0 in registry.
 
@@ -504,7 +505,8 @@ pub fn method_registry_zero(peer: &mut Peer) -> TestResult {
                 TestResult::pass()
             } else {
                 TestResult::fail(
-                    "r[handshake.registry.no-zero]: expected close on method_id=0".to_string(),
+                    "[verify handshake.registry.no-zero]: expected close on method_id=0"
+                        .to_string(),
                 )
             }
         }

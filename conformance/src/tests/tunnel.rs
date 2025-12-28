@@ -9,7 +9,7 @@ use crate::testcase::TestResult;
 // =============================================================================
 // tunnel.raw_bytes
 // =============================================================================
-// Rules: r[core.tunnel.raw-bytes]
+// Rules: [verify core.tunnel.raw-bytes]
 //
 // TUNNEL payloads are raw bytes, not Postcard-encoded.
 
@@ -22,7 +22,7 @@ pub fn raw_bytes(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // tunnel.frame_boundaries
 // =============================================================================
-// Rules: r[core.tunnel.frame-boundaries]
+// Rules: [verify core.tunnel.frame-boundaries]
 //
 // Frame boundaries in TUNNEL are transport artifacts, not semantic.
 
@@ -35,7 +35,7 @@ pub fn frame_boundaries(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // tunnel.ordering
 // =============================================================================
-// Rules: r[core.tunnel.ordering]
+// Rules: [verify core.tunnel.ordering]
 //
 // Tunnel data is delivered in order.
 
@@ -47,7 +47,7 @@ pub fn ordering(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // tunnel.reliability
 // =============================================================================
-// Rules: r[core.tunnel.reliability]
+// Rules: [verify core.tunnel.reliability]
 //
 // Tunnel provides reliable delivery (no loss, no duplication).
 
@@ -59,7 +59,7 @@ pub fn reliability(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // tunnel.semantics
 // =============================================================================
-// Rules: r[core.tunnel.semantics]
+// Rules: [verify core.tunnel.semantics]
 //
 // EOS indicates half-close (like TCP FIN).
 
@@ -67,7 +67,7 @@ pub fn semantics(_peer: &mut Peer) -> TestResult {
     // Verify EOS flag exists and has correct value
     if flags::EOS != 0b0000_0100 {
         return TestResult::fail(format!(
-            "r[core.tunnel.semantics]: EOS flag should be 0x04, got {:#X}",
+            "[verify core.tunnel.semantics]: EOS flag should be 0x04, got {:#X}",
             flags::EOS
         ));
     }
@@ -77,14 +77,14 @@ pub fn semantics(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // tunnel.channel_kind
 // =============================================================================
-// Rules: r[core.channel.kind]
+// Rules: [verify core.channel.kind]
 //
 // ChannelKind::Tunnel should have correct value.
 
 pub fn channel_kind(_peer: &mut Peer) -> TestResult {
     if ChannelKind::Tunnel as u8 != 3 {
         return TestResult::fail(format!(
-            "r[core.channel.kind]: ChannelKind::Tunnel should be 3, got {}",
+            "[verify core.channel.kind]: ChannelKind::Tunnel should be 3, got {}",
             ChannelKind::Tunnel as u8
         ));
     }
@@ -94,7 +94,7 @@ pub fn channel_kind(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // tunnel.credits
 // =============================================================================
-// Rules: r[core.tunnel.credits]
+// Rules: [verify core.tunnel.credits]
 //
 // Tunnels use credit-based flow control like streams.
 
@@ -102,7 +102,7 @@ pub fn credits(_peer: &mut Peer) -> TestResult {
     // Verify CREDITS flag exists
     if flags::CREDITS != 0b0100_0000 {
         return TestResult::fail(format!(
-            "r[core.tunnel.credits]: CREDITS flag should be 0x40, got {:#X}",
+            "[verify core.tunnel.credits]: CREDITS flag should be 0x40, got {:#X}",
             flags::CREDITS
         ));
     }

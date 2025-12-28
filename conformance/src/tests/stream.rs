@@ -9,7 +9,7 @@ use crate::testcase::TestResult;
 // =============================================================================
 // stream.method_id_zero
 // =============================================================================
-// Rules: r[core.stream.frame.method-id-zero]
+// Rules: [verify core.stream.frame.method-id-zero]
 //
 // STREAM frames must have method_id = 0.
 
@@ -22,7 +22,7 @@ pub fn method_id_zero(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // stream.attachment_required
 // =============================================================================
-// Rules: r[core.stream.attachment], r[core.channel.open.attach-required]
+// Rules: [verify core.stream.attachment], [verify core.channel.open.attach-required]
 //
 // STREAM channels must be attached to a CALL channel.
 
@@ -49,7 +49,7 @@ pub fn attachment_required(_peer: &mut Peer) -> TestResult {
         || decoded.direction != Direction::ClientToServer
     {
         return TestResult::fail(
-            "r[core.stream.attachment]: AttachTo roundtrip failed".to_string(),
+            "[verify core.stream.attachment]: AttachTo roundtrip failed".to_string(),
         );
     }
 
@@ -59,7 +59,7 @@ pub fn attachment_required(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // stream.direction_values
 // =============================================================================
-// Rules: r[core.stream.bidir]
+// Rules: [verify core.stream.bidir]
 //
 // Direction enum should have correct values.
 
@@ -73,7 +73,7 @@ pub fn direction_values(_peer: &mut Peer) -> TestResult {
     for (actual, expected, name) in checks {
         if actual != expected {
             return TestResult::fail(format!(
-                "r[core.stream.bidir]: Direction::{} should be {}, got {}",
+                "[verify core.stream.bidir]: Direction::{} should be {}, got {}",
                 name, expected, actual
             ));
         }
@@ -85,7 +85,7 @@ pub fn direction_values(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // stream.ordering
 // =============================================================================
-// Rules: r[core.stream.ordering]
+// Rules: [verify core.stream.ordering]
 //
 // Stream items are delivered in order.
 
@@ -98,14 +98,14 @@ pub fn ordering(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // stream.channel_kind
 // =============================================================================
-// Rules: r[core.channel.kind]
+// Rules: [verify core.channel.kind]
 //
 // ChannelKind::Stream should have correct value.
 
 pub fn channel_kind(_peer: &mut Peer) -> TestResult {
     if ChannelKind::Stream as u8 != 2 {
         return TestResult::fail(format!(
-            "r[core.channel.kind]: ChannelKind::Stream should be 2, got {}",
+            "[verify core.channel.kind]: ChannelKind::Stream should be 2, got {}",
             ChannelKind::Stream as u8
         ));
     }

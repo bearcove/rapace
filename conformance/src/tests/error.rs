@@ -9,7 +9,7 @@ use crate::testcase::TestResult;
 // =============================================================================
 // error.status_codes
 // =============================================================================
-// Rules: r[error.impl.standard-codes]
+// Rules: [verify error.impl.standard-codes]
 //
 // Validates standard error code values.
 
@@ -39,7 +39,7 @@ pub fn status_codes(_peer: &mut Peer) -> TestResult {
     for (actual, expected, name) in checks {
         if actual != expected {
             return TestResult::fail(format!(
-                "r[error.impl.standard-codes]: {} should be {}, got {}",
+                "[verify error.impl.standard-codes]: {} should be {}, got {}",
                 name, expected, actual
             ));
         }
@@ -51,7 +51,7 @@ pub fn status_codes(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // error.protocol_codes
 // =============================================================================
-// Rules: r[error.impl.standard-codes]
+// Rules: [verify error.impl.standard-codes]
 //
 // Validates protocol error code values (50-99 range).
 
@@ -80,7 +80,7 @@ pub fn protocol_codes(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // error.status_success
 // =============================================================================
-// Rules: r[error.status.success]
+// Rules: [verify error.status.success]
 //
 // On success, status.code must be 0 and body must be present.
 
@@ -92,11 +92,11 @@ pub fn status_success(_peer: &mut Peer) -> TestResult {
     };
 
     if result.status.code != 0 {
-        return TestResult::fail("r[error.status.success]: success status.code should be 0");
+        return TestResult::fail("[verify error.status.success]: success status.code should be 0");
     }
 
     if result.body.is_none() {
-        return TestResult::fail("r[error.status.success]: success should have body");
+        return TestResult::fail("[verify error.status.success]: success should have body");
     }
 
     TestResult::pass()
@@ -105,7 +105,7 @@ pub fn status_success(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // error.status_error
 // =============================================================================
-// Rules: r[error.status.error]
+// Rules: [verify error.status.error]
 //
 // On error, status.code must not be 0 and body must be None.
 
@@ -117,11 +117,11 @@ pub fn status_error(_peer: &mut Peer) -> TestResult {
     };
 
     if result.status.code == 0 {
-        return TestResult::fail("r[error.status.error]: error status.code should not be 0");
+        return TestResult::fail("[verify error.status.error]: error status.code should not be 0");
     }
 
     if result.body.is_some() {
-        return TestResult::fail("r[error.status.error]: error should not have body");
+        return TestResult::fail("[verify error.status.error]: error should not have body");
     }
 
     TestResult::pass()
@@ -130,7 +130,7 @@ pub fn status_error(_peer: &mut Peer) -> TestResult {
 // =============================================================================
 // error.cancel_reasons
 // =============================================================================
-// Rules: r[core.cancel.behavior]
+// Rules: [verify core.cancel.behavior]
 //
 // Validates CancelReason enum values.
 
