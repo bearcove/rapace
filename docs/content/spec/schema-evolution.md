@@ -61,11 +61,8 @@ The identifier is the **canonical wire name** for the field/variant:
 - In Rust with Facet: the field name as declared (e.g., `user_id`)
 - Facet rename attributes (if any) override the default
 
-**Normalization rules**:
-- Identifiers are exact UTF-8 byte strings
-- Case-sensitive (`userId` ≠ `user_id` ≠ `UserId`)
-- No Unicode normalization (NFC/NFKD not applied)
-- Hashing uses the raw UTF-8 bytes
+r[schema.identifier.normalization]
+Identifiers MUST be exact UTF-8 byte strings. Identifiers are case-sensitive (`userId` ≠ `user_id` ≠ `UserId`). No Unicode normalization (NFC/NFKD) SHALL be applied. Hashing MUST use the raw UTF-8 bytes.
 
 **Tuple fields**: For tuple structs and tuple variants, implicit identifiers are used: `_0`, `_1`, `_2`, etc.
 
@@ -102,7 +99,8 @@ This enables:
 
 ## Hash Algorithm
 
-The schema hash uses BLAKE3 over a canonical serialization of the type shape.
+r[schema.hash.algorithm]
+The schema hash MUST use BLAKE3 over a canonical serialization of the type shape.
 
 ### Canonical Shape Serialization
 
