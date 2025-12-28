@@ -282,10 +282,16 @@ Implementations SHOULD impose a handshake timeout (recommended: 30 seconds). If 
 ### Failure
 
 r[handshake.failure]
-If handshake fails (version mismatch, required feature not supported, role conflict, non-Hello first frame), the peer that detects the failure MAY send a `CloseChannel` on channel 0 with an error reason string, MUST close the transport connection immediately after, and MUST NOT process any further frames.
+If handshake fails (version mismatch, required feature not supported, role conflict, non-Hello first frame), the peer that detects the failure:
+- MAY send a `CloseChannel` on channel 0 with an error reason string
+- MUST close the transport connection immediately after
+- MUST NOT process any further frames
 
 r[handshake.first-frame]
-If the first frame received on a new connection is not a `Hello` (i.e., `channel_id != 0` or `method_id != 0`), this is a handshake failure. The receiver SHOULD send `CloseChannel { channel_id: 0, reason: Error("expected Hello") }` if possible, MUST close the transport connection, and MUST NOT attempt to process the non-Hello frame.
+If the first frame received on a new connection is not a `Hello` (i.e., `channel_id != 0` or `method_id != 0`), this is a handshake failure. The receiver:
+- SHOULD send `CloseChannel { channel_id: 0, reason: Error("expected Hello") }` if possible
+- MUST close the transport connection
+- MUST NOT attempt to process the non-Hello frame
 
 r[handshake.explicit-required]
 Explicit handshake is a hard requirement for all compliance levels. There is no implicit handshake mode.

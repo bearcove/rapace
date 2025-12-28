@@ -32,7 +32,11 @@ Keys starting with `rapace.` are reserved for protocol-defined metadata. Applica
 ### Key Format
 
 r[metadata.key.format]
-Keys MUST be valid UTF-8 strings, be at most 256 bytes, contain only printable ASCII characters (0x21-0x7E) excluding `=` and whitespace, and not start with a digit.
+Keys MUST satisfy all of the following:
+- Be valid UTF-8 strings
+- Be at most 256 bytes
+- Contain only printable ASCII characters (0x21-0x7E) excluding `=` and whitespace
+- Not start with a digit
 
 r[metadata.key.standard-format]
 Standard keys (prefixed `rapace.`) MUST use only lowercase letters, digits, hyphens, underscores, and dots.
@@ -50,7 +54,10 @@ Implementations SHOULD use lowercase keys consistently for interoperability. Rec
 ### Duplicate Keys
 
 r[metadata.key.duplicates]
-If the same key appears multiple times in a metadata list, receivers MUST use the first occurrence (first-wins semantics). Subsequent occurrences of the same key SHOULD be ignored. Senders SHOULD NOT include duplicate keys.
+If the same key appears multiple times in a metadata list:
+- Receivers MUST use the first occurrence (first-wins semantics)
+- Subsequent occurrences SHOULD be ignored
+- Senders SHOULD NOT include duplicate keys
 
 This rule applies to `Hello.params`, `OpenChannel.metadata`, and `CallResult.trailers`.
 

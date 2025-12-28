@@ -59,7 +59,11 @@ When a call has a deadline:
 ### Deadline Exceeded Behavior
 
 r[cancel.deadline.exceeded]
-When `now() > deadline_ns`: senders SHOULD NOT send the request (fail immediately); receivers MUST stop processing and return `DEADLINE_EXCEEDED`; attached channels MUST be canceled; SHM slot guards MUST be dropped to free slots.
+When `now() > deadline_ns`:
+- Senders SHOULD NOT send the request (fail immediately)
+- Receivers MUST stop processing and return `DEADLINE_EXCEEDED`
+- Attached channels MUST be canceled
+- SHM slot guards MUST be dropped to free slots
 
 r[cancel.deadline.terminal]
 The `DEADLINE_EXCEEDED` error is terminal. The call cannot succeed after this point.
@@ -129,7 +133,12 @@ A stream may receive `EOS` from one side and `CancelChannel` from the other. `Ca
 ### SHM Slot Reclamation
 
 r[cancel.shm.reclaim]
-When a channel is canceled (or deadline exceeded): the receiver MUST drop all `SlotGuard`s for that channel; slots are freed back to the sender's pool; pending frames in the ring for that channel MAY be discarded without processing. This prevents slot leaks when requests are abandoned.
+When a channel is canceled (or deadline exceeded):
+- The receiver MUST drop all `SlotGuard`s for that channel
+- Slots are freed back to the sender's pool
+- Pending frames in the ring for that channel MAY be discarded without processing
+
+This prevents slot leaks when requests are abandoned.
 
 ### Pending Writes
 
@@ -148,7 +157,10 @@ r[cancel.ordering]
 Cancellation is asynchronous. There is no guarantee about ordering between `CancelChannel` on channel 0 and data frames on the canceled channel.
 
 r[cancel.ordering.handle]
-Implementations MUST handle: data frames arriving after `CancelChannel` (ignore them); `CancelChannel` arriving after `EOS` (no-op, already closed); multiple `CancelChannel` for the same channel (idempotent).
+Implementations MUST handle all of the following cases:
+- Data frames arriving after `CancelChannel`: these MUST be ignored
+- `CancelChannel` arriving after `EOS`: this is a no-op (already closed)
+- Multiple `CancelChannel` for the same channel: handling MUST be idempotent
 
 ## Client-Side Cancellation
 

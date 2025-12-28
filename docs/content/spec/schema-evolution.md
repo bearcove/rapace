@@ -62,7 +62,7 @@ The identifier is the **canonical wire name** for the field/variant:
 - Facet rename attributes (if any) override the default
 
 r[schema.identifier.normalization]
-Identifiers MUST be exact UTF-8 byte strings. Identifiers are case-sensitive (`userId` ≠ `user_id` ≠ `UserId`). No Unicode normalization (NFC/NFKD) SHALL be applied. Hashing MUST use the raw UTF-8 bytes.
+Identifiers MUST be exact UTF-8 byte strings. Identifiers are case-sensitive (`userId` ≠ `user_id` ≠ `UserId`). No Unicode normalization (NFC/NFKD) MUST be applied. Hashing MUST use the raw UTF-8 bytes.
 
 **Tuple fields**: For tuple structs and tuple variants, implicit identifiers are used: `_0`, `_1`, `_2`, etc.
 

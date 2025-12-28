@@ -39,8 +39,11 @@ Channel IDs MUST be 32-bit unsigned integers.
 r[core.channel.id.zero-reserved]
 Channel 0 MUST be reserved for control messages. Neither peer SHALL allocate channel 0 for application use.
 
-r[core.channel.id.parity]
-The initiator (connection opener) MUST use odd channel IDs (1, 3, 5, 7, ...). The acceptor (connection listener) MUST use even channel IDs (2, 4, 6, 8, ...).
+r[core.channel.id.parity.initiator]
+The initiator (connection opener) MUST use odd channel IDs (1, 3, 5, 7, ...).
+
+r[core.channel.id.parity.acceptor]
+The acceptor (connection listener) MUST use even channel IDs (2, 4, 6, 8, ...).
 
 Formula:
 - Initiator: `channel_id = 2*n + 1` for n = 0, 1, 2, ... (yields 1, 3, 5, ...)
@@ -253,7 +256,9 @@ fn fetch(req: FetchReq) -> (meta: FetchMeta, body: Stream<Chunk>);
 ```
 
 r[core.stream.port-id-assignment]
-Each `Stream<T>` in the method signature MUST be assigned a **port_id** by codegen. Request ports (client→server) MUST use IDs 1, 2, 3, ... (in declaration order). Response ports (server→client) MUST use IDs 101, 102, 103, ... (in declaration order).
+Each `Stream<T>` in the method signature MUST be assigned a **port_id** by codegen:
+- Request ports (client→server) MUST use IDs 1, 2, 3, ... (in declaration order)
+- Response ports (server→client) MUST use IDs 101, 102, 103, ... (in declaration order)
 
 ### Port References
 
@@ -346,8 +351,11 @@ Frame boundaries in TUNNEL channels are transport artifacts, NOT message boundar
 
 ### Ordering and Reliability
 
+r[core.tunnel.ordering]
+TUNNEL frames MUST be ordered within the channel.
+
 r[core.tunnel.reliability]
-TUNNEL frames MUST be ordered within the channel. TUNNEL channels MUST use reliable delivery; implementations MUST NOT use WebTransport datagrams for TUNNEL channels. Lost or reordered frames would corrupt the byte stream.
+TUNNEL channels MUST use reliable delivery. Implementations MUST NOT use WebTransport datagrams for TUNNEL channels. Lost or reordered frames would corrupt the byte stream.
 
 ### Flow Control
 
@@ -436,7 +444,10 @@ enum CancelReason {
 ```
 
 r[core.cancel.behavior]
-Upon receiving `CancelChannel`, implementations MUST stop work immediately, discard pending data, and wake waiters with an error. `CancelChannel` MUST be idempotent (multiple cancels for the same channel are harmless).
+Upon receiving `CancelChannel`, implementations MUST stop work immediately. They MUST discard pending data. They MUST wake waiters with an error.
+
+r[core.cancel.idempotent]
+`CancelChannel` MUST be idempotent (multiple cancels for the same channel are harmless).
 
 r[core.cancel.propagation]
 When a CALL channel is canceled, implementations MUST also cancel all attached stream/tunnel channels. When an attached channel is canceled, only that port is affected; the parent call MAY still complete if the port is optional.
@@ -472,8 +483,11 @@ If a required port is never opened before deadline:
 r[core.control.reserved]
 Channel 0 MUST be reserved for control messages.
 
-r[core.control.flag-rule]
-The `CONTROL` flag MUST be set on all frames with `channel_id == 0`, and MUST NOT be set on any other channel. This redundancy allows fast filtering without inspecting `channel_id`.
+r[core.control.flag-set]
+The `CONTROL` flag MUST be set on all frames with `channel_id == 0`.
+
+r[core.control.flag-clear]
+The `CONTROL` flag MUST NOT be set on any channel other than 0. This redundancy allows fast filtering without inspecting `channel_id`.
 
 r[core.control.verb-selector]
 Control frames MUST use the `method_id` field as a verb selector from the table below.

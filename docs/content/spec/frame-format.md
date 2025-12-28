@@ -199,7 +199,10 @@ For shared memory transports, the payload is stored in a slot within the shared 
 4. **Receiver** drops the guard → slot is freed back to the sender's pool
 
 r[frame.shm.slot-guard]
-The `SlotGuard` MUST ensure that payload bytes are valid for the lifetime of the guard, the slot cannot be reused until the guard is dropped, and the generation counter prevents ABA problems.
+The `SlotGuard` MUST ensure:
+- Payload bytes remain valid for the lifetime of the guard
+- The slot cannot be reused until the guard is dropped
+- The generation counter prevents ABA problems
 
 r[frame.shm.borrow-required]
 Receivers MUST be able to borrow payload data without copying. Copying is permitted only if the application explicitly requests ownership.
@@ -224,7 +227,10 @@ Empty payloads (`payload_len = 0`) MUST be valid. Implementations MUST set `payl
 ## Descriptor Encoding on Wire
 
 r[frame.desc.encoding]
-The 64-byte `MsgDescHot` MUST be encoded as raw bytes (NOT Postcard-encoded). All fields MUST be little-endian. There MUST be no padding between fields. The total size MUST be exactly 64 bytes.
+The 64-byte `MsgDescHot` MUST be encoded as raw bytes (NOT Postcard-encoded):
+- All fields MUST be little-endian
+- There MUST be no padding between fields
+- The total size MUST be exactly 64 bytes
 
 This allows direct memory mapping on SHM, single memcpy for stream transports, and predictable offset calculations.
 
