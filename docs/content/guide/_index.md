@@ -23,6 +23,5 @@ For the formal protocol definition, see the [Specification](/spec/).
 
 - [Motivation](motivation.md) — why rapace exists (dodeca's plugin system)
 - [Comparisons](comparisons.md) — how this relates to gRPC, Cap'n Proto, etc.
-- [Future directions](future.md) — planned improvements
 
 For API details, see the [crate documentation on docs.rs](https://docs.rs/rapace).
