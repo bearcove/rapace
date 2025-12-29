@@ -10,27 +10,7 @@ status-level = "pass"
 
 # Exclude coverage tests from default runs - they track spec compliance gaps
 # Run them explicitly with: cargo nextest run -p rapace-conformance --test coverage
-#
-# Also exclude conformance tests for features not yet implemented in rapace-core:
-# - cancel.cancel_idempotent: CancelChannel on non-existent channel should be ignored
-# - cancel.cancel_impl_idempotent: Same as above
-# - cancel.cancel_impl_support: CancelChannel support not fully implemented
-# - channel.id_zero_reserved: Sending data on channel 0 should be rejected
-# - channel.open_required_before_data: Data before OpenChannel should be rejected
-# - control.ping_pong: Ping/Pong not implemented
-# - control.unknown_extension_verb: Unknown extension verbs should be ignored
-# - handshake.missing_hello: Meta-test that expects non-compliant behavior
-default-filter = '''
-    not (package(rapace-conformance) & test(/^rule\./))
-    & not test(/^cancel\.cancel_idempotent$/)
-    & not test(/^cancel\.cancel_impl_idempotent$/)
-    & not test(/^cancel\.cancel_impl_support$/)
-    & not test(/^channel\.id_zero_reserved$/)
-    & not test(/^channel\.open_required_before_data$/)
-    & not test(/^control\.ping_pong$/)
-    & not test(/^control\.unknown_extension_verb$/)
-    & not test(/^handshake\.missing_hello$/)
-''' 
+default-filter = 'not (package(rapace-conformance) & test(/^rule\./))' 
 
 # Pre-build helper binaries before running tests
 [scripts.setup.build-helpers]

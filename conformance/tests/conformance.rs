@@ -968,6 +968,241 @@ async fn run_channel_close_semantics(bin_path: &str) -> Result<(), String> {
     }
 }
 
+/// Run control.ping_pong test.
+///
+/// The harness sends Ping after handshake. We need to run the session to handle it.
+async fn run_control_ping_pong(bin_path: &str) -> Result<(), String> {
+    let (child, transport) = spawn_harness(bin_path, "control.ping_pong").await?;
+
+    // 1. Send Hello as initiator
+    send_hello(&transport).await?;
+
+    // 2. Receive Hello from harness
+    recv_hello(&transport).await?;
+
+    // 3. Create RpcSession and run it - the session handles Ping/Pong automatically
+    let session = Arc::new(RpcSession::new(transport));
+    let session_clone = session.clone();
+    let run_handle = tokio::spawn(async move {
+        let _ = session_clone.run().await;
+    });
+
+    // Wait for harness to complete (it will send Ping, we respond with Pong)
+    let output = child
+        .wait_with_output()
+        .await
+        .map_err(|e| format!("failed to wait for child: {}", e))?;
+
+    session.close();
+    run_handle.abort();
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!("conformance test failed: {}", stderr))
+    }
+}
+
+/// Run control.unknown_extension_verb test.
+///
+/// The harness sends unknown control verb (200+), then Ping. We should ignore the
+/// unknown verb and respond to Ping with Pong.
+async fn run_control_unknown_extension_verb(bin_path: &str) -> Result<(), String> {
+    let (child, transport) = spawn_harness(bin_path, "control.unknown_extension_verb").await?;
+
+    // 1. Send Hello as initiator
+    send_hello(&transport).await?;
+
+    // 2. Receive Hello from harness
+    recv_hello(&transport).await?;
+
+    // 3. Create RpcSession and run it - the session handles control frames
+    let session = Arc::new(RpcSession::new(transport));
+    let session_clone = session.clone();
+    let run_handle = tokio::spawn(async move {
+        let _ = session_clone.run().await;
+    });
+
+    // Wait for harness to complete
+    let output = child
+        .wait_with_output()
+        .await
+        .map_err(|e| format!("failed to wait for child: {}", e))?;
+
+    session.close();
+    run_handle.abort();
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!("conformance test failed: {}", stderr))
+    }
+}
+
+/// Run cancel.cancel_idempotent test.
+///
+/// The harness sends CancelChannel twice for the same (non-existent) channel,
+/// then Ping. We should accept both CancelChannels and respond to Ping.
+async fn run_cancel_idempotent(bin_path: &str) -> Result<(), String> {
+    let (child, transport) = spawn_harness(bin_path, "cancel.cancel_idempotent").await?;
+
+    // 1. Send Hello as initiator
+    send_hello(&transport).await?;
+
+    // 2. Receive Hello from harness
+    recv_hello(&transport).await?;
+
+    // 3. Create RpcSession and run it
+    let session = Arc::new(RpcSession::new(transport));
+    let session_clone = session.clone();
+    let run_handle = tokio::spawn(async move {
+        let _ = session_clone.run().await;
+    });
+
+    // Wait for harness to complete
+    let output = child
+        .wait_with_output()
+        .await
+        .map_err(|e| format!("failed to wait for child: {}", e))?;
+
+    session.close();
+    run_handle.abort();
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!("conformance test failed: {}", stderr))
+    }
+}
+
+/// Run cancel.cancel_impl_idempotent test (same as cancel.cancel_idempotent).
+async fn run_cancel_impl_idempotent(bin_path: &str) -> Result<(), String> {
+    let (child, transport) = spawn_harness(bin_path, "cancel.cancel_impl_idempotent").await?;
+
+    send_hello(&transport).await?;
+    recv_hello(&transport).await?;
+
+    let session = Arc::new(RpcSession::new(transport));
+    let session_clone = session.clone();
+    let run_handle = tokio::spawn(async move {
+        let _ = session_clone.run().await;
+    });
+
+    let output = child
+        .wait_with_output()
+        .await
+        .map_err(|e| format!("failed to wait for child: {}", e))?;
+
+    session.close();
+    run_handle.abort();
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!("conformance test failed: {}", stderr))
+    }
+}
+
+/// Run cancel.cancel_impl_support test.
+///
+/// The harness sends CancelChannel for a non-existent channel and expects
+/// the connection to stay open.
+async fn run_cancel_impl_support(bin_path: &str) -> Result<(), String> {
+    let (child, transport) = spawn_harness(bin_path, "cancel.cancel_impl_support").await?;
+
+    send_hello(&transport).await?;
+    recv_hello(&transport).await?;
+
+    let session = Arc::new(RpcSession::new(transport));
+    let session_clone = session.clone();
+    let run_handle = tokio::spawn(async move {
+        let _ = session_clone.run().await;
+    });
+
+    let output = child
+        .wait_with_output()
+        .await
+        .map_err(|e| format!("failed to wait for child: {}", e))?;
+
+    session.close();
+    run_handle.abort();
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!("conformance test failed: {}", stderr))
+    }
+}
+
+/// Run channel.id_zero_reserved test.
+///
+/// The harness sends OpenChannel with channel_id=0. We should respond with
+/// CancelChannel to reject it.
+async fn run_channel_id_zero_reserved(bin_path: &str) -> Result<(), String> {
+    let (child, transport) = spawn_harness(bin_path, "channel.id_zero_reserved").await?;
+
+    send_hello(&transport).await?;
+    recv_hello(&transport).await?;
+
+    let session = Arc::new(RpcSession::new(transport));
+    let session_clone = session.clone();
+    let run_handle = tokio::spawn(async move {
+        let _ = session_clone.run().await;
+    });
+
+    let output = child
+        .wait_with_output()
+        .await
+        .map_err(|e| format!("failed to wait for child: {}", e))?;
+
+    session.close();
+    run_handle.abort();
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!("conformance test failed: {}", stderr))
+    }
+}
+
+/// Run channel.open_required_before_data test.
+///
+/// The harness sends data on an unopened channel. We should respond with
+/// CancelChannel or GoAway.
+async fn run_channel_open_required_before_data(bin_path: &str) -> Result<(), String> {
+    let (child, transport) = spawn_harness(bin_path, "channel.open_required_before_data").await?;
+
+    send_hello(&transport).await?;
+    recv_hello(&transport).await?;
+
+    let session = Arc::new(RpcSession::new(transport));
+    let session_clone = session.clone();
+    let run_handle = tokio::spawn(async move {
+        let _ = session_clone.run().await;
+    });
+
+    let output = child
+        .wait_with_output()
+        .await
+        .map_err(|e| format!("failed to wait for child: {}", e))?;
+
+    session.close();
+    run_handle.abort();
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!("conformance test failed: {}", stderr))
+    }
+}
+
 /// Generic test runner for tests that just need Hello exchange.
 /// The harness validates the frames we send.
 async fn run_hello_based_test(bin_path: &str, test_name: &str) -> Result<(), String> {
@@ -1099,12 +1334,15 @@ fn main() {
     add_hello_test!("channel.id_allocation_monotonic");
     add_hello_test!("channel.open_cancel_on_violation");
     add_hello_test!("channel.close_full");
-    add_hello_test!("channel.open_required_before_data");
+    add_test!(
+        "channel.open_required_before_data",
+        run_channel_open_required_before_data
+    );
     add_hello_test!("channel.id_no_reuse");
     add_hello_test!("channel.parity_acceptor_even");
     add_hello_test!("channel.open_call_validation");
     add_hello_test!("channel.open_attach_validation");
-    add_hello_test!("channel.id_zero_reserved");
+    add_test!("channel.id_zero_reserved", run_channel_id_zero_reserved);
     add_hello_test!("channel.open_ownership");
     add_hello_test!("channel.goaway_after_send");
     add_hello_test!("channel.close_state_free");
@@ -1195,7 +1433,7 @@ fn main() {
     add_hello_test!("langmap.enum_discriminant");
 
     // Cancellation tests
-    add_hello_test!("cancel.cancel_impl_idempotent");
+    add_test!("cancel.cancel_impl_idempotent", run_cancel_impl_idempotent);
     add_hello_test!("cancel.cancel_ordering_handle");
     add_hello_test!("cancel.deadline_rounding");
     add_hello_test!("cancel.cancel_shm_reclaim");
@@ -1206,13 +1444,13 @@ fn main() {
     add_hello_test!("cancel.deadline_terminal");
     add_hello_test!("cancel.cancel_ordering");
     add_hello_test!("cancel.cancel_propagation");
-    add_hello_test!("cancel.cancel_impl_support");
+    add_test!("cancel.cancel_impl_support", run_cancel_impl_support);
     add_hello_test!("cancel.reason_values");
     add_hello_test!("cancel.deadline_expired");
     add_hello_test!("cancel.cancel_impl_error_response");
     add_hello_test!("cancel.cancel_impl_ignore_data");
     add_hello_test!("cancel.deadline_field");
-    add_hello_test!("cancel.cancel_idempotent");
+    add_test!("cancel.cancel_idempotent", run_cancel_idempotent);
     add_hello_test!("cancel.deadline_clock");
     add_hello_test!("cancel.deadline_stream");
     add_hello_test!("cancel.cancel_precedence");
@@ -1270,7 +1508,10 @@ fn main() {
     // More handshake tests
     add_hello_test!("handshake.timeout");
     add_hello_test!("handshake.role_conflict");
-    add_hello_test!("handshake.missing_hello");
+    // NOTE: handshake.missing_hello is NOT run because it's a meta-test that
+    // expects the implementation to send an invalid first frame (not Hello).
+    // A compliant implementation correctly sends Hello, so this test would fail.
+    // This test validates the harness can detect violations, not the implementation.
     add_hello_test!("handshake.explicit_required");
     add_hello_test!("handshake.version_mismatch");
     add_hello_test!("handshake.required_features_missing");
@@ -1299,8 +1540,11 @@ fn main() {
     // More control tests
     add_hello_test!("control.unknown_reserved_verb");
     add_hello_test!("control.goaway_last_channel_id");
-    add_hello_test!("control.ping_pong");
-    add_hello_test!("control.unknown_extension_verb");
+    add_test!("control.ping_pong", run_control_ping_pong);
+    add_test!(
+        "control.unknown_extension_verb",
+        run_control_unknown_extension_verb
+    );
 
     libtest_mimic::run(&args, trials).exit();
 }
