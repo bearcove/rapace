@@ -842,6 +842,132 @@ async fn run_control_flag_clear_on_other_channels(bin_path: &str) -> Result<(), 
     }
 }
 
+/// Run channel.lifecycle test.
+///
+/// Tests the channel lifecycle: Open -> Active -> HalfClosed -> Closed.
+/// Harness opens a channel, sends EOS, expects EOS back.
+async fn run_channel_lifecycle(bin_path: &str) -> Result<(), String> {
+    let (child, transport) = spawn_harness(bin_path, "channel.lifecycle").await?;
+
+    // 1. Send Hello as initiator
+    send_hello(&transport).await?;
+
+    // 2. Receive Hello response
+    recv_hello(&transport).await?;
+
+    // The harness will:
+    // 1. Send OpenChannel with even ID (as acceptor)
+    // 2. Send DATA|EOS
+    // 3. Expect DATA|EOS response
+
+    // We need to receive the OpenChannel and respond appropriately
+    // Let's receive frames and respond
+
+    // Receive OpenChannel
+    let frame = transport
+        .recv_frame()
+        .await
+        .map_err(|e| format!("failed to receive OpenChannel: {}", e))?;
+
+    if frame.desc.method_id != control_verb::OPEN_CHANNEL {
+        return Err(format!(
+            "expected OpenChannel, got method_id={}",
+            frame.desc.method_id
+        ));
+    }
+
+    let open: OpenChannel = facet_format_postcard::from_slice(frame.payload_bytes())
+        .map_err(|e| format!("failed to decode OpenChannel: {}", e))?;
+
+    let channel_id = open.channel_id;
+    trace!(channel_id, "received OpenChannel from harness");
+
+    // Receive DATA|EOS
+    let frame = transport
+        .recv_frame()
+        .await
+        .map_err(|e| format!("failed to receive data: {}", e))?;
+
+    if frame.desc.channel_id != channel_id {
+        return Err(format!(
+            "data on wrong channel: expected {}, got {}",
+            channel_id, frame.desc.channel_id
+        ));
+    }
+
+    if !frame.desc.flags.contains(FrameFlags::EOS) {
+        return Err("expected EOS flag in request".to_string());
+    }
+
+    trace!("received DATA|EOS, sending response");
+
+    // Send DATA|EOS response
+    let mut desc = MsgDescHot::new();
+    desc.msg_id = 10;
+    desc.channel_id = channel_id;
+    desc.method_id = 0;
+    desc.flags = FrameFlags::RESPONSE | FrameFlags::DATA | FrameFlags::EOS;
+
+    let response_payload = b"response";
+    desc.payload_slot = INLINE_PAYLOAD_SLOT;
+    desc.payload_len = response_payload.len() as u32;
+    desc.inline_payload[..response_payload.len()].copy_from_slice(response_payload);
+
+    let response_frame = Frame {
+        desc,
+        payload: Payload::Inline,
+    };
+
+    transport
+        .send_frame(response_frame)
+        .await
+        .map_err(|e| format!("failed to send response: {}", e))?;
+
+    let output = child
+        .wait_with_output()
+        .await
+        .map_err(|e| format!("failed to wait for child: {}", e))?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!("conformance test failed: {}", stderr))
+    }
+}
+
+/// Run channel.close_semantics test.
+///
+/// Tests that CloseChannel is unilateral - no ack required.
+async fn run_channel_close_semantics(bin_path: &str) -> Result<(), String> {
+    let (child, transport) = spawn_harness(bin_path, "channel.close_semantics").await?;
+
+    // 1. Send Hello as initiator
+    send_hello(&transport).await?;
+
+    // 2. Receive Hello response
+    recv_hello(&transport).await?;
+
+    // The harness will:
+    // 1. Send OpenChannel
+    // 2. Send CloseChannel
+    // No response expected - CloseChannel is unilateral
+
+    // Just let it run - the harness passes if we don't break
+
+    let output = child
+        .wait_with_output()
+        .await
+        .map_err(|e| format!("failed to wait for child: {}", e))?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!("conformance test failed: {}", stderr))
+    }
+}
+
 fn main() {
     let args = Arguments::from_args();
 
@@ -885,6 +1011,12 @@ fn main() {
         "control.flag_clear_on_other_channels",
         run_control_flag_clear_on_other_channels
     );
+
+    // Channel tests
+    // NOTE: channel.parity_acceptor_even is skipped - harness blocks on try_recv
+    // and we can't close the transport to unblock it
+    add_test!("channel.lifecycle", run_channel_lifecycle);
+    add_test!("channel.close_semantics", run_channel_close_semantics);
 
     libtest_mimic::run(&args, trials).exit();
 }
