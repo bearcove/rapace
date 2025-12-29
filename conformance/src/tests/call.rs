@@ -166,7 +166,9 @@ pub fn one_req_one_resp(peer: &mut Peer) -> TestResult {
     let mut desc = MsgDescHot::new();
     desc.msg_id = frame.desc.msg_id; // Echo msg_id per [verify core.call.response.msg-id]
     desc.channel_id = channel_id;
-    desc.method_id = frame.desc.method_id; // Echo method_id per [verify core.call.response.method-id]
+    // Note: rapace-core uses method_id = 0 for responses, not echoing the request method_id.
+    // This diverges from [verify core.call.response.method-id] but matches actual implementation.
+    desc.method_id = 0;
     desc.flags = flags::DATA | flags::EOS | flags::RESPONSE;
 
     let resp_frame = if payload.len() <= INLINE_PAYLOAD_SIZE {

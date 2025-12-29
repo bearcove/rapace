@@ -1,28 +1,22 @@
 //! Conformance tests using real rapace-core implementation.
 //!
-//! This test harness runs all conformance tests from the rapace-conformance binary.
+//! This test harness runs conformance tests from the rapace-conformance binary.
 //! It spawns the conformance harness and connects to it using a real StreamTransport,
 //! letting rapace-core handle the protocol.
 
-use libtest_mimic::{Arguments, Failed, Trial};
 use std::process::Stdio;
+use std::sync::Arc;
+
+use libtest_mimic::{Arguments, Failed, Trial};
 use tokio::process::{Child, Command as TokioCommand};
 use tracing::trace;
 
-use facet::Facet;
 use rapace_core::stream::StreamTransport;
-use rapace_core::{BufferPool, Frame, FrameFlags, MsgDescHot, Payload, Transport};
+use rapace_core::{BufferPool, Frame, FrameFlags, MsgDescHot, Payload, RpcSession, Transport};
 use rapace_protocol::{
-    Hello, INLINE_PAYLOAD_SIZE, INLINE_PAYLOAD_SLOT, Limits, PROTOCOL_VERSION_1_0, Role,
-    control_verb, features, flags,
+    ChannelKind, Hello, INLINE_PAYLOAD_SIZE, INLINE_PAYLOAD_SLOT, Limits, OpenChannel,
+    PROTOCOL_VERSION_1_0, Role, control_verb, features, flags,
 };
-
-/// Test case from the conformance binary.
-#[derive(Facet)]
-struct TestCase {
-    name: String,
-    rules: Vec<String>,
-}
 
 /// Wrapper to make ChildStdin/ChildStdout work with StreamTransport.
 struct ChildIo {
@@ -73,7 +67,7 @@ async fn spawn_harness(
         .args(["--case", test_case])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
+        .stderr(Stdio::piped()) // Capture stderr so we can see harness errors
         .spawn()
         .map_err(|e| format!("failed to spawn conformance binary: {}", e))?;
 
@@ -176,7 +170,7 @@ async fn recv_hello(transport: &StreamTransport) -> Result<(), String> {
 }
 
 /// Run the handshake.valid_hello_exchange test.
-async fn run_handshake_test(bin_path: &str) -> Result<(), String> {
+async fn run_handshake_valid_hello_exchange(bin_path: &str) -> Result<(), String> {
     let (mut child, transport) = spawn_harness(bin_path, "handshake.valid_hello_exchange").await?;
 
     // Send our Hello as initiator
@@ -203,20 +197,167 @@ async fn run_handshake_test(bin_path: &str) -> Result<(), String> {
     }
 }
 
+/// Send an OpenChannel control message.
+async fn send_open_channel(
+    transport: &StreamTransport,
+    channel_id: u32,
+    kind: ChannelKind,
+) -> Result<(), String> {
+    let open = OpenChannel {
+        channel_id,
+        kind,
+        attach: None,
+        metadata: vec![],
+        initial_credits: 1024 * 1024,
+    };
+
+    let payload = facet_format_postcard::to_vec(&open)
+        .map_err(|e| format!("failed to encode OpenChannel: {}", e))?;
+
+    let mut desc = MsgDescHot::new();
+    desc.msg_id = 2; // After Hello
+    desc.channel_id = 0; // Control channel
+    desc.method_id = control_verb::OPEN_CHANNEL;
+    desc.flags = FrameFlags::from_bits_truncate(flags::CONTROL);
+
+    let frame = if payload.len() <= INLINE_PAYLOAD_SIZE {
+        desc.payload_slot = INLINE_PAYLOAD_SLOT;
+        desc.payload_len = payload.len() as u32;
+        desc.inline_payload[..payload.len()].copy_from_slice(&payload);
+        Frame {
+            desc,
+            payload: Payload::Inline,
+        }
+    } else {
+        desc.payload_slot = 0;
+        desc.payload_len = payload.len() as u32;
+        Frame {
+            desc,
+            payload: Payload::Owned(payload),
+        }
+    };
+
+    transport
+        .send_frame(frame)
+        .await
+        .map_err(|e| format!("failed to send OpenChannel: {}", e))
+}
+
+/// Run the call.one_req_one_resp test using RpcSession.
+///
+/// This tests that RpcSession.call() properly sends frames and receives responses.
+async fn run_call_one_req_one_resp(bin_path: &str) -> Result<(), String> {
+    let (child, transport) = spawn_harness(bin_path, "call.one_req_one_resp").await?;
+
+    // 1. Send Hello (RpcSession doesn't do this)
+    send_hello(&transport).await?;
+    trace!("sent Hello");
+
+    // 2. Receive Hello response
+    recv_hello(&transport).await?;
+    trace!("received Hello response");
+
+    // 3. Send OpenChannel for channel 1 (RpcSession doesn't do this either)
+    // RpcSession starts channel IDs at 1 (odd = initiator)
+    let channel_id = 1u32;
+    send_open_channel(&transport, channel_id, ChannelKind::Call).await?;
+    trace!(channel_id, "sent OpenChannel");
+
+    // 4. Create RpcSession and use it to make the call
+    // The session will send DATA|EOS and wait for response
+    let session = Arc::new(RpcSession::new(transport));
+
+    // Spawn the run loop to receive the response
+    let session_clone = session.clone();
+    let run_handle = tokio::spawn(async move {
+        let _ = session_clone.run().await;
+    });
+
+    // Make the call on the channel we already opened
+    let method_id = rapace_protocol::compute_method_id("Test", "echo");
+    let response = session
+        .call(channel_id, method_id, b"test request".to_vec())
+        .await
+        .map_err(|e| format!("call failed: {:?}", e))?;
+
+    trace!(
+        channel_id = response.channel_id(),
+        method_id = response.method_id(),
+        flags = ?response.flags(),
+        "received response via RpcSession"
+    );
+
+    // Validate response
+    if response.channel_id() != channel_id {
+        return Err(format!(
+            "response on wrong channel: expected {}, got {}",
+            channel_id,
+            response.channel_id()
+        ));
+    }
+
+    if !response.flags().contains(FrameFlags::RESPONSE) {
+        return Err("response missing RESPONSE flag".to_string());
+    }
+
+    // Clean up
+    session.close();
+    run_handle.abort();
+
+    let output = child
+        .wait_with_output()
+        .await
+        .map_err(|e| format!("failed to wait for child: {}", e))?;
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if !stderr.is_empty() {
+        trace!("harness stderr: {}", stderr);
+    }
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "conformance test failed with exit code {:?}, stderr: {}",
+            output.status.code(),
+            stderr
+        ))
+    }
+}
+
 fn main() {
     let args = Arguments::from_args();
 
     // Get the path to the conformance binary
     let conformance_bin = env!("CARGO_BIN_EXE_rapace-conformance");
 
-    // Create tokio runtime
-    let rt = tokio::runtime::Runtime::new().expect("failed to create runtime");
+    let mut trials = Vec::new();
 
-    // For now, just test the one handshake test
-    let bin_path = conformance_bin.to_string();
-    let trial = Trial::test("handshake.valid_hello_exchange", move || {
-        rt.block_on(async { run_handshake_test(&bin_path).await.map_err(Failed::from) })
-    });
+    // handshake.valid_hello_exchange
+    {
+        let bin_path = conformance_bin.to_string();
+        trials.push(Trial::test("handshake.valid_hello_exchange", move || {
+            let rt = tokio::runtime::Runtime::new().expect("failed to create runtime");
+            rt.block_on(async {
+                run_handshake_valid_hello_exchange(&bin_path)
+                    .await
+                    .map_err(Failed::from)
+            })
+        }));
+    }
 
-    libtest_mimic::run(&args, vec![trial]).exit();
+    // call.one_req_one_resp
+    {
+        let bin_path = conformance_bin.to_string();
+        trials.push(Trial::test("call.one_req_one_resp", move || {
+            let rt = tokio::runtime::Runtime::new().expect("failed to create runtime");
+            rt.block_on(async {
+                run_call_one_req_one_resp(&bin_path)
+                    .await
+                    .map_err(Failed::from)
+            })
+        }));
+    }
+
+    libtest_mimic::run(&args, trials).exit();
 }
