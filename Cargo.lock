@@ -1921,10 +1921,12 @@ name = "rapace-conformance"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "facet",
  "facet-format-postcard",
+ "facet-json",
  "libtest-mimic",
  "rapace-protocol",
- "serde_json",
+ "regex",
 ]
 
 [[package]]

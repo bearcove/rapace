@@ -17,14 +17,23 @@ path = "src/main.rs"
 
 [dependencies]
 rapace-protocol.workspace = true
+facet.workspace = true
+facet-json.workspace = true
 facet-format-postcard.workspace = true
 clap = { version = "4", features = ["derive"] }
-serde_json = "1"
 
 [dev-dependencies]
+facet.workspace = true
+facet-json.workspace = true
 libtest-mimic = "0.8"
+regex = "1"
 
 [[test]]
 name = "conformance"
 path = "tests/conformance.rs"
+harness = false
+
+[[test]]
+name = "coverage"
+path = "tests/coverage.rs"
 harness = false

@@ -3,8 +3,24 @@
 //! This test harness discovers all conformance tests from the binary
 //! and runs them as individual Rust tests.
 
+use facet::Facet;
 use libtest_mimic::{Arguments, Failed, Trial};
 use std::process::Command;
+
+/// Test case from the conformance binary.
+#[derive(Facet)]
+struct TestCase {
+    name: String,
+    rules: Vec<String>,
+}
+
+/// Test result from the conformance binary.
+#[derive(Facet)]
+struct TestResult {
+    test: String,
+    passed: bool,
+    error: Option<String>,
+}
 
 fn main() {
     let args = Arguments::from_args();
@@ -26,20 +42,14 @@ fn main() {
         std::process::exit(1);
     }
 
-    let tests: Vec<serde_json::Value> =
-        serde_json::from_slice(&output.stdout).expect("failed to parse test list");
+    let json_str = String::from_utf8_lossy(&output.stdout);
+    let tests: Vec<TestCase> = facet_json::from_str(&json_str).expect("failed to parse test list");
 
     // Create a Trial for each test
     let trials: Vec<Trial> = tests
         .into_iter()
         .map(|test| {
-            let name = test["name"].as_str().unwrap().to_string();
-            let _rules: Vec<String> = test["rules"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|r| r.as_str().unwrap().to_string())
-                .collect();
+            let name = test.name;
 
             let bin_path = conformance_bin.to_string();
 
@@ -77,13 +87,14 @@ fn run_structural_test(bin_path: &str, test_name: &str) -> Result<(), Failed> {
         .output()
         .map_err(|e| Failed::from(format!("failed to run test: {}", e)))?;
 
-    let result: serde_json::Value = serde_json::from_slice(&output.stdout)
+    let json_str = String::from_utf8_lossy(&output.stdout);
+    let result: TestResult = facet_json::from_str(&json_str)
         .map_err(|e| Failed::from(format!("failed to parse result: {}", e)))?;
 
-    if result["passed"].as_bool() == Some(true) {
+    if result.passed {
         Ok(())
     } else {
-        let error = result["error"].as_str().unwrap_or("unknown error");
+        let error = result.error.as_deref().unwrap_or("unknown error");
         Err(Failed::from(error.to_string()))
     }
 }

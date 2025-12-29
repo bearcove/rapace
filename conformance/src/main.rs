@@ -32,6 +32,7 @@
 //! - 2: Internal error (bug in peer)
 
 use clap::Parser;
+use facet::Facet;
 use rapace_conformance::tests;
 
 #[derive(Parser, Debug)]
@@ -59,6 +60,21 @@ struct Args {
     format: String,
 }
 
+/// JSON output for a test case listing.
+#[derive(Facet)]
+struct TestCaseJson {
+    name: String,
+    rules: Vec<String>,
+}
+
+/// JSON output for a test result.
+#[derive(Facet)]
+struct TestResultJson {
+    test: String,
+    passed: bool,
+    error: Option<String>,
+}
+
 fn main() {
     let args = Args::parse();
 
@@ -84,16 +100,14 @@ fn list_tests(args: &Args) {
     };
 
     if args.format == "json" {
-        let output: Vec<_> = tests
+        let output: Vec<TestCaseJson> = tests
             .iter()
-            .map(|(name, rules)| {
-                serde_json::json!({
-                    "name": name,
-                    "rules": rules,
-                })
+            .map(|(name, rules)| TestCaseJson {
+                name: name.clone(),
+                rules: rules.iter().map(|s| s.to_string()).collect(),
             })
             .collect();
-        println!("{}", serde_json::to_string_pretty(&output).unwrap());
+        println!("{}", facet_json::to_string(&output));
     } else {
         println!("Available test cases:\n");
 
@@ -130,12 +144,12 @@ fn run_test(case: &str, args: &Args) {
     let result = tests::run(case);
 
     if args.format == "json" {
-        let output = serde_json::json!({
-            "test": case,
-            "passed": result.passed,
-            "error": result.error,
-        });
-        println!("{}", serde_json::to_string(&output).unwrap());
+        let output = TestResultJson {
+            test: case.to_string(),
+            passed: result.passed,
+            error: result.error.clone(),
+        };
+        println!("{}", facet_json::to_string(&output));
     } else if !result.passed
         && let Some(error) = &result.error
     {
