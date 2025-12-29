@@ -37,7 +37,7 @@ fn main() {
     // Get covered rules from conformance harness and implementation annotations
     let covered = get_covered_rules();
 
-    // Create a test for each rule - NO IGNORING, let them fail
+    // Create a test for each rule
     let trials: Vec<Trial> = rules
         .into_iter()
         .map(|rule_id| {
@@ -79,17 +79,17 @@ fn extract_rules_from_spec(spec_dir: &Path) -> Vec<String> {
             let path = entry.path();
             if path.is_dir() {
                 walk_md_files(&path, rules);
-            } else if path.extension().is_some_and(|e| e == "md") {
-                if let Ok(content) = fs::read_to_string(&path) {
-                    match MarkdownProcessor::process(&content) {
-                        Ok(processed) => {
-                            for rule in processed.rules {
-                                rules.push(rule.id);
-                            }
+            } else if path.extension().is_some_and(|e| e == "md")
+                && let Ok(content) = fs::read_to_string(&path)
+            {
+                match MarkdownProcessor::process(&content) {
+                    Ok(processed) => {
+                        for rule in processed.rules {
+                            rules.push(rule.id);
                         }
-                        Err(e) => {
-                            eprintln!("Warning: failed to process {:?}: {}", path, e);
-                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Warning: failed to process {:?}: {}", path, e);
                     }
                 }
             }
