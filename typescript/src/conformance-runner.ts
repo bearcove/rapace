@@ -9,7 +9,6 @@
 import { spawn, ChildProcess } from "child_process";
 import { MsgDescHot, MSG_DESC_HOT_SIZE, INLINE_PAYLOAD_SLOT } from "./rapace/msg-desc-hot.js";
 import { FrameFlags } from "./rapace/frame-flags.js";
-import { computeMethodId } from "./rapace/method-id.js";
 
 /** Control verb constants */
 export const ControlVerb = {
