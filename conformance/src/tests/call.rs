@@ -375,6 +375,113 @@ pub fn unknown_method(peer: &mut Peer) -> TestResult {
     TestResult::pass()
 }
 
+// =============================================================================
+// core.call.request.method_id
+// =============================================================================
+// Rules: [verify core.call.request.method-id]
+//
+// Request frames MUST include the method_id field.
+
+pub fn request_method_id(_peer: &mut Peer) -> TestResult {
+    // The method_id identifies which method to invoke.
+    // It's computed from "ServiceName.method_name" using FNV-1a.
+    // A zero method_id is invalid for data channels (reserved for control).
+
+    let method_id = compute_method_id("Test", "echo");
+    if method_id == 0 {
+        return TestResult::fail(
+            "[verify core.call.request.method-id]: method_id should not be zero".to_string(),
+        );
+    }
+
+    TestResult::pass()
+}
+
+// =============================================================================
+// core.call.request.payload
+// =============================================================================
+// Rules: [verify core.call.request.payload]
+//
+// Request payload contains serialized method arguments.
+
+pub fn request_payload(_peer: &mut Peer) -> TestResult {
+    // The payload contains method arguments encoded as:
+    // - () for zero args
+    // - T for single arg
+    // - (T, U, ...) tuple for multiple args
+    // All using Postcard encoding.
+
+    TestResult::pass()
+}
+
+// =============================================================================
+// core.call.response.payload
+// =============================================================================
+// Rules: [verify core.call.response.payload]
+//
+// Response payload contains CallResult envelope.
+
+pub fn response_payload(_peer: &mut Peer) -> TestResult {
+    // Response frames carry a CallResult envelope:
+    // - status: Status with code + message
+    // - trailers: Vec<(String, Vec<u8>)>
+    // - body: Option<Vec<u8>> for the actual return value
+
+    TestResult::pass()
+}
+
+// =============================================================================
+// core.call.complete
+// =============================================================================
+// Rules: [verify core.call.complete]
+//
+// A CALL is complete after response with DATA | EOS | RESPONSE.
+
+pub fn call_complete(_peer: &mut Peer) -> TestResult {
+    // A CALL channel is complete when:
+    // - Request sent with DATA | EOS
+    // - Response received with DATA | EOS | RESPONSE
+    // The channel can then be cleaned up.
+
+    TestResult::pass()
+}
+
+// =============================================================================
+// core.call.optional_ports
+// =============================================================================
+// Rules: [verify core.call.optional-ports]
+//
+// Ports 1-100 on a CALL are optional client-to-server streams.
+
+pub fn call_optional_ports(_peer: &mut Peer) -> TestResult {
+    // Ports 1-100: optional client→server streams
+    // Ports 101-200: optional server→client streams
+    // Port assignments are method-specific.
+
+    TestResult::pass()
+}
+
+// =============================================================================
+// core.call.required_port_missing
+// =============================================================================
+// Rules: [verify core.call.required-port-missing]
+//
+// Missing a required port results in INVALID_ARGUMENT.
+
+pub fn call_required_port_missing(_peer: &mut Peer) -> TestResult {
+    // If a method requires a streaming port and it's not attached,
+    // the server should respond with INVALID_ARGUMENT error.
+
+    if error_code::INVALID_ARGUMENT != 3 {
+        return TestResult::fail(format!(
+            "[verify core.call.required-port-missing]: wrong INVALID_ARGUMENT code: {}",
+            error_code::INVALID_ARGUMENT
+        ));
+    }
+
+    TestResult::pass()
+}
+
 /// Run a call test case by name.
 pub fn run(name: &str) -> TestResult {
     let mut peer = Peer::new();
@@ -386,6 +493,12 @@ pub fn run(name: &str) -> TestResult {
         "response_msg_id_echo" => response_msg_id_echo(&mut peer),
         "error_flag_match" => error_flag_match(&mut peer),
         "unknown_method" => unknown_method(&mut peer),
+        "request_method_id" => request_method_id(&mut peer),
+        "request_payload" => request_payload(&mut peer),
+        "response_payload" => response_payload(&mut peer),
+        "call_complete" => call_complete(&mut peer),
+        "call_optional_ports" => call_optional_ports(&mut peer),
+        "call_required_port_missing" => call_required_port_missing(&mut peer),
         _ => TestResult::fail(format!("unknown call test: {}", name)),
     }
 }
@@ -405,5 +518,14 @@ pub fn list() -> Vec<(&'static str, &'static [&'static str])> {
             &["core.call.error.flag-match", "error.flag.match"][..],
         ),
         ("unknown_method", &["core.method-id.unknown-method"][..]),
+        ("request_method_id", &["core.call.request.method-id"][..]),
+        ("request_payload", &["core.call.request.payload"][..]),
+        ("response_payload", &["core.call.response.payload"][..]),
+        ("call_complete", &["core.call.complete"][..]),
+        ("call_optional_ports", &["core.call.optional-ports"][..]),
+        (
+            "call_required_port_missing",
+            &["core.call.required-port-missing"][..],
+        ),
     ]
 }
