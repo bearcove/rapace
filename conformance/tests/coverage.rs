@@ -50,7 +50,7 @@ fn main() {
         manifest.rules.into_keys().collect()
     } else {
         eprintln!(
-            "Warning: _rules.json not found at {:?}. Run `ddc build` first.",
+            "Warning: _rules.json not found at {:?}. Run `tracey rules -o docs/public/_rules.json docs/content/spec/**/*.md` first.",
             rules_path
         );
         Vec::new()

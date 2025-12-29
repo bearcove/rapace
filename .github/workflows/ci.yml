@@ -245,8 +245,8 @@ jobs:
         working-directory: swift
         run: swift test
 
-  spec-coverage:
-    name: Spec Coverage
+  spec-coverage-rust:
+    name: Spec Coverage (Rust)
     runs-on: depot-ubuntu-24.04-16
     steps:
       - uses: actions/checkout@v4
@@ -259,6 +259,55 @@ jobs:
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
+
+      - name: Install tracey and generate _rules.json
+        run: |
+          cargo install tracey --git https://github.com/bearcove/tracey
+          tracey rules -o docs/public/_rules.json docs/content/spec/**/*.md
+
+      - name: Build conformance harness
+        run: cargo build -p rapace-conformance
+
+      - name: Rust spec coverage
+        run: cargo nextest run -p rapace-conformance --test coverage --no-fail-fast
+
+  spec-coverage-swift:
+    name: Spec Coverage (Swift)
+    runs-on: depot-macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install tracey and generate _rules.json
+        run: |
+          cargo install tracey --git https://github.com/bearcove/tracey
+          tracey rules -o docs/public/_rules.json docs/content/spec/**/*.md
+
+      - name: Swift spec coverage
+        working-directory: swift
+        run: swift test --filter CoverageTests
+
+  spec-coverage-typescript:
+    name: Spec Coverage (TypeScript)
+    runs-on: depot-ubuntu-24.04-4
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install tracey and generate _rules.json
+        run: |
+          cargo install tracey --git https://github.com/bearcove/tracey
+          tracey rules -o docs/public/_rules.json docs/content/spec/**/*.md
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -279,17 +328,6 @@ jobs:
       - name: Build TypeScript
         working-directory: typescript
         run: pnpm build
-
-      - name: Build docs (for _rules.json)
-        run: |
-          cargo install dodeca --git https://github.com/bearcove/dodeca
-          cd docs && dodeca build
-
-      - name: Build conformance harness
-        run: cargo build -p rapace-conformance
-
-      - name: Rust spec coverage
-        run: cargo nextest run -p rapace-conformance --test coverage --no-fail-fast
 
       - name: TypeScript spec coverage
         working-directory: typescript
