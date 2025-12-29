@@ -115,7 +115,7 @@ fn scan_file(path: &Path, covered: &mut HashSet<String>) {
         return;
     };
 
-    // Match [impl rule.id] and [verify rule.id] patterns
+    // Match patterns like: [impl cancel.deadline.field] or [verify core.stream.intro]
     let impl_re = regex::Regex::new(r"\[impl ([a-z][a-z0-9._-]+)\]").unwrap();
     let verify_re = regex::Regex::new(r"\[verify ([a-z][a-z0-9._-]+)\]").unwrap();
 
