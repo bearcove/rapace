@@ -316,8 +316,8 @@ The receiver knows the expected item type `T` from:
 
 r[core.stream.decode-failure]
 If payload decoding fails (type mismatch, malformed data):
-- The receiver SHOULD send `CancelChannel` for the stream channel with reason `ProtocolViolation`
-- The parent call SHOULD fail with an appropriate error status
+- The receiver MUST send `CancelChannel` for the stream channel with reason `ProtocolViolation`
+- The parent call MUST fail with an appropriate error status
 
 ### Ordering
 
