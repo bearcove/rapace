@@ -15,7 +15,7 @@ use rapace_conformance_macros::conformance;
 // Method IDs use FNV-1a hash folded to 32 bits.
 
 #[conformance(name = "method.algorithm", rules = "core.method-id.algorithm")]
-pub fn algorithm(_peer: &mut Peer) -> TestResult {
+pub async fn algorithm(_peer: &mut Peer) -> TestResult {
     // Verify the algorithm produces consistent results
     let id1 = compute_method_id("Test", "foo");
     let id2 = compute_method_id("Test", "foo");
@@ -46,7 +46,7 @@ pub fn algorithm(_peer: &mut Peer) -> TestResult {
 // Method ID input is "ServiceName.MethodName".
 
 #[conformance(name = "method.input_format", rules = "core.method-id.input-format")]
-pub fn input_format(_peer: &mut Peer) -> TestResult {
+pub async fn input_format(_peer: &mut Peer) -> TestResult {
     // Verify the input format (service.method)
     let id = compute_method_id("Calculator", "add");
 
@@ -68,7 +68,7 @@ pub fn input_format(_peer: &mut Peer) -> TestResult {
 // method_id = 0 is reserved for control/stream/tunnel.
 
 #[conformance(name = "method.zero_reserved", rules = "core.method-id.zero-reserved")]
-pub fn zero_reserved(_peer: &mut Peer) -> TestResult {
+pub async fn zero_reserved(_peer: &mut Peer) -> TestResult {
     // Verify that real methods don't produce ID 0
     // (statistically very unlikely with FNV-1a)
 
@@ -104,7 +104,7 @@ pub fn zero_reserved(_peer: &mut Peer) -> TestResult {
     name = "method.collision_detection",
     rules = "core.method-id.collision-detection"
 )]
-pub fn collision_detection(_peer: &mut Peer) -> TestResult {
+pub async fn collision_detection(_peer: &mut Peer) -> TestResult {
     // This is a behavioral requirement for implementations
     // We can document it but not directly test it here
     TestResult::pass()
@@ -118,7 +118,7 @@ pub fn collision_detection(_peer: &mut Peer) -> TestResult {
 // Verify FNV-1a properties: avalanche effect, bit distribution.
 
 #[conformance(name = "method.fnv1a_properties", rules = "core.method-id.algorithm")]
-pub fn fnv1a_properties(_peer: &mut Peer) -> TestResult {
+pub async fn fnv1a_properties(_peer: &mut Peer) -> TestResult {
     // Test that small changes produce very different IDs (avalanche)
     let id1 = compute_method_id("Test", "foo");
     let id2 = compute_method_id("Test", "fop"); // One char different
@@ -147,7 +147,7 @@ pub fn fnv1a_properties(_peer: &mut Peer) -> TestResult {
 // Method IDs MUST be 32-bit identifiers computed as a hash.
 
 #[conformance(name = "method.intro", rules = "core.method-id.intro")]
-pub fn intro(_peer: &mut Peer) -> TestResult {
+pub async fn intro(_peer: &mut Peer) -> TestResult {
     // Method IDs are 32-bit unsigned integers computed by hashing
     // the fully-qualified method name.
 
@@ -180,7 +180,7 @@ pub fn intro(_peer: &mut Peer) -> TestResult {
     name = "method.zero_enforcement",
     rules = "core.method-id.zero-enforcement"
 )]
-pub fn zero_enforcement(_peer: &mut Peer) -> TestResult {
+pub async fn zero_enforcement(_peer: &mut Peer) -> TestResult {
     // This rule requires:
     // 1. Code generators MUST check if compute_method_id returns 0
     // 2. If it does, code generation MUST fail

@@ -18,7 +18,7 @@ use rapace_conformance_macros::conformance;
     name = "security.auth_failure_handshake",
     rules = "security.auth-failure.handshake"
 )]
-pub fn auth_failure_handshake(_peer: &mut Peer) -> TestResult {
+pub async fn auth_failure_handshake(_peer: &mut Peer) -> TestResult {
     // This rule specifies that on authentication failure during Hello:
     // 1. Send CloseChannel { channel_id: 0, reason: Error("authentication failed") }
     // 2. Close the transport connection
@@ -69,7 +69,7 @@ pub fn auth_failure_handshake(_peer: &mut Peer) -> TestResult {
     name = "security.metadata_plaintext",
     rules = "security.metadata.plaintext"
 )]
-pub fn metadata_plaintext(_peer: &mut Peer) -> TestResult {
+pub async fn metadata_plaintext(_peer: &mut Peer) -> TestResult {
     // This rule documents that:
     // - Hello.params are transmitted in plaintext (at Rapace layer)
     // - OpenChannel.metadata are transmitted in plaintext
@@ -126,7 +126,7 @@ pub fn metadata_plaintext(_peer: &mut Peer) -> TestResult {
     name = "security.profile_c_reject",
     rules = "security.profile-c.reject"
 )]
-pub fn profile_c_reject(_peer: &mut Peer) -> TestResult {
+pub async fn profile_c_reject(_peer: &mut Peer) -> TestResult {
     // Profile C (Networked/Untrusted) requires:
     // - Reject connections with invalid authentication
     // - Reject connections with missing authentication

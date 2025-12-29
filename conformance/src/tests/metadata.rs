@@ -18,7 +18,7 @@ use rapace_protocol::error_code;
     name = "metadata.key_reserved_prefix",
     rules = "metadata.key.reserved-prefix"
 )]
-pub fn key_reserved_prefix(_peer: &mut Peer) -> TestResult {
+pub async fn key_reserved_prefix(_peer: &mut Peer) -> TestResult {
     // Reserved prefixes:
     // - rapace.* : protocol-defined
     // - x-* : application-defined (not standardized)
@@ -66,7 +66,7 @@ pub fn key_reserved_prefix(_peer: &mut Peer) -> TestResult {
 // Keys MUST be lowercase kebab-case matching `[a-z][a-z0-9]*(-[a-z0-9]+)*`.
 
 #[conformance(name = "metadata.key_format", rules = "metadata.key.format")]
-pub fn key_format(_peer: &mut Peer) -> TestResult {
+pub async fn key_format(_peer: &mut Peer) -> TestResult {
     // Pattern: [a-z][a-z0-9]*(-[a-z0-9]+)*
     // Examples: trace-id, request-timeout, x-custom-header
 
@@ -159,7 +159,7 @@ pub fn key_format(_peer: &mut Peer) -> TestResult {
 // Keys MUST be lowercase. Mixed-case or uppercase keys are a protocol error.
 
 #[conformance(name = "metadata.key_lowercase", rules = "metadata.key.lowercase")]
-pub fn key_lowercase(_peer: &mut Peer) -> TestResult {
+pub async fn key_lowercase(_peer: &mut Peer) -> TestResult {
     // Function to check if a key is lowercase
     fn is_lowercase_key(key: &str) -> bool {
         key.chars().all(|c| !c.is_uppercase())
@@ -203,7 +203,7 @@ pub fn key_lowercase(_peer: &mut Peer) -> TestResult {
     name = "metadata.key_case_sensitive",
     rules = "metadata.key.case-sensitive"
 )]
-pub fn key_case_sensitive(_peer: &mut Peer) -> TestResult {
+pub async fn key_case_sensitive(_peer: &mut Peer) -> TestResult {
     // Keys are compared as raw bytes
     // Since all valid keys are lowercase, case normalization is not needed
 
@@ -237,7 +237,7 @@ pub fn key_case_sensitive(_peer: &mut Peer) -> TestResult {
 // Senders MUST NOT include duplicate keys.
 
 #[conformance(name = "metadata.key_duplicates", rules = "metadata.key.duplicates")]
-pub fn key_duplicates(_peer: &mut Peer) -> TestResult {
+pub async fn key_duplicates(_peer: &mut Peer) -> TestResult {
     use std::collections::HashSet;
 
     // Function to check for duplicates
@@ -289,7 +289,7 @@ pub fn key_duplicates(_peer: &mut Peer) -> TestResult {
 // Implementations MUST enforce size limits.
 
 #[conformance(name = "metadata.limits", rules = "metadata.limits")]
-pub fn limits(_peer: &mut Peer) -> TestResult {
+pub async fn limits(_peer: &mut Peer) -> TestResult {
     // Limits:
     // - Max key length: 256 bytes
     // - Max value length: 64 KiB
@@ -413,7 +413,7 @@ pub fn limits(_peer: &mut Peer) -> TestResult {
 // Implementations SHOULD reject messages exceeding limits with RESOURCE_EXHAUSTED.
 
 #[conformance(name = "metadata.limits_reject", rules = "metadata.limits.reject")]
-pub fn limits_reject(_peer: &mut Peer) -> TestResult {
+pub async fn limits_reject(_peer: &mut Peer) -> TestResult {
     // This rule specifies the error code for limit violations
 
     // Verify RESOURCE_EXHAUSTED exists and has expected value

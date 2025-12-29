@@ -15,7 +15,7 @@ use rapace_conformance_macros::conformance;
 // Validates standard error code values.
 
 #[conformance(name = "error.status_codes", rules = "error.impl.standard-codes")]
-pub fn status_codes(_peer: &mut Peer) -> TestResult {
+pub async fn status_codes(_peer: &mut Peer) -> TestResult {
     // Verify code values match spec
     let checks = [
         (error_code::OK, 0, "OK"),
@@ -58,7 +58,7 @@ pub fn status_codes(_peer: &mut Peer) -> TestResult {
 // Validates protocol error code values (50-99 range).
 
 #[conformance(name = "error.protocol_codes", rules = "error.impl.standard-codes")]
-pub fn protocol_codes(_peer: &mut Peer) -> TestResult {
+pub async fn protocol_codes(_peer: &mut Peer) -> TestResult {
     let checks = [
         (error_code::PROTOCOL_ERROR, 50, "PROTOCOL_ERROR"),
         (error_code::INVALID_FRAME, 51, "INVALID_FRAME"),
@@ -88,7 +88,7 @@ pub fn protocol_codes(_peer: &mut Peer) -> TestResult {
 // On success, status.code must be 0 and body must be present.
 
 #[conformance(name = "error.status_success", rules = "error.status.success")]
-pub fn status_success(_peer: &mut Peer) -> TestResult {
+pub async fn status_success(_peer: &mut Peer) -> TestResult {
     let result = CallResult {
         status: Status::ok(),
         trailers: Vec::new(),
@@ -114,7 +114,7 @@ pub fn status_success(_peer: &mut Peer) -> TestResult {
 // On error, status.code must not be 0 and body must be None.
 
 #[conformance(name = "error.status_error", rules = "error.status.error")]
-pub fn status_error(_peer: &mut Peer) -> TestResult {
+pub async fn status_error(_peer: &mut Peer) -> TestResult {
     let result = CallResult {
         status: Status::error(error_code::NOT_FOUND, "not found"),
         trailers: Vec::new(),
@@ -140,7 +140,7 @@ pub fn status_error(_peer: &mut Peer) -> TestResult {
 // Validates CancelReason enum values.
 
 #[conformance(name = "error.cancel_reasons", rules = "core.cancel.behavior")]
-pub fn cancel_reasons(_peer: &mut Peer) -> TestResult {
+pub async fn cancel_reasons(_peer: &mut Peer) -> TestResult {
     // Verify discriminants
     let checks = [
         (CancelReason::ClientCancel as u8, 1, "ClientCancel"),
@@ -179,7 +179,7 @@ pub fn cancel_reasons(_peer: &mut Peer) -> TestResult {
 // Implementations SHOULD populate details for actionable errors.
 
 #[conformance(name = "error.details_populate", rules = "error.details.populate")]
-pub fn details_populate(_peer: &mut Peer) -> TestResult {
+pub async fn details_populate(_peer: &mut Peer) -> TestResult {
     // Verify Status.details field can hold structured error info
 
     let status = Status {
@@ -226,7 +226,7 @@ pub fn details_populate(_peer: &mut Peer) -> TestResult {
     name = "error.details_unknown_format",
     rules = "error.details.unknown-format"
 )]
-pub fn details_unknown_format(_peer: &mut Peer) -> TestResult {
+pub async fn details_unknown_format(_peer: &mut Peer) -> TestResult {
     // Test 1: Empty details must work
     let status_empty = Status {
         code: error_code::NOT_FOUND,
@@ -278,7 +278,7 @@ pub fn details_unknown_format(_peer: &mut Peer) -> TestResult {
 // Receivers MAY use ERROR flag for fast detection but MUST still parse CallResult.
 
 #[conformance(name = "error.flag_parse", rules = "error.flag.parse")]
-pub fn flag_parse(_peer: &mut Peer) -> TestResult {
+pub async fn flag_parse(_peer: &mut Peer) -> TestResult {
     // The ERROR flag (0x10) is a fast-path hint.
     // Receivers can check it quickly but MUST still parse CallResult.
 
@@ -315,7 +315,7 @@ pub fn flag_parse(_peer: &mut Peer) -> TestResult {
 // Implementations SHOULD implement exponential backoff for retries.
 
 #[conformance(name = "error.impl_backoff", rules = "error.impl.backoff")]
-pub fn impl_backoff(_peer: &mut Peer) -> TestResult {
+pub async fn impl_backoff(_peer: &mut Peer) -> TestResult {
     // This is a behavioral requirement for implementations.
     // We can only verify the retryable error codes exist.
 
@@ -351,7 +351,7 @@ pub fn impl_backoff(_peer: &mut Peer) -> TestResult {
 // Implementations MAY define application-specific error codes in the 400+ range.
 
 #[conformance(name = "error.impl_custom_codes", rules = "error.impl.custom-codes")]
-pub fn impl_custom_codes(_peer: &mut Peer) -> TestResult {
+pub async fn impl_custom_codes(_peer: &mut Peer) -> TestResult {
     // Application-defined codes start at 400
     const APP_ERROR_MIN: u32 = 400;
 
@@ -398,7 +398,7 @@ pub fn impl_custom_codes(_peer: &mut Peer) -> TestResult {
 // Implementations SHOULD populate details for actionable errors and SHOULD include message.
 
 #[conformance(name = "error.impl_details", rules = "error.impl.details")]
-pub fn impl_details(_peer: &mut Peer) -> TestResult {
+pub async fn impl_details(_peer: &mut Peer) -> TestResult {
     // Verify Status has both message and details fields
 
     let status = Status {
@@ -432,7 +432,7 @@ pub fn impl_details(_peer: &mut Peer) -> TestResult {
 // Implementations MUST set the ERROR flag correctly (matching status.code != 0).
 
 #[conformance(name = "error.impl_error_flag", rules = "error.impl.error-flag")]
-pub fn impl_error_flag(_peer: &mut Peer) -> TestResult {
+pub async fn impl_error_flag(_peer: &mut Peer) -> TestResult {
     // ERROR flag (0x10) MUST match status.code != 0
 
     // Test 1: Success (code == 0) -> ERROR flag NOT set
@@ -465,7 +465,7 @@ pub fn impl_error_flag(_peer: &mut Peer) -> TestResult {
     name = "error.impl_status_required",
     rules = "error.impl.status-required"
 )]
-pub fn impl_status_required(_peer: &mut Peer) -> TestResult {
+pub async fn impl_status_required(_peer: &mut Peer) -> TestResult {
     // Every error response MUST have a Status in CallResult
 
     let result = CallResult {
@@ -517,7 +517,7 @@ pub fn impl_status_required(_peer: &mut Peer) -> TestResult {
 // Implementations MUST handle unknown error codes gracefully.
 
 #[conformance(name = "error.impl_unknown_codes", rules = "error.impl.unknown-codes")]
-pub fn impl_unknown_codes(_peer: &mut Peer) -> TestResult {
+pub async fn impl_unknown_codes(_peer: &mut Peer) -> TestResult {
     // Unknown error codes should not cause failures
 
     // Use a code that doesn't exist in the standard ranges

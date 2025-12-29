@@ -15,7 +15,7 @@ use rapace_protocol::flags;
 // Rapace uses an 8-bit priority value (0-255).
 
 #[conformance(name = "priority.value_range", rules = "priority.value.range")]
-pub fn value_range(_peer: &mut Peer) -> TestResult {
+pub async fn value_range(_peer: &mut Peer) -> TestResult {
     // Priority is u8 (0-255)
 
     // Verify the range
@@ -78,7 +78,7 @@ pub fn value_range(_peer: &mut Peer) -> TestResult {
 // The default priority MUST be 128 when no priority is specified.
 
 #[conformance(name = "priority.value_default", rules = "priority.value.default")]
-pub fn value_default(_peer: &mut Peer) -> TestResult {
+pub async fn value_default(_peer: &mut Peer) -> TestResult {
     // Default priority is 128
 
     const DEFAULT_PRIORITY: u8 = 128;
@@ -108,7 +108,7 @@ pub fn value_default(_peer: &mut Peer) -> TestResult {
 // Priority sources: per-call metadata > frame flag > connection default.
 
 #[conformance(name = "priority.precedence", rules = "priority.precedence")]
-pub fn precedence(_peer: &mut Peer) -> TestResult {
+pub async fn precedence(_peer: &mut Peer) -> TestResult {
     // Precedence order (highest to lowest):
     // 1. Per-call metadata (rapace.priority)
     // 2. Frame flag (HIGH_PRIORITY = 192)
@@ -170,7 +170,7 @@ pub fn precedence(_peer: &mut Peer) -> TestResult {
     name = "priority.high_flag_mapping",
     rules = "priority.high-flag.mapping"
 )]
-pub fn high_flag_mapping(_peer: &mut Peer) -> TestResult {
+pub async fn high_flag_mapping(_peer: &mut Peer) -> TestResult {
     // HIGH_PRIORITY flag maps to priority 192
 
     const HIGH_PRIORITY_VALUE: u8 = 192;
@@ -214,7 +214,7 @@ pub fn high_flag_mapping(_peer: &mut Peer) -> TestResult {
     name = "priority.scheduling_queue",
     rules = "priority.scheduling.queue"
 )]
-pub fn scheduling_queue(_peer: &mut Peer) -> TestResult {
+pub async fn scheduling_queue(_peer: &mut Peer) -> TestResult {
     // This is a SHOULD rule for server implementation
     // We verify the priority bucketing scheme from the spec
 
@@ -265,7 +265,7 @@ pub fn scheduling_queue(_peer: &mut Peer) -> TestResult {
 // Low-priority channels MUST receive minimum credits to prevent deadlock.
 
 #[conformance(name = "priority.credits_minimum", rules = "priority.credits.minimum")]
-pub fn credits_minimum(_peer: &mut Peer) -> TestResult {
+pub async fn credits_minimum(_peer: &mut Peer) -> TestResult {
     // This rule ensures even low-priority channels get some credits
     // to prevent deadlock
 
@@ -293,7 +293,7 @@ pub fn credits_minimum(_peer: &mut Peer) -> TestResult {
     name = "priority.propagation_rules",
     rules = "priority.propagation.rules"
 )]
-pub fn propagation_rules(_peer: &mut Peer) -> TestResult {
+pub async fn propagation_rules(_peer: &mut Peer) -> TestResult {
     // Priority propagation rules:
     // - SHOULD propagate for synchronous chains
     // - SHOULD reduce for fan-out (to prevent priority inversion)
@@ -347,7 +347,7 @@ pub fn propagation_rules(_peer: &mut Peer) -> TestResult {
     name = "priority.guarantee_starvation",
     rules = "priority.guarantee.starvation"
 )]
-pub fn guarantee_starvation(_peer: &mut Peer) -> TestResult {
+pub async fn guarantee_starvation(_peer: &mut Peer) -> TestResult {
     // This rule requires that low-priority requests eventually get served
     // even when high-priority requests are present
 
@@ -368,7 +368,7 @@ pub fn guarantee_starvation(_peer: &mut Peer) -> TestResult {
     name = "priority.guarantee_ordering",
     rules = "priority.guarantee.ordering"
 )]
-pub fn guarantee_ordering(_peer: &mut Peer) -> TestResult {
+pub async fn guarantee_ordering(_peer: &mut Peer) -> TestResult {
     // Higher priority = higher chance of being scheduled first
     // This is a SHOULD rule (not strict ordering guarantee)
 
@@ -397,7 +397,7 @@ pub fn guarantee_ordering(_peer: &mut Peer) -> TestResult {
     name = "priority.guarantee_deadline",
     rules = "priority.guarantee.deadline"
 )]
-pub fn guarantee_deadline(_peer: &mut Peer) -> TestResult {
+pub async fn guarantee_deadline(_peer: &mut Peer) -> TestResult {
     // Requests with deadlines must be tracked even if low priority
     // This ensures they either complete or get DeadlineExceeded error
 
@@ -415,7 +415,7 @@ pub fn guarantee_deadline(_peer: &mut Peer) -> TestResult {
 // NOT required: strict priority, latency bounds, cross-connection fairness.
 
 #[conformance(name = "priority.non_guarantee", rules = "priority.non-guarantee")]
-pub fn non_guarantee(_peer: &mut Peer) -> TestResult {
+pub async fn non_guarantee(_peer: &mut Peer) -> TestResult {
     // This rule documents what is NOT guaranteed:
     // - Strict priority ordering
     // - Latency bounds

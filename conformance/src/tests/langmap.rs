@@ -14,7 +14,7 @@ use rapace_conformance_macros::conformance;
 // Types MUST preserve the same encoding/decoding behavior across all languages.
 
 #[conformance(name = "langmap.semantic", rules = "langmap.semantic")]
-pub fn semantic(_peer: &mut Peer) -> TestResult {
+pub async fn semantic(_peer: &mut Peer) -> TestResult {
     // This rule requires that encoding/decoding is identical across languages
     // We verify by testing that Rust encoding matches expected wire format
 
@@ -61,7 +61,7 @@ pub fn semantic(_peer: &mut Peer) -> TestResult {
 // Generated code SHOULD follow target language conventions.
 
 #[conformance(name = "langmap.idiomatic", rules = "langmap.idiomatic")]
-pub fn idiomatic(_peer: &mut Peer) -> TestResult {
+pub async fn idiomatic(_peer: &mut Peer) -> TestResult {
     // This is a SHOULD rule about code style
     // We verify the naming convention transformations
 
@@ -108,7 +108,7 @@ pub fn idiomatic(_peer: &mut Peer) -> TestResult {
 // A value encoded in one language MUST decode identically in another.
 
 #[conformance(name = "langmap.roundtrip", rules = "langmap.roundtrip")]
-pub fn roundtrip(_peer: &mut Peer) -> TestResult {
+pub async fn roundtrip(_peer: &mut Peer) -> TestResult {
     // Verify roundtrip encoding/decoding in Rust
     // Other languages must produce identical bytes
 
@@ -192,7 +192,7 @@ pub fn roundtrip(_peer: &mut Peer) -> TestResult {
 // Lossy mappings (e.g., i128 → bigint) MUST be documented.
 
 #[conformance(name = "langmap.lossy", rules = "langmap.lossy")]
-pub fn lossy(_peer: &mut Peer) -> TestResult {
+pub async fn lossy(_peer: &mut Peer) -> TestResult {
     // This rule requires documentation of lossy mappings
     // We verify the specific lossy cases mentioned in the spec
 
@@ -233,7 +233,7 @@ pub fn lossy(_peer: &mut Peer) -> TestResult {
 // Java lacks unsigned types, so u8/u16 use wider signed types.
 
 #[conformance(name = "langmap.java_unsigned", rules = "langmap.java.unsigned")]
-pub fn java_unsigned(_peer: &mut Peer) -> TestResult {
+pub async fn java_unsigned(_peer: &mut Peer) -> TestResult {
     // Java type mappings for unsigned:
     // u8 -> int (not byte, which is signed)
     // u16 -> int
@@ -281,7 +281,7 @@ pub fn java_unsigned(_peer: &mut Peer) -> TestResult {
 // usize/isize are prohibited in public service APIs.
 
 #[conformance(name = "langmap.usize_prohibited", rules = "langmap.usize.prohibited")]
-pub fn usize_prohibited(_peer: &mut Peer) -> TestResult {
+pub async fn usize_prohibited(_peer: &mut Peer) -> TestResult {
     // usize/isize have platform-dependent sizes:
     // - 32-bit: 4 bytes
     // - 64-bit: 8 bytes
@@ -318,7 +318,7 @@ pub fn usize_prohibited(_peer: &mut Peer) -> TestResult {
 // Swift Int64/UInt64 cannot represent full i128/u128 range.
 
 #[conformance(name = "langmap.i128_swift", rules = "langmap.i128.swift")]
-pub fn i128_swift(_peer: &mut Peer) -> TestResult {
+pub async fn i128_swift(_peer: &mut Peer) -> TestResult {
     // Swift mapping:
     // i128 -> Int64 (lossy)
     // u128 -> UInt64 (lossy)
@@ -372,7 +372,7 @@ pub fn i128_swift(_peer: &mut Peer) -> TestResult {
     name = "langmap.enum_discriminant",
     rules = "langmap.enum.discriminant"
 )]
-pub fn enum_discriminant(_peer: &mut Peer) -> TestResult {
+pub async fn enum_discriminant(_peer: &mut Peer) -> TestResult {
     // Enum variants are encoded as varint discriminants (0, 1, 2, ...)
     // The discriminant is the declaration order
 

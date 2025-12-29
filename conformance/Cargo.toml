@@ -23,6 +23,7 @@ facet-format-postcard.workspace = true
 clap = { version = "4", features = ["derive"] }
 inventory = "0.3"
 rapace-conformance-macros = { path = "macros" }
+tokio = { version = "1", features = ["full"] }
 
 [dev-dependencies]
 facet.workspace = true

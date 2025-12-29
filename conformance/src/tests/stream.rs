@@ -18,7 +18,7 @@ use rapace_conformance_macros::conformance;
     name = "stream.method_id_zero",
     rules = "core.stream.frame.method-id-zero"
 )]
-pub fn method_id_zero(_peer: &mut Peer) -> TestResult {
+pub async fn method_id_zero(_peer: &mut Peer) -> TestResult {
     // STREAM frames MUST have method_id = 0.
     // This differentiates them from CALL frames.
 
@@ -47,7 +47,7 @@ pub fn method_id_zero(_peer: &mut Peer) -> TestResult {
     name = "stream.attachment_required",
     rules = "core.stream.attachment, core.channel.open.attach-required"
 )]
-pub fn attachment_required(_peer: &mut Peer) -> TestResult {
+pub async fn attachment_required(_peer: &mut Peer) -> TestResult {
     // Verify AttachTo structure
     let attach = AttachTo {
         call_channel_id: 5,
@@ -85,7 +85,7 @@ pub fn attachment_required(_peer: &mut Peer) -> TestResult {
 // Direction enum should have correct values.
 
 #[conformance(name = "stream.direction_values", rules = "core.stream.bidir")]
-pub fn direction_values(_peer: &mut Peer) -> TestResult {
+pub async fn direction_values(_peer: &mut Peer) -> TestResult {
     let checks = [
         (Direction::ClientToServer as u8, 1, "ClientToServer"),
         (Direction::ServerToClient as u8, 2, "ServerToClient"),
@@ -112,7 +112,7 @@ pub fn direction_values(_peer: &mut Peer) -> TestResult {
 // Stream items are delivered in order.
 
 #[conformance(name = "stream.ordering", rules = "core.stream.ordering")]
-pub fn ordering(_peer: &mut Peer) -> TestResult {
+pub async fn ordering(_peer: &mut Peer) -> TestResult {
     // This is a behavioral guarantee - implementations must preserve order
     // We can only document that this rule exists
     TestResult::pass()
@@ -126,7 +126,7 @@ pub fn ordering(_peer: &mut Peer) -> TestResult {
 // ChannelKind::Stream should have correct value.
 
 #[conformance(name = "stream.channel_kind", rules = "core.channel.kind")]
-pub fn channel_kind(_peer: &mut Peer) -> TestResult {
+pub async fn channel_kind(_peer: &mut Peer) -> TestResult {
     if ChannelKind::Stream as u8 != 2 {
         return TestResult::fail(format!(
             "[verify core.channel.kind]: ChannelKind::Stream should be 2, got {}",
@@ -145,7 +145,7 @@ pub fn channel_kind(_peer: &mut Peer) -> TestResult {
 // to a parent CALL channel.
 
 #[conformance(name = "stream.intro", rules = "core.stream.intro")]
-pub fn intro(_peer: &mut Peer) -> TestResult {
+pub async fn intro(_peer: &mut Peer) -> TestResult {
     // STREAM channels:
     // 1. Carry typed sequences of items (like Vec<T> streamed one at a time)
     // 2. MUST be attached to a parent CALL channel via AttachTo
@@ -184,7 +184,7 @@ pub fn intro(_peer: &mut Peer) -> TestResult {
 // An empty stream is represented by a single frame with EOS flag and payload_len = 0.
 
 #[conformance(name = "stream.empty", rules = "core.stream.empty")]
-pub fn empty(_peer: &mut Peer) -> TestResult {
+pub async fn empty(_peer: &mut Peer) -> TestResult {
     // An empty stream (zero items) is represented by:
     // - Single frame with EOS flag
     // - payload_len = 0
@@ -220,7 +220,7 @@ pub fn empty(_peer: &mut Peer) -> TestResult {
 // The payload MUST be a Postcard-encoded item of the stream's declared type T.
 
 #[conformance(name = "stream.frame_payload", rules = "core.stream.frame.payload")]
-pub fn frame_payload(_peer: &mut Peer) -> TestResult {
+pub async fn frame_payload(_peer: &mut Peer) -> TestResult {
     // Stream item payloads are Postcard-encoded.
     // The type T is known from the method signature and port binding.
 
@@ -258,7 +258,7 @@ pub fn frame_payload(_peer: &mut Peer) -> TestResult {
     name = "stream.type_enforcement",
     rules = "core.stream.type-enforcement"
 )]
-pub fn type_enforcement(_peer: &mut Peer) -> TestResult {
+pub async fn type_enforcement(_peer: &mut Peer) -> TestResult {
     // Type enforcement for streams:
     // 1. The receiver knows expected type T from:
     //    a. method_id on the parent CALL channel
@@ -294,7 +294,7 @@ pub fn type_enforcement(_peer: &mut Peer) -> TestResult {
 // If payload decoding fails, receiver MUST send CancelChannel with ProtocolViolation.
 
 #[conformance(name = "stream.decode_failure", rules = "core.stream.decode-failure")]
-pub fn decode_failure(_peer: &mut Peer) -> TestResult {
+pub async fn decode_failure(_peer: &mut Peer) -> TestResult {
     // When stream item decoding fails:
     // 1. Receiver MUST send CancelChannel for the stream channel
     // 2. Reason MUST be ProtocolViolation

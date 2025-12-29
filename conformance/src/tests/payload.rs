@@ -14,7 +14,7 @@ use rapace_conformance_macros::conformance;
 // Rapace MUST use Postcard for message payload encoding on CALL and STREAM channels.
 
 #[conformance(name = "payload.encoding_scope", rules = "payload.encoding.scope")]
-pub fn encoding_scope(_peer: &mut Peer) -> TestResult {
+pub async fn encoding_scope(_peer: &mut Peer) -> TestResult {
     // This rule specifies:
     // - CALL channel payloads use Postcard encoding
     // - STREAM channel payloads use Postcard encoding
@@ -63,7 +63,7 @@ pub fn encoding_scope(_peer: &mut Peer) -> TestResult {
     name = "payload.encoding_tunnel_exception",
     rules = "payload.encoding.tunnel-exception"
 )]
-pub fn encoding_tunnel_exception(_peer: &mut Peer) -> TestResult {
+pub async fn encoding_tunnel_exception(_peer: &mut Peer) -> TestResult {
     // This rule specifies:
     // - TUNNEL channels carry raw bytes (no encoding)
     // - This allows embedding arbitrary protocols (HTTP, TLS, etc.)
@@ -90,7 +90,7 @@ pub fn encoding_tunnel_exception(_peer: &mut Peer) -> TestResult {
 // Varints MUST be encoded in canonical form: the shortest possible encoding.
 
 #[conformance(name = "payload.varint_canonical", rules = "payload.varint.canonical")]
-pub fn varint_canonical(_peer: &mut Peer) -> TestResult {
+pub async fn varint_canonical(_peer: &mut Peer) -> TestResult {
     // Test that encoding produces canonical (shortest) form
 
     // 0 should be 1 byte
@@ -157,7 +157,7 @@ pub fn varint_canonical(_peer: &mut Peer) -> TestResult {
     name = "payload.varint_reject_noncanonical",
     rules = "payload.varint.reject-noncanonical"
 )]
-pub fn varint_reject_noncanonical(_peer: &mut Peer) -> TestResult {
+pub async fn varint_reject_noncanonical(_peer: &mut Peer) -> TestResult {
     // Non-canonical encodings that MUST be rejected:
     // - 0 encoded as [0x80, 0x00] (2 bytes instead of 1)
     // - 1 encoded as [0x81, 0x00] (2 bytes instead of 1)
@@ -199,7 +199,7 @@ pub fn varint_reject_noncanonical(_peer: &mut Peer) -> TestResult {
 // All NaN values MUST be canonicalized before encoding.
 
 #[conformance(name = "payload.float_nan", rules = "payload.float.nan")]
-pub fn float_nan(_peer: &mut Peer) -> TestResult {
+pub async fn float_nan(_peer: &mut Peer) -> TestResult {
     // Canonical NaN bit patterns:
     // f32: 0x7FC00000
     // f64: 0x7FF8000000000000
@@ -247,7 +247,7 @@ pub fn float_nan(_peer: &mut Peer) -> TestResult {
 // Negative zero MUST NOT be canonicalized and MUST encode as its IEEE 754 bit pattern.
 
 #[conformance(name = "payload.float_negzero", rules = "payload.float.negzero")]
-pub fn float_negzero(_peer: &mut Peer) -> TestResult {
+pub async fn float_negzero(_peer: &mut Peer) -> TestResult {
     // -0.0 must be preserved, not canonicalized to +0.0
 
     let neg_zero: f64 = -0.0;
@@ -308,7 +308,7 @@ pub fn float_negzero(_peer: &mut Peer) -> TestResult {
     name = "payload.struct_field_order",
     rules = "payload.struct.field-order"
 )]
-pub fn struct_field_order(_peer: &mut Peer) -> TestResult {
+pub async fn struct_field_order(_peer: &mut Peer) -> TestResult {
     // Struct fields are encoded in order without names
     // This is verified by encoding a tuple and checking order
 
@@ -347,7 +347,7 @@ pub fn struct_field_order(_peer: &mut Peer) -> TestResult {
     name = "payload.struct_order_immutable",
     rules = "payload.struct.order-immutable"
 )]
-pub fn struct_order_immutable(_peer: &mut Peer) -> TestResult {
+pub async fn struct_order_immutable(_peer: &mut Peer) -> TestResult {
     // This is a semantic rule about schema evolution
     // We verify that field order affects encoding
 
@@ -383,7 +383,7 @@ pub fn struct_order_immutable(_peer: &mut Peer) -> TestResult {
     name = "payload.map_nondeterministic",
     rules = "payload.map.nondeterministic"
 )]
-pub fn map_nondeterministic(_peer: &mut Peer) -> TestResult {
+pub async fn map_nondeterministic(_peer: &mut Peer) -> TestResult {
     use std::collections::HashMap;
 
     // Map iteration order is not guaranteed
@@ -421,7 +421,7 @@ pub fn map_nondeterministic(_peer: &mut Peer) -> TestResult {
 // Rapace freezes the Postcard v1 wire format as specified.
 
 #[conformance(name = "payload.stability_frozen", rules = "payload.stability.frozen")]
-pub fn stability_frozen(_peer: &mut Peer) -> TestResult {
+pub async fn stability_frozen(_peer: &mut Peer) -> TestResult {
     // This is a meta-rule: the wire format is frozen
     // We verify by testing known encodings
 
@@ -479,7 +479,7 @@ pub fn stability_frozen(_peer: &mut Peer) -> TestResult {
     name = "payload.stability_canonical",
     rules = "payload.stability.canonical"
 )]
-pub fn stability_canonical(_peer: &mut Peer) -> TestResult {
+pub async fn stability_canonical(_peer: &mut Peer) -> TestResult {
     // This is a meta-rule stating that the spec document is authoritative
     // The postcard crate is a reference, not the authority
 

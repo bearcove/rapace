@@ -32,11 +32,11 @@ use crate::testcase::TestResult;
 /// Run a test case by name (e.g., "handshake.valid_hello_exchange").
 ///
 /// Looks up the test in the inventory of registered tests.
-pub fn run(name: &str) -> TestResult {
+pub async fn run(name: &str) -> TestResult {
     for test in inventory::iter::<ConformanceTest> {
         if test.name == name {
             let mut peer = Peer::new();
-            return (test.func)(&mut peer);
+            return (test.func)(&mut peer).await;
         }
     }
 

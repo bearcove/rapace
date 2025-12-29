@@ -21,9 +21,9 @@ use rapace_conformance_macros::conformance;
     name = "handshake.valid_hello_exchange",
     rules = "handshake.required, handshake.ordering"
 )]
-pub fn valid_hello_exchange(peer: &mut Peer) -> TestResult {
+pub async fn valid_hello_exchange(peer: &mut Peer) -> TestResult {
     // Wait for Hello from implementation (initiator)
-    let frame = match peer.recv() {
+    let frame = match peer.recv().await {
         Ok(f) => f,
         Err(e) => return TestResult::fail(format!("failed to receive Hello: {}", e)),
     };
@@ -105,7 +105,7 @@ pub fn valid_hello_exchange(peer: &mut Peer) -> TestResult {
         Frame::with_payload(desc, payload)
     };
 
-    if let Err(e) = peer.send(&frame) {
+    if let Err(e) = peer.send(&frame).await {
         return TestResult::fail(format!("failed to send Hello response: {}", e));
     }
 
@@ -124,12 +124,12 @@ pub fn valid_hello_exchange(peer: &mut Peer) -> TestResult {
     name = "handshake.missing_hello",
     rules = "handshake.first-frame, handshake.failure"
 )]
-pub fn missing_hello(peer: &mut Peer) -> TestResult {
+pub async fn missing_hello(peer: &mut Peer) -> TestResult {
     // Implementation should send Hello first
     // This test expects the implementation to INCORRECTLY send a non-Hello frame
     // The peer validates that it's NOT a Hello
 
-    let frame = match peer.recv() {
+    let frame = match peer.recv().await {
         Ok(f) => f,
         Err(e) => return TestResult::fail(format!("failed to receive frame: {}", e)),
     };
@@ -165,7 +165,7 @@ pub fn missing_hello(peer: &mut Peer) -> TestResult {
         Frame::with_payload(desc, payload)
     };
 
-    let _ = peer.send(&frame);
+    let _ = peer.send(&frame).await;
 
     TestResult::pass()
 }
@@ -179,9 +179,9 @@ pub fn missing_hello(peer: &mut Peer) -> TestResult {
 // Implementation should reject/close.
 
 #[conformance(name = "handshake.version_mismatch", rules = "handshake.version.major")]
-pub fn version_mismatch(peer: &mut Peer) -> TestResult {
+pub async fn version_mismatch(peer: &mut Peer) -> TestResult {
     // Wait for Hello from implementation
-    let frame = match peer.recv() {
+    let frame = match peer.recv().await {
         Ok(f) => f,
         Err(e) => return TestResult::fail(format!("failed to receive Hello: {}", e)),
     };
@@ -216,13 +216,13 @@ pub fn version_mismatch(peer: &mut Peer) -> TestResult {
         Frame::with_payload(desc, payload)
     };
 
-    if let Err(e) = peer.send(&frame) {
+    if let Err(e) = peer.send(&frame).await {
         return TestResult::fail(format!("failed to send Hello: {}", e));
     }
 
     // Implementation should close the connection or send error
     // We expect either EOF or a CloseChannel
-    match peer.try_recv() {
+    match peer.try_recv().await {
         Ok(None) => TestResult::pass(), // EOF - connection closed, good
         Ok(Some(f)) => {
             // Check if it's a close/error
@@ -248,9 +248,9 @@ pub fn version_mismatch(peer: &mut Peer) -> TestResult {
 // Implementation should reject.
 
 #[conformance(name = "handshake.role_conflict", rules = "handshake.role.validation")]
-pub fn role_conflict(peer: &mut Peer) -> TestResult {
+pub async fn role_conflict(peer: &mut Peer) -> TestResult {
     // Wait for Hello from implementation (initiator)
-    let frame = match peer.recv() {
+    let frame = match peer.recv().await {
         Ok(f) => f,
         Err(e) => return TestResult::fail(format!("failed to receive Hello: {}", e)),
     };
@@ -284,12 +284,12 @@ pub fn role_conflict(peer: &mut Peer) -> TestResult {
         Frame::with_payload(desc, payload)
     };
 
-    if let Err(e) = peer.send(&frame) {
+    if let Err(e) = peer.send(&frame).await {
         return TestResult::fail(format!("failed to send Hello: {}", e));
     }
 
     // Implementation should reject
-    match peer.try_recv() {
+    match peer.try_recv().await {
         Ok(None) => TestResult::pass(),
         Ok(Some(f)) => {
             if f.desc.channel_id == 0 && f.desc.method_id == control_verb::CLOSE_CHANNEL {
@@ -316,9 +316,9 @@ pub fn role_conflict(peer: &mut Peer) -> TestResult {
     name = "handshake.required_features_missing",
     rules = "handshake.features.required"
 )]
-pub fn required_features_missing(peer: &mut Peer) -> TestResult {
+pub async fn required_features_missing(peer: &mut Peer) -> TestResult {
     // Wait for Hello from implementation
-    let frame = match peer.recv() {
+    let frame = match peer.recv().await {
         Ok(f) => f,
         Err(e) => return TestResult::fail(format!("failed to receive Hello: {}", e)),
     };
@@ -365,12 +365,12 @@ pub fn required_features_missing(peer: &mut Peer) -> TestResult {
         Frame::with_payload(desc, payload)
     };
 
-    if let Err(e) = peer.send(&frame) {
+    if let Err(e) = peer.send(&frame).await {
         return TestResult::fail(format!("failed to send Hello: {}", e));
     }
 
     // Implementation should reject
-    match peer.try_recv() {
+    match peer.try_recv().await {
         Ok(None) => TestResult::pass(),
         Ok(Some(f)) => {
             if f.desc.channel_id == 0 && f.desc.method_id == control_verb::CLOSE_CHANNEL {
@@ -397,9 +397,9 @@ pub fn required_features_missing(peer: &mut Peer) -> TestResult {
     name = "handshake.method_registry_duplicate",
     rules = "handshake.registry.no-duplicates"
 )]
-pub fn method_registry_duplicate(peer: &mut Peer) -> TestResult {
+pub async fn method_registry_duplicate(peer: &mut Peer) -> TestResult {
     // Wait for Hello from implementation
-    let frame = match peer.recv() {
+    let frame = match peer.recv().await {
         Ok(f) => f,
         Err(e) => return TestResult::fail(format!("failed to receive Hello: {}", e)),
     };
@@ -444,12 +444,12 @@ pub fn method_registry_duplicate(peer: &mut Peer) -> TestResult {
         Frame::with_payload(desc, payload)
     };
 
-    if let Err(e) = peer.send(&frame) {
+    if let Err(e) = peer.send(&frame).await {
         return TestResult::fail(format!("failed to send Hello: {}", e));
     }
 
     // Implementation should reject due to duplicate
-    match peer.try_recv() {
+    match peer.try_recv().await {
         Ok(None) => TestResult::pass(),
         Ok(Some(f)) => {
             if f.desc.channel_id == 0 && f.desc.method_id == control_verb::CLOSE_CHANNEL {
@@ -476,9 +476,9 @@ pub fn method_registry_duplicate(peer: &mut Peer) -> TestResult {
     name = "handshake.method_registry_zero",
     rules = "handshake.registry.no-zero"
 )]
-pub fn method_registry_zero(peer: &mut Peer) -> TestResult {
+pub async fn method_registry_zero(peer: &mut Peer) -> TestResult {
     // Wait for Hello from implementation
-    let frame = match peer.recv() {
+    let frame = match peer.recv().await {
         Ok(f) => f,
         Err(e) => return TestResult::fail(format!("failed to receive Hello: {}", e)),
     };
@@ -516,12 +516,12 @@ pub fn method_registry_zero(peer: &mut Peer) -> TestResult {
         Frame::with_payload(desc, payload)
     };
 
-    if let Err(e) = peer.send(&frame) {
+    if let Err(e) = peer.send(&frame).await {
         return TestResult::fail(format!("failed to send Hello: {}", e));
     }
 
     // Implementation should reject
-    match peer.try_recv() {
+    match peer.try_recv().await {
         Ok(None) => TestResult::pass(),
         Ok(Some(f)) => {
             if f.desc.channel_id == 0 && f.desc.method_id == control_verb::CLOSE_CHANNEL {
@@ -548,7 +548,7 @@ pub fn method_registry_zero(peer: &mut Peer) -> TestResult {
     name = "handshake.explicit_required",
     rules = "handshake.explicit-required"
 )]
-pub fn explicit_required(_peer: &mut Peer) -> TestResult {
+pub async fn explicit_required(_peer: &mut Peer) -> TestResult {
     // This rule states that explicit Hello exchange is mandatory.
     // There is no implicit handshake mode.
     //
@@ -572,7 +572,7 @@ pub fn explicit_required(_peer: &mut Peer) -> TestResult {
     name = "handshake.registry_cross_service",
     rules = "handshake.registry.cross-service"
 )]
-pub fn registry_cross_service(_peer: &mut Peer) -> TestResult {
+pub async fn registry_cross_service(_peer: &mut Peer) -> TestResult {
     // Method ID collisions can occur across services because:
     // - method_id = FNV-1a("ServiceName.methodName")
     // - Two different service.method combinations could hash to same value
@@ -602,7 +602,7 @@ pub fn registry_cross_service(_peer: &mut Peer) -> TestResult {
     name = "handshake.registry_failure",
     rules = "handshake.registry.failure"
 )]
-pub fn registry_failure(_peer: &mut Peer) -> TestResult {
+pub async fn registry_failure(_peer: &mut Peer) -> TestResult {
     // On registry validation failure:
     // 1. Send CloseChannel { channel_id: 0, reason: Error("...") }
     // 2. Close the transport connection
@@ -651,7 +651,7 @@ pub fn registry_failure(_peer: &mut Peer) -> TestResult {
 // Implementations MUST impose a handshake timeout.
 
 #[conformance(name = "handshake.timeout", rules = "handshake.timeout")]
-pub fn timeout(_peer: &mut Peer) -> TestResult {
+pub async fn timeout(_peer: &mut Peer) -> TestResult {
     // Handshake timeout requirements:
     // - MUST be at most 30 seconds
     // - MAY be shorter (e.g., 2 seconds for localhost)

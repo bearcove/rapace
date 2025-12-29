@@ -18,7 +18,7 @@ use rapace_conformance_macros::conformance;
     name = "transport.ordering_single",
     rules = "transport.ordering.single"
 )]
-pub fn ordering_single(_peer: &mut Peer) -> TestResult {
+pub async fn ordering_single(_peer: &mut Peer) -> TestResult {
     // Behavioral guarantee - transport must preserve per-channel ordering
     TestResult::pass()
 }
@@ -34,7 +34,7 @@ pub fn ordering_single(_peer: &mut Peer) -> TestResult {
     name = "transport.ordering_channel",
     rules = "transport.ordering.channel"
 )]
-pub fn ordering_channel(_peer: &mut Peer) -> TestResult {
+pub async fn ordering_channel(_peer: &mut Peer) -> TestResult {
     // Documents that cross-channel ordering is not guaranteed
     TestResult::pass()
 }
@@ -50,7 +50,7 @@ pub fn ordering_channel(_peer: &mut Peer) -> TestResult {
     name = "transport.reliable_delivery",
     rules = "transport.reliable.delivery"
 )]
-pub fn reliable_delivery(_peer: &mut Peer) -> TestResult {
+pub async fn reliable_delivery(_peer: &mut Peer) -> TestResult {
     // Behavioral guarantee - no loss, no corruption
     TestResult::pass()
 }
@@ -66,7 +66,7 @@ pub fn reliable_delivery(_peer: &mut Peer) -> TestResult {
     name = "transport.framing_boundaries",
     rules = "transport.framing.boundaries"
 )]
-pub fn framing_boundaries(_peer: &mut Peer) -> TestResult {
+pub async fn framing_boundaries(_peer: &mut Peer) -> TestResult {
     // Behavioral guarantee - each frame is atomic
     TestResult::pass()
 }
@@ -82,7 +82,7 @@ pub fn framing_boundaries(_peer: &mut Peer) -> TestResult {
     name = "transport.framing_no_coalesce",
     rules = "transport.framing.no-coalesce"
 )]
-pub fn framing_no_coalesce(_peer: &mut Peer) -> TestResult {
+pub async fn framing_no_coalesce(_peer: &mut Peer) -> TestResult {
     // Behavioral guarantee - each frame arrives separately
     TestResult::pass()
 }
@@ -98,7 +98,7 @@ pub fn framing_no_coalesce(_peer: &mut Peer) -> TestResult {
     name = "transport.stream_length_match",
     rules = "transport.stream.length-match"
 )]
-pub fn stream_length_match(_peer: &mut Peer) -> TestResult {
+pub async fn stream_length_match(_peer: &mut Peer) -> TestResult {
     // Verify the frame structure allows length specification
     let mut desc = MsgDescHot::new();
     desc.payload_len = 100;
@@ -123,7 +123,7 @@ pub fn stream_length_match(_peer: &mut Peer) -> TestResult {
     name = "transport.stream_max_length",
     rules = "transport.stream.max-length"
 )]
-pub fn stream_max_length(_peer: &mut Peer) -> TestResult {
+pub async fn stream_max_length(_peer: &mut Peer) -> TestResult {
     // Verify that payload_len is u32, supporting large payloads
     let mut desc = MsgDescHot::new();
     desc.payload_len = 1024 * 1024; // 1MB
@@ -148,7 +148,7 @@ pub fn stream_max_length(_peer: &mut Peer) -> TestResult {
     name = "transport.shutdown_orderly",
     rules = "transport.shutdown.orderly"
 )]
-pub fn shutdown_orderly(_peer: &mut Peer) -> TestResult {
+pub async fn shutdown_orderly(_peer: &mut Peer) -> TestResult {
     // Verify GoAway structure
     let goaway = GoAway {
         reason: GoAwayReason::Shutdown,
@@ -185,7 +185,7 @@ pub fn shutdown_orderly(_peer: &mut Peer) -> TestResult {
     name = "transport.stream_validation",
     rules = "transport.stream.validation"
 )]
-pub fn stream_validation(_peer: &mut Peer) -> TestResult {
+pub async fn stream_validation(_peer: &mut Peer) -> TestResult {
     // This rule requires receivers to enforce:
     // - varint-limit: max 10 bytes
     // - varint-canonical: shortest encoding
@@ -218,7 +218,7 @@ pub fn stream_validation(_peer: &mut Peer) -> TestResult {
     name = "transport.stream_varint_limit",
     rules = "transport.stream.varint-limit"
 )]
-pub fn stream_varint_limit(_peer: &mut Peer) -> TestResult {
+pub async fn stream_varint_limit(_peer: &mut Peer) -> TestResult {
     // Varint encoding uses 7 bits per byte
     // Maximum reasonable value for frame length fits in 10 bytes
     // 10 bytes * 7 bits = 70 bits > 64 bits for u64
@@ -257,7 +257,7 @@ pub fn stream_varint_limit(_peer: &mut Peer) -> TestResult {
     name = "transport.stream_varint_canonical",
     rules = "transport.stream.varint-canonical"
 )]
-pub fn stream_varint_canonical(_peer: &mut Peer) -> TestResult {
+pub async fn stream_varint_canonical(_peer: &mut Peer) -> TestResult {
     // Canonical encoding examples:
     // 0 -> [0x00] (1 byte)
     // 127 -> [0x7F] (1 byte)
@@ -318,7 +318,7 @@ pub fn stream_varint_canonical(_peer: &mut Peer) -> TestResult {
     name = "transport.stream_min_length",
     rules = "transport.stream.min-length"
 )]
-pub fn stream_min_length(_peer: &mut Peer) -> TestResult {
+pub async fn stream_min_length(_peer: &mut Peer) -> TestResult {
     // Minimum frame is just the descriptor (64 bytes), no payload
     const MIN_FRAME_SIZE: usize = 64;
 
@@ -358,7 +358,7 @@ pub fn stream_min_length(_peer: &mut Peer) -> TestResult {
     name = "transport.stream_size_limits",
     rules = "transport.stream.size-limits"
 )]
-pub fn stream_size_limits(_peer: &mut Peer) -> TestResult {
+pub async fn stream_size_limits(_peer: &mut Peer) -> TestResult {
     // max_payload_size is negotiated at handshake (typically 1-16 MB)
     // Frame size = payload_size + 64 (descriptor)
 
@@ -386,7 +386,7 @@ pub fn stream_size_limits(_peer: &mut Peer) -> TestResult {
 // Transports SHOULD propagate backpressure.
 
 #[conformance(name = "transport.backpressure", rules = "transport.backpressure")]
-pub fn backpressure(_peer: &mut Peer) -> TestResult {
+pub async fn backpressure(_peer: &mut Peer) -> TestResult {
     // This is a SHOULD rule about runtime behavior
     // Backpressure prevents overwhelming slow receivers
 
@@ -404,7 +404,7 @@ pub fn backpressure(_peer: &mut Peer) -> TestResult {
 // Transports MUST provide a BufferPool for payload allocation.
 
 #[conformance(name = "transport.buffer_pool", rules = "transport.buffer-pool")]
-pub fn buffer_pool(_peer: &mut Peer) -> TestResult {
+pub async fn buffer_pool(_peer: &mut Peer) -> TestResult {
     // BufferPool enables:
     // - Memory reuse (avoiding allocations)
     // - SHM slot management
@@ -427,7 +427,7 @@ pub fn buffer_pool(_peer: &mut Peer) -> TestResult {
     name = "transport.keepalive_transport",
     rules = "transport.keepalive.transport"
 )]
-pub fn keepalive_transport(_peer: &mut Peer) -> TestResult {
+pub async fn keepalive_transport(_peer: &mut Peer) -> TestResult {
     // Transport-level keepalive:
     // - TCP: SO_KEEPALIVE
     // - WebSocket: ping/pong frames
@@ -449,7 +449,7 @@ pub fn keepalive_transport(_peer: &mut Peer) -> TestResult {
     name = "transport.webtransport_server_requirements",
     rules = "transport.webtransport.server-requirements"
 )]
-pub fn webtransport_server_requirements(_peer: &mut Peer) -> TestResult {
+pub async fn webtransport_server_requirements(_peer: &mut Peer) -> TestResult {
     // WebTransport requirements:
     // - HTTPS on port 443 (or alt-svc)
     // - Proper handshake handling
@@ -471,7 +471,7 @@ pub fn webtransport_server_requirements(_peer: &mut Peer) -> TestResult {
     name = "transport.webtransport_datagram_restrictions",
     rules = "transport.webtransport.datagram-restrictions"
 )]
-pub fn webtransport_datagram_restrictions(_peer: &mut Peer) -> TestResult {
+pub async fn webtransport_datagram_restrictions(_peer: &mut Peer) -> TestResult {
     // Datagrams are unreliable and may be:
     // - Lost
     // - Reordered

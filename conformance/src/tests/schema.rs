@@ -17,7 +17,7 @@ use rapace_conformance_macros::conformance;
     name = "schema.identifier_normalization",
     rules = "schema.identifier.normalization"
 )]
-pub fn identifier_normalization(_peer: &mut Peer) -> TestResult {
+pub async fn identifier_normalization(_peer: &mut Peer) -> TestResult {
     // Identifiers are case-sensitive
     // userId ≠ user_id ≠ UserId
 
@@ -63,7 +63,7 @@ pub fn identifier_normalization(_peer: &mut Peer) -> TestResult {
 // The schema hash MUST use BLAKE3 over a canonical serialization.
 
 #[conformance(name = "schema.hash_algorithm", rules = "schema.hash.algorithm")]
-pub fn hash_algorithm(_peer: &mut Peer) -> TestResult {
+pub async fn hash_algorithm(_peer: &mut Peer) -> TestResult {
     // This rule specifies BLAKE3 as the hash algorithm
     // The sig_hash is a 32-byte BLAKE3 digest
 
@@ -105,7 +105,7 @@ pub fn hash_algorithm(_peer: &mut Peer) -> TestResult {
     name = "schema.encoding_endianness",
     rules = "schema.encoding.endianness"
 )]
-pub fn encoding_endianness(_peer: &mut Peer) -> TestResult {
+pub async fn encoding_endianness(_peer: &mut Peer) -> TestResult {
     // Verify little-endian encoding
 
     let value: u32 = 0x12345678;
@@ -142,7 +142,7 @@ pub fn encoding_endianness(_peer: &mut Peer) -> TestResult {
 // String lengths and counts MUST be encoded as u32 little-endian.
 
 #[conformance(name = "schema.encoding_lengths", rules = "schema.encoding.lengths")]
-pub fn encoding_lengths(_peer: &mut Peer) -> TestResult {
+pub async fn encoding_lengths(_peer: &mut Peer) -> TestResult {
     // Lengths are u32 little-endian
 
     let length: u32 = 42;
@@ -175,7 +175,7 @@ pub fn encoding_lengths(_peer: &mut Peer) -> TestResult {
 // Fields and variants MUST be serialized in declaration order.
 
 #[conformance(name = "schema.encoding_order", rules = "schema.encoding.order")]
-pub fn encoding_order(_peer: &mut Peer) -> TestResult {
+pub async fn encoding_order(_peer: &mut Peer) -> TestResult {
     // Declaration order is critical for schema hashing
     // Reordering fields produces a different hash
 
@@ -223,7 +223,7 @@ pub fn encoding_order(_peer: &mut Peer) -> TestResult {
     name = "schema.hash_cross_language",
     rules = "schema.hash.cross-language"
 )]
-pub fn hash_cross_language(_peer: &mut Peer) -> TestResult {
+pub async fn hash_cross_language(_peer: &mut Peer) -> TestResult {
     // This is a semantic rule about cross-language compatibility
     // We verify by testing known canonical representations
 
@@ -280,7 +280,7 @@ pub fn hash_cross_language(_peer: &mut Peer) -> TestResult {
 // Peers MUST check compatibility based on method_id and sig_hash.
 
 #[conformance(name = "schema.compat_check", rules = "schema.compat.check")]
-pub fn compat_check(_peer: &mut Peer) -> TestResult {
+pub async fn compat_check(_peer: &mut Peer) -> TestResult {
     // Compatibility check rules:
     // - Same method_id, same sig_hash -> Compatible
     // - Same method_id, different sig_hash -> Incompatible
@@ -353,7 +353,7 @@ pub fn compat_check(_peer: &mut Peer) -> TestResult {
 // Client MUST reject incompatible calls with INCOMPATIBLE_SCHEMA.
 
 #[conformance(name = "schema.compat_rejection", rules = "schema.compat.rejection")]
-pub fn compat_rejection(_peer: &mut Peer) -> TestResult {
+pub async fn compat_rejection(_peer: &mut Peer) -> TestResult {
     // When sig_hash mismatches, client must reject before encoding
 
     use rapace_protocol::error_code;
@@ -392,7 +392,7 @@ pub fn compat_rejection(_peer: &mut Peer) -> TestResult {
     name = "schema.collision_detection",
     rules = "schema.collision.detection"
 )]
-pub fn collision_detection(_peer: &mut Peer) -> TestResult {
+pub async fn collision_detection(_peer: &mut Peer) -> TestResult {
     // method_id is computed via FNV-1a hash
     // Collisions must be detected at compile/build time
 
@@ -439,7 +439,7 @@ pub fn collision_detection(_peer: &mut Peer) -> TestResult {
 // Runtime collisions SHALL NOT occur if codegen is correct.
 
 #[conformance(name = "schema.collision_runtime", rules = "schema.collision.runtime")]
-pub fn collision_runtime(_peer: &mut Peer) -> TestResult {
+pub async fn collision_runtime(_peer: &mut Peer) -> TestResult {
     // This is a semantic rule stating that runtime assumes no collisions
     // Codegen is responsible for detecting collisions
 

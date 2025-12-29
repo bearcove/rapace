@@ -15,7 +15,7 @@ use rapace_conformance_macros::conformance;
 // Credits from multiple GrantCredits messages are additive.
 
 #[conformance(name = "flow.credit_additive", rules = "core.flow.credit-additive")]
-pub fn credit_additive(_peer: &mut Peer) -> TestResult {
+pub async fn credit_additive(_peer: &mut Peer) -> TestResult {
     // Structural test - verify GrantCredits structure
     let grant = GrantCredits {
         channel_id: 5,
@@ -50,7 +50,7 @@ pub fn credit_additive(_peer: &mut Peer) -> TestResult {
 // The CREDITS flag indicates credit_grant field is valid.
 
 #[conformance(name = "flow.credit_in_flags", rules = "core.flow.credit-semantics")]
-pub fn credit_in_flags(_peer: &mut Peer) -> TestResult {
+pub async fn credit_in_flags(_peer: &mut Peer) -> TestResult {
     // Verify CREDITS flag value
     if flags::CREDITS != 0b0100_0000 {
         return TestResult::fail(format!(
@@ -70,7 +70,7 @@ pub fn credit_in_flags(_peer: &mut Peer) -> TestResult {
 // EOS-only frames don't consume credits.
 
 #[conformance(name = "flow.eos_no_credits", rules = "core.flow.eos-no-credits")]
-pub fn eos_no_credits(_peer: &mut Peer) -> TestResult {
+pub async fn eos_no_credits(_peer: &mut Peer) -> TestResult {
     // This is a behavioral test - implementations must not decrement
     // credits when receiving EOS-only frames (no DATA flag or empty payload)
     // We can only verify the flag values here
@@ -92,7 +92,7 @@ pub fn eos_no_credits(_peer: &mut Peer) -> TestResult {
 // Credit value 0xFFFFFFFF means unlimited.
 
 #[conformance(name = "flow.infinite_credit", rules = "core.flow.infinite-credit")]
-pub fn infinite_credit(_peer: &mut Peer) -> TestResult {
+pub async fn infinite_credit(_peer: &mut Peer) -> TestResult {
     // Verify the sentinel value
     const INFINITE_CREDIT: u32 = 0xFFFFFFFF;
 
@@ -118,7 +118,7 @@ pub fn infinite_credit(_peer: &mut Peer) -> TestResult {
 // Rapace MUST use credit-based flow control per channel.
 
 #[conformance(name = "flow.intro", rules = "core.flow.intro")]
-pub fn intro(_peer: &mut Peer) -> TestResult {
+pub async fn intro(_peer: &mut Peer) -> TestResult {
     // This rule establishes that Rapace uses credit-based flow control.
     // Each channel has its own credit window.
     //
@@ -162,7 +162,7 @@ pub fn intro(_peer: &mut Peer) -> TestResult {
 // Receiver SHOULD send GoAway and MUST close the connection.
 
 #[conformance(name = "flow.credit_overrun", rules = "core.flow.credit-overrun")]
-pub fn credit_overrun(_peer: &mut Peer) -> TestResult {
+pub async fn credit_overrun(_peer: &mut Peer) -> TestResult {
     // Credit overrun is a serious protocol violation.
     // When a receiver sees payload_len > remaining credits:
     // 1. It's a protocol error

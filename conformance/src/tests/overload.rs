@@ -8,9 +8,10 @@ use crate::testcase::TestResult;
 use rapace_conformance_macros::conformance;
 
 /// Helper to complete handshake.
-fn do_handshake(peer: &mut Peer) -> Result<(), String> {
+async fn do_handshake(peer: &mut Peer) -> Result<(), String> {
     let frame = peer
         .recv()
+        .await
         .map_err(|e| format!("failed to receive Hello: {}", e))?;
 
     if frame.desc.channel_id != 0 || frame.desc.method_id != control_verb::HELLO {
@@ -43,7 +44,7 @@ fn do_handshake(peer: &mut Peer) -> Result<(), String> {
         Frame::with_payload(desc, payload)
     };
 
-    peer.send(&frame).map_err(|e| e.to_string())?;
+    peer.send(&frame).await.map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -55,7 +56,7 @@ fn do_handshake(peer: &mut Peer) -> Result<(), String> {
 // When limits exceeded: max_channels -> CancelChannel, max_pending -> RESOURCE_EXHAUSTED
 
 #[conformance(name = "overload.limits_response", rules = "overload.limits.response")]
-pub fn limits_response(_peer: &mut Peer) -> TestResult {
+pub async fn limits_response(_peer: &mut Peer) -> TestResult {
     // This rule specifies responses for limit violations:
     // - max_channels exceeded -> CancelChannel { reason: ResourceExhausted }
     // - max_pending_calls exceeded -> CallResult { status: RESOURCE_EXHAUSTED }
@@ -103,8 +104,8 @@ pub fn limits_response(_peer: &mut Peer) -> TestResult {
 // Calls on channel_id <= last_channel_id MUST proceed normally after GoAway.
 
 #[conformance(name = "overload.goaway_existing", rules = "overload.goaway.existing")]
-pub fn goaway_existing(peer: &mut Peer) -> TestResult {
-    if let Err(e) = do_handshake(peer) {
+pub async fn goaway_existing(peer: &mut Peer) -> TestResult {
+    if let Err(e) = do_handshake(peer).await {
         return TestResult::fail(e);
     }
 
@@ -130,7 +131,7 @@ pub fn goaway_existing(peer: &mut Peer) -> TestResult {
         Frame::with_payload(desc, payload)
     };
 
-    if let Err(e) = peer.send(&frame) {
+    if let Err(e) = peer.send(&frame).await {
         return TestResult::fail(format!("failed to send OpenChannel: {}", e));
     }
 
@@ -155,7 +156,7 @@ pub fn goaway_existing(peer: &mut Peer) -> TestResult {
         Frame::with_payload(desc, payload)
     };
 
-    if let Err(e) = peer.send(&frame) {
+    if let Err(e) = peer.send(&frame).await {
         return TestResult::fail(format!("failed to send GoAway: {}", e));
     }
 
@@ -176,8 +177,8 @@ pub fn goaway_existing(peer: &mut Peer) -> TestResult {
     name = "overload.goaway_new_rejected",
     rules = "overload.goaway.new-rejected"
 )]
-pub fn goaway_new_rejected(peer: &mut Peer) -> TestResult {
-    if let Err(e) = do_handshake(peer) {
+pub async fn goaway_new_rejected(peer: &mut Peer) -> TestResult {
+    if let Err(e) = do_handshake(peer).await {
         return TestResult::fail(e);
     }
 
@@ -217,7 +218,7 @@ pub fn goaway_new_rejected(peer: &mut Peer) -> TestResult {
 // After sending GoAway, peer MUST NOT open new channels.
 
 #[conformance(name = "overload.goaway_no_new", rules = "overload.goaway.no-new")]
-pub fn goaway_no_new(_peer: &mut Peer) -> TestResult {
+pub async fn goaway_no_new(_peer: &mut Peer) -> TestResult {
     // This rule specifies that after sending GoAway:
     // - The sender MUST NOT send any OpenChannel messages
     // - This is enforced by the sender, verified by receiver
@@ -244,7 +245,7 @@ pub fn goaway_no_new(_peer: &mut Peer) -> TestResult {
 // Sender MUST close connection after grace period.
 
 #[conformance(name = "overload.goaway_drain", rules = "overload.goaway.drain")]
-pub fn goaway_drain(_peer: &mut Peer) -> TestResult {
+pub async fn goaway_drain(_peer: &mut Peer) -> TestResult {
     // This rule specifies:
     // - After sending GoAway, wait for grace period
     // - Then close the connection
@@ -288,7 +289,7 @@ pub fn goaway_drain(_peer: &mut Peer) -> TestResult {
     name = "overload.drain_grace_period",
     rules = "overload.drain.grace-period"
 )]
-pub fn drain_grace_period(_peer: &mut Peer) -> TestResult {
+pub async fn drain_grace_period(_peer: &mut Peer) -> TestResult {
     // Grace period formula:
     // grace_period = max(latest_pending_deadline - now(), 30 seconds)
 
@@ -318,7 +319,7 @@ pub fn drain_grace_period(_peer: &mut Peer) -> TestResult {
     name = "overload.drain_after_grace",
     rules = "overload.drain.after-grace"
 )]
-pub fn drain_after_grace(_peer: &mut Peer) -> TestResult {
+pub async fn drain_after_grace(_peer: &mut Peer) -> TestResult {
     // After grace period, implementations MUST:
     // 1. Cancel remaining calls with DeadlineExceeded
     // 2. Send CloseChannel for all open channels
@@ -358,7 +359,7 @@ pub fn drain_after_grace(_peer: &mut Peer) -> TestResult {
 // Clients MUST check rapace.retryable trailer; if 0, MUST NOT retry.
 
 #[conformance(name = "overload.retry_retryable", rules = "overload.retry.retryable")]
-pub fn retry_retryable(_peer: &mut Peer) -> TestResult {
+pub async fn retry_retryable(_peer: &mut Peer) -> TestResult {
     // The rapace.retryable trailer indicates if a request can be retried
     // - 1 (or absent): retryable
     // - 0: not retryable
@@ -408,7 +409,7 @@ pub fn retry_retryable(_peer: &mut Peer) -> TestResult {
     name = "overload.retry_retry_after",
     rules = "overload.retry.retry-after"
 )]
-pub fn retry_retry_after(_peer: &mut Peer) -> TestResult {
+pub async fn retry_retry_after(_peer: &mut Peer) -> TestResult {
     // The rapace.retry_after_ms trailer specifies minimum wait time
 
     let retry_after_ms: u32 = 100;

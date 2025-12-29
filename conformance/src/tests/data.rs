@@ -18,7 +18,7 @@ use std::collections::HashMap;
     name = "data.determinism_map_order",
     rules = "data.determinism.map-order"
 )]
-pub fn determinism_map_order(_peer: &mut Peer) -> TestResult {
+pub async fn determinism_map_order(_peer: &mut Peer) -> TestResult {
     // Map ordering is NOT deterministic between different:
     // - HashMap instances (even with same contents)
     // - Program runs (HashMap uses random state)
@@ -58,7 +58,7 @@ pub fn determinism_map_order(_peer: &mut Peer) -> TestResult {
 // Floating-point types MUST be encoded as IEEE 754 little-endian bit patterns.
 
 #[conformance(name = "data.float_encoding", rules = "data.float.encoding")]
-pub fn float_encoding(_peer: &mut Peer) -> TestResult {
+pub async fn float_encoding(_peer: &mut Peer) -> TestResult {
     // Verify f32 encoding (IEEE 754 little-endian)
     let f32_val: f32 = 1.0;
     let f32_bytes = f32_val.to_le_bytes();
@@ -97,7 +97,7 @@ pub fn float_encoding(_peer: &mut Peer) -> TestResult {
     name = "data.float_nan_canonicalization",
     rules = "data.float.nan-canonicalization"
 )]
-pub fn float_nan_canonicalization(_peer: &mut Peer) -> TestResult {
+pub async fn float_nan_canonicalization(_peer: &mut Peer) -> TestResult {
     // Canonical NaN values:
     // f32: 0x7FC00000
     // f64: 0x7FF8000000000000
@@ -145,7 +145,7 @@ pub fn float_nan_canonicalization(_peer: &mut Peer) -> TestResult {
 // Negative zero and positive zero MUST be encoded as distinct bit patterns.
 
 #[conformance(name = "data.float_negative_zero", rules = "data.float.negative-zero")]
-pub fn float_negative_zero(_peer: &mut Peer) -> TestResult {
+pub async fn float_negative_zero(_peer: &mut Peer) -> TestResult {
     // Positive zero and negative zero have different bit patterns
     let pos_zero: f64 = 0.0;
     let neg_zero: f64 = -0.0;
@@ -192,7 +192,7 @@ pub fn float_negative_zero(_peer: &mut Peer) -> TestResult {
     name = "data.service_facet_required",
     rules = "data.service.facet-required"
 )]
-pub fn service_facet_required(_peer: &mut Peer) -> TestResult {
+pub async fn service_facet_required(_peer: &mut Peer) -> TestResult {
     // This is a compile-time requirement enforced by the #[rapace::service] macro.
     // The macro requires all argument and return types to implement Facet.
     //
@@ -225,7 +225,7 @@ pub fn service_facet_required(_peer: &mut Peer) -> TestResult {
     name = "data.type_system_additional",
     rules = "data.type-system.additional"
 )]
-pub fn type_system_additional(_peer: &mut Peer) -> TestResult {
+pub async fn type_system_additional(_peer: &mut Peer) -> TestResult {
     // The core type system includes:
     // - Primitives: i8-i128, u8-u128, f32, f64, bool, char, String
     // - Compound: structs, tuples, arrays, Vec, HashMap, BTreeMap, enums, Option, ()
@@ -248,7 +248,7 @@ pub fn type_system_additional(_peer: &mut Peer) -> TestResult {
     name = "data.unsupported_borrowed_return",
     rules = "data.unsupported.borrowed-return"
 )]
-pub fn unsupported_borrowed_return(_peer: &mut Peer) -> TestResult {
+pub async fn unsupported_borrowed_return(_peer: &mut Peer) -> TestResult {
     // Borrowed types like &[u8] or &str MUST NOT be used in return position.
     // Use owned types instead: Vec<u8>, String.
     //
@@ -270,7 +270,7 @@ pub fn unsupported_borrowed_return(_peer: &mut Peer) -> TestResult {
     name = "data.unsupported_pointers",
     rules = "data.unsupported.pointers"
 )]
-pub fn unsupported_pointers(_peer: &mut Peer) -> TestResult {
+pub async fn unsupported_pointers(_peer: &mut Peer) -> TestResult {
     // Raw pointers (*const T, *mut T) cannot be serialized.
     // They represent memory addresses which are meaningless across processes.
     //
@@ -289,7 +289,7 @@ pub fn unsupported_pointers(_peer: &mut Peer) -> TestResult {
     name = "data.unsupported_self_ref",
     rules = "data.unsupported.self-ref"
 )]
-pub fn unsupported_self_ref(_peer: &mut Peer) -> TestResult {
+pub async fn unsupported_self_ref(_peer: &mut Peer) -> TestResult {
     // Self-referential types (types that contain references to themselves)
     // cannot be serialized with Postcard.
     //
@@ -309,7 +309,7 @@ pub fn unsupported_self_ref(_peer: &mut Peer) -> TestResult {
 // Untagged unions MUST NOT be used; not supported by Postcard.
 
 #[conformance(name = "data.unsupported_unions", rules = "data.unsupported.unions")]
-pub fn unsupported_unions(_peer: &mut Peer) -> TestResult {
+pub async fn unsupported_unions(_peer: &mut Peer) -> TestResult {
     // Rust's `union` types are not supported.
     // Use enums (tagged unions) instead.
     //
@@ -325,7 +325,7 @@ pub fn unsupported_unions(_peer: &mut Peer) -> TestResult {
 // usize and isize MUST NOT be used in public service APIs.
 
 #[conformance(name = "data.unsupported_usize", rules = "data.unsupported.usize")]
-pub fn unsupported_usize(_peer: &mut Peer) -> TestResult {
+pub async fn unsupported_usize(_peer: &mut Peer) -> TestResult {
     // usize/isize vary by platform:
     // - 32-bit platforms: 4 bytes
     // - 64-bit platforms: 8 bytes
@@ -369,7 +369,7 @@ pub fn unsupported_usize(_peer: &mut Peer) -> TestResult {
 // Struct fields MUST be encoded in declaration order with no names.
 
 #[conformance(name = "data.wire_field_order", rules = "data.wire.field-order")]
-pub fn wire_field_order(_peer: &mut Peer) -> TestResult {
+pub async fn wire_field_order(_peer: &mut Peer) -> TestResult {
     // Fields are encoded in declaration order.
     // No field names or indices are sent over the wire.
     //
@@ -405,7 +405,7 @@ pub fn wire_field_order(_peer: &mut Peer) -> TestResult {
     name = "data.wire_non_self_describing",
     rules = "data.wire.non-self-describing"
 )]
-pub fn wire_non_self_describing(_peer: &mut Peer) -> TestResult {
+pub async fn wire_non_self_describing(_peer: &mut Peer) -> TestResult {
     // Postcard is NOT self-describing.
     // Field names, struct names, type tags are NOT sent over the wire.
     //
