@@ -261,6 +261,7 @@ jobs:
         run: |
           cargo install tracey --git https://github.com/bearcove/tracey
           mkdir -p docs/public
+          shopt -s globstar
           tracey rules -o docs/public/_rules.json docs/content/spec/**/*.md
 
       - name: Upload _rules.json
