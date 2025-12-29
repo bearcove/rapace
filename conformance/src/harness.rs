@@ -63,7 +63,7 @@ impl Peer {
     /// Send a frame to the implementation.
     pub fn send(&mut self, frame: &Frame) -> io::Result<()> {
         let payload = if frame.desc.payload_slot == INLINE_PAYLOAD_SLOT {
-            &[] as &[u8]
+            &frame.desc.inline_payload[..frame.desc.payload_len as usize]
         } else {
             &frame.payload
         };
