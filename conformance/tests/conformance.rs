@@ -998,6 +998,26 @@ fn is_interactive_test(test_name: &str) -> bool {
         return false;
     }
 
+    // All payload tests are non-interactive (structural verification)
+    if test_name.starts_with("payload.") {
+        return false;
+    }
+
+    // All metadata tests are non-interactive (structural verification)
+    if test_name.starts_with("metadata.") {
+        return false;
+    }
+
+    // All schema tests are non-interactive (structural verification)
+    if test_name.starts_with("schema.") {
+        return false;
+    }
+
+    // All priority tests are non-interactive (structural verification)
+    if test_name.starts_with("priority.") {
+        return false;
+    }
+
     test_name.starts_with("handshake.")
         || test_name.starts_with("call.")
         || test_name.starts_with("channel.")
