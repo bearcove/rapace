@@ -5,9 +5,10 @@
 use crate::harness::{Frame, Peer};
 use crate::protocol::*;
 use crate::testcase::TestResult;
+use rapace_conformance_macros::conformance;
 
-/// Helper to complete handshake.
-fn do_handshake(peer: &mut Peer) -> Result<(), String> {
+/// Helper to complete handshake as acceptor (wait for Hello, send Hello response).
+fn do_handshake_as_acceptor(peer: &mut Peer) -> Result<(), String> {
     let frame = peer
         .recv()
         .map_err(|e| format!("failed to receive Hello: {}", e))?;
@@ -45,6 +46,51 @@ fn do_handshake(peer: &mut Peer) -> Result<(), String> {
     };
 
     peer.send(&frame).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Backwards compat alias
+fn do_handshake(peer: &mut Peer) -> Result<(), String> {
+    do_handshake_as_acceptor(peer)
+}
+
+/// Helper to complete handshake as initiator (send Hello, wait for Hello response).
+fn do_handshake_as_initiator(peer: &mut Peer) -> Result<(), String> {
+    let hello = Hello {
+        protocol_version: PROTOCOL_VERSION_1_0,
+        role: Role::Initiator,
+        required_features: 0,
+        supported_features: features::ATTACHED_STREAMS | features::CALL_ENVELOPE,
+        limits: Limits::default(),
+        methods: vec![],
+        params: Vec::new(),
+    };
+
+    let payload = facet_format_postcard::to_vec(&hello).map_err(|e| e.to_string())?;
+
+    let mut desc = MsgDescHot::new();
+    desc.msg_id = 1;
+    desc.channel_id = 0;
+    desc.method_id = control_verb::HELLO;
+    desc.flags = flags::CONTROL;
+
+    let frame = if payload.len() <= INLINE_PAYLOAD_SIZE {
+        Frame::inline(desc, &payload)
+    } else {
+        Frame::with_payload(desc, payload)
+    };
+
+    peer.send(&frame).map_err(|e| e.to_string())?;
+
+    // Wait for Hello response
+    let frame = peer
+        .recv()
+        .map_err(|e| format!("failed to receive Hello response: {}", e))?;
+
+    if frame.desc.channel_id != 0 || frame.desc.method_id != control_verb::HELLO {
+        return Err("expected Hello response".to_string());
+    }
+
     Ok(())
 }
 
@@ -398,6 +444,85 @@ pub fn request_method_id(_peer: &mut Peer) -> TestResult {
 }
 
 // =============================================================================
+// core.call.response.method_id
+// =============================================================================
+// Rules: [verify core.call.response.method-id]
+//
+// Response method_id MUST match request method_id.
+
+#[conformance(
+    name = "call.response_method_id_must_match",
+    rules = "core.call.response.method-id"
+)]
+pub fn response_method_id_must_match(peer: &mut Peer) -> TestResult {
+    // Act as initiator: send Hello, make a call, verify response echoes method_id
+    if let Err(e) = do_handshake_as_initiator(peer) {
+        return TestResult::fail(e);
+    }
+
+    let method_id = compute_method_id("Test", "echo");
+    let channel_id = 1u32; // Initiator uses odd channel IDs
+
+    // Send OpenChannel
+    let open = OpenChannel {
+        channel_id,
+        kind: ChannelKind::Call,
+        attach: None,
+        metadata: Vec::new(),
+        initial_credits: 65536,
+    };
+
+    let payload = facet_format_postcard::to_vec(&open).expect("failed to encode OpenChannel");
+
+    let mut desc = MsgDescHot::new();
+    desc.msg_id = 2;
+    desc.channel_id = 0;
+    desc.method_id = control_verb::OPEN_CHANNEL;
+    desc.flags = flags::CONTROL;
+
+    let frame = if payload.len() <= INLINE_PAYLOAD_SIZE {
+        Frame::inline(desc, &payload)
+    } else {
+        Frame::with_payload(desc, payload)
+    };
+
+    if let Err(e) = peer.send(&frame) {
+        return TestResult::fail(format!("failed to send OpenChannel: {}", e));
+    }
+
+    // Send request
+    let request_payload = b"test request";
+
+    let mut desc = MsgDescHot::new();
+    desc.msg_id = 3;
+    desc.channel_id = channel_id;
+    desc.method_id = method_id;
+    desc.flags = flags::DATA | flags::EOS;
+
+    let frame = Frame::inline(desc, request_payload);
+
+    if let Err(e) = peer.send(&frame) {
+        return TestResult::fail(format!("failed to send request: {}", e));
+    }
+
+    // Receive response
+    let frame = match peer.recv() {
+        Ok(f) => f,
+        Err(e) => return TestResult::fail(format!("failed to receive response: {}", e)),
+    };
+
+    // Verify method_id matches
+    if frame.desc.method_id != method_id {
+        return TestResult::fail(format!(
+            "[verify core.call.response.method-id]: response method_id {} does not match request method_id {}",
+            frame.desc.method_id, method_id
+        ));
+    }
+
+    TestResult::pass()
+}
+
+// =============================================================================
 // core.call.request.payload
 // =============================================================================
 // Rules: [verify core.call.request.payload]
@@ -484,6 +609,7 @@ pub fn run(name: &str) -> TestResult {
         "request_flags" => request_flags(&mut peer),
         "response_flags" => response_flags(&mut peer),
         "response_msg_id_echo" => response_msg_id_echo(&mut peer),
+        // response_method_id_must_match: now registered via #[conformance] macro
         "error_flag_match" => error_flag_match(&mut peer),
         "unknown_method" => unknown_method(&mut peer),
         "request_method_id" => request_method_id(&mut peer),
@@ -496,7 +622,8 @@ pub fn run(name: &str) -> TestResult {
     }
 }
 
-/// List all call test cases.
+/// List all call test cases (manually registered ones).
+/// Tests with #[conformance] macro are registered via inventory.
 pub fn list() -> Vec<(&'static str, &'static [&'static str])> {
     vec![
         ("one_req_one_resp", &["core.call.one-req-one-resp"][..]),
@@ -506,6 +633,7 @@ pub fn list() -> Vec<(&'static str, &'static [&'static str])> {
             "response_msg_id_echo",
             &["core.call.response.msg-id", "frame.msg-id.call-echo"][..],
         ),
+        // response_method_id_must_match: now registered via #[conformance] macro
         (
             "error_flag_match",
             &["core.call.error.flag-match", "error.flag.match"][..],
