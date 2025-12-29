@@ -66,6 +66,9 @@ impl Peer {
     }
 
     /// Send a frame to the implementation.
+    ///
+    /// Note: StreamTransport sends inline payloads as separate bytes after the descriptor,
+    /// even though they're also in desc.inline_payload. We match this behavior for compatibility.
     pub async fn send(&mut self, frame: &Frame) -> std::io::Result<()> {
         let payload = if frame.desc.payload_slot == INLINE_PAYLOAD_SLOT {
             &frame.desc.inline_payload[..frame.desc.payload_len as usize]
@@ -83,7 +86,7 @@ impl Peer {
         // Write descriptor
         self.stdout.write_all(&frame.desc.to_bytes()).await?;
 
-        // Write payload (if external)
+        // Write payload bytes (StreamTransport sends inline payloads here too)
         if !payload.is_empty() {
             self.stdout.write_all(payload).await?;
         }
