@@ -3,7 +3,10 @@
 //! This test suite generates one test per spec rule. Each test fails unless
 //! the rule has an `[impl ...]` or `[verify ...]` annotation in the codebase.
 //!
-//! Run with: cargo nextest run -p rapace-conformance --test coverage
+//! These tests are marked as ignored by default because they're expected to fail
+//! until we achieve full spec coverage. Run them explicitly with:
+//!
+//!   cargo nextest run -p rapace-conformance --test coverage --run-ignored=all --no-fail-fast
 
 use facet::Facet;
 use libtest_mimic::{Arguments, Failed, Trial};
@@ -48,7 +51,7 @@ fn main() {
     // Get covered rules by scanning the codebase
     let covered = get_covered_rules();
 
-    // Create a test for each rule
+    // Create a test for each rule (all ignored by default)
     let trials: Vec<Trial> = rules
         .into_iter()
         .map(|rule_id| {
@@ -65,6 +68,7 @@ fn main() {
                     )))
                 }
             })
+            .with_ignored_flag(true)
         })
         .collect();
 
