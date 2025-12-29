@@ -245,6 +245,31 @@ jobs:
         working-directory: swift
         run: swift test
 
+  spec-rules:
+    name: Extract Spec Rules
+    runs-on: depot-ubuntu-24.04-4
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install tracey and generate _rules.json
+        run: |
+          cargo install tracey --git https://github.com/bearcove/tracey
+          mkdir -p docs/public
+          tracey rules -o docs/public/_rules.json docs/content/spec/**/*.md
+
+      - name: Upload _rules.json
+        uses: actions/upload-artifact@v4
+        with:
+          name: spec-rules
+          path: docs/public/_rules.json
+          retention-days: 1
+
   spec-coverage-rust:
     name: Spec Coverage (Rust)
     runs-on: depot-ubuntu-24.04-16
@@ -265,6 +290,7 @@ jobs:
 
   spec-coverage-swift:
     name: Spec Coverage (Swift)
+    needs: spec-rules
     runs-on: depot-macos-14
     steps:
       - uses: actions/checkout@v4
@@ -275,10 +301,11 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Install tracey and generate _rules.json
-        run: |
-          cargo install tracey --git https://github.com/bearcove/tracey
-          tracey rules -o docs/public/_rules.json docs/content/spec/**/*.md
+      - name: Download _rules.json
+        uses: actions/download-artifact@v4
+        with:
+          name: spec-rules
+          path: docs/public
 
       - name: Swift spec coverage
         working-directory: swift
@@ -286,6 +313,7 @@ jobs:
 
   spec-coverage-typescript:
     name: Spec Coverage (TypeScript)
+    needs: spec-rules
     runs-on: depot-ubuntu-24.04-4
     steps:
       - uses: actions/checkout@v4
@@ -296,10 +324,11 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Install tracey and generate _rules.json
-        run: |
-          cargo install tracey --git https://github.com/bearcove/tracey
-          tracey rules -o docs/public/_rules.json docs/content/spec/**/*.md
+      - name: Download _rules.json
+        uses: actions/download-artifact@v4
+        with:
+          name: spec-rules
+          path: docs/public
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
