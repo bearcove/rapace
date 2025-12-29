@@ -411,7 +411,7 @@ pub fn request_payload(_peer: &mut Peer) -> TestResult {
     // - (T, U, ...) tuple for multiple args
     // All using Postcard encoding.
 
-    TestResult::pass()
+    TestResult::fail("test not implemented".to_string())
 }
 
 // =============================================================================
@@ -427,7 +427,7 @@ pub fn response_payload(_peer: &mut Peer) -> TestResult {
     // - trailers: Vec<(String, Vec<u8>)>
     // - body: Option<Vec<u8>> for the actual return value
 
-    TestResult::pass()
+    TestResult::fail("test not implemented".to_string())
 }
 
 // =============================================================================
@@ -443,7 +443,7 @@ pub fn call_complete(_peer: &mut Peer) -> TestResult {
     // - Response received with DATA | EOS | RESPONSE
     // The channel can then be cleaned up.
 
-    TestResult::pass()
+    TestResult::fail("test not implemented".to_string())
 }
 
 // =============================================================================
@@ -458,7 +458,7 @@ pub fn call_optional_ports(_peer: &mut Peer) -> TestResult {
     // Ports 101-200: optional server→client streams
     // Port assignments are method-specific.
 
-    TestResult::pass()
+    TestResult::fail("test not implemented".to_string())
 }
 
 // =============================================================================
@@ -472,14 +472,7 @@ pub fn call_required_port_missing(_peer: &mut Peer) -> TestResult {
     // If a method requires a streaming port and it's not attached,
     // the server should respond with INVALID_ARGUMENT error.
 
-    if error_code::INVALID_ARGUMENT != 3 {
-        return TestResult::fail(format!(
-            "[verify core.call.required-port-missing]: wrong INVALID_ARGUMENT code: {}",
-            error_code::INVALID_ARGUMENT
-        ));
-    }
-
-    TestResult::pass()
+    TestResult::fail("test not implemented".to_string())
 }
 
 /// Run a call test case by name.

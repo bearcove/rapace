@@ -504,7 +504,7 @@ pub fn cancel_impl_check_deadline(_peer: &mut Peer) -> TestResult {
     // - Implementation should reject it locally without sending
     // - This is an optimization, not a MUST requirement
 
-    TestResult::pass()
+    TestResult::fail("test not implemented".to_string())
 }
 
 // =============================================================================
@@ -520,15 +520,7 @@ pub fn cancel_impl_error_response(_peer: &mut Peer) -> TestResult {
     // - SHOULD drain pending writes gracefully when possible
     // - Allows client to know the cancel was acknowledged
 
-    // Verify CANCELLED error code exists
-    if error_code::CANCELLED != 1 {
-        return TestResult::fail(format!(
-            "[verify cancel.impl.error-response]: wrong CANCELLED code: {}",
-            error_code::CANCELLED
-        ));
-    }
-
-    TestResult::pass()
+    TestResult::fail("test not implemented".to_string())
 }
 
 // =============================================================================
@@ -544,7 +536,7 @@ pub fn cancel_impl_ignore_data(_peer: &mut Peer) -> TestResult {
     // - Implementation MAY close connection on repeated protocol violations
     // - This is a MAY (permission), not a requirement
 
-    TestResult::pass()
+    TestResult::fail("test not implemented".to_string())
 }
 
 // =============================================================================
@@ -560,10 +552,7 @@ pub fn cancel_impl_shm_free(_peer: &mut Peer) -> TestResult {
     // - "Promptly" means without waiting for normal processing to complete
     // - This prevents slot exhaustion during cancellation storms
 
-    // This is tested by the SlotGuard Drop implementation in rapace-core
-    // which frees the slot when the guard goes out of scope (including on cancel)
-
-    TestResult::pass()
+    TestResult::fail("test not implemented".to_string())
 }
 
 /// Run a cancel test case by name.
