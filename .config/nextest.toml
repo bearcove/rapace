@@ -22,13 +22,3 @@ fail-fast = true
 slow-timeout = { period = "30s", terminate-after = 2 }
 status-level = "pass"
 
-# Coverage tests are run separately with --no-fail-fast
-# Exclude them from the default run since they're expected to fail
-# until we have full spec coverage
-[[profile.default.overrides]]
-filter = "test(~coverage::)"
-skip = true
-
-[[profile.ci.overrides]]
-filter = "test(~coverage::)"
-skip = true
