@@ -13,6 +13,7 @@ pub mod error;
 pub mod flow;
 pub mod frame;
 pub mod handshake;
+pub mod langmap;
 pub mod metadata;
 pub mod method;
 pub mod payload;

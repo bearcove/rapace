@@ -1018,6 +1018,11 @@ fn is_interactive_test(test_name: &str) -> bool {
         return false;
     }
 
+    // All langmap tests are non-interactive (structural verification)
+    if test_name.starts_with("langmap.") {
+        return false;
+    }
+
     test_name.starts_with("handshake.")
         || test_name.starts_with("call.")
         || test_name.starts_with("channel.")
