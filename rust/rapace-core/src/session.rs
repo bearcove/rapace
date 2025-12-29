@@ -1076,18 +1076,16 @@ impl<T: Transport> RpcSession<T> {
 
             // 2. Try to route to a pending RPC waiter (responses only).
             //
-            // In Rapace, responses are encoded with `method_id = 0`. Requests use a non-zero
-            // method ID and are dispatched to the registered handler, so attempting
-            // "pending waiter" routing for every request just produces log spam.
-            let received = if method_id == 0 {
+            // Spec: `[impl core.call.response.flags]` - responses have RESPONSE flag set.
+            // Spec: `[impl core.call.response.method-id]` - responses echo the request method_id.
+            let received = if flags.contains(FrameFlags::RESPONSE) {
                 match self.try_route_to_pending(channel_id, received) {
                     None => continue, // Frame was delivered to waiter
                     Some(unroutable) => {
-                        // `method_id = 0` frames are responses/tunnel chunks. If a response arrives
-                        // without a registered waiter (and we already failed to route it to a tunnel),
-                        // there's nowhere correct to send it. Log once and drop.
+                        // Response frame without a registered waiter - nowhere to send it.
                         tracing::warn!(
                             channel_id,
+                            method_id,
                             msg_id = unroutable.frame.desc.msg_id,
                             flags = ?unroutable.frame.desc.flags,
                             payload_len = unroutable.payload_bytes().len(),
