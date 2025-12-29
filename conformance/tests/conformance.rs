@@ -978,6 +978,20 @@ fn is_interactive_test(test_name: &str) -> bool {
         "channel.eos_after_send",
         "channel.id_no_reuse",
         "channel.kind_immutable",
+        // New channel tests that just validate semantic rules
+        "channel.close_full",
+        "channel.close_state_free",
+        "channel.open_ownership",
+        "channel.open_attach_validation",
+        "channel.open_call_validation",
+        "channel.open_cancel_on_violation",
+        "channel.open_no_pre_open",
+        "channel.parity_initiator_odd",
+        // handshake tests that just validate semantic rules
+        "handshake.explicit_required",
+        "handshake.registry_cross_service",
+        "handshake.registry_failure",
+        "handshake.timeout",
     ];
 
     if non_interactive.contains(&test_name) {

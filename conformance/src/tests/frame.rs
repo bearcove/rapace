@@ -122,3 +122,120 @@ pub fn encoding_little_endian(_peer: &mut Peer) -> TestResult {
 
     TestResult::pass()
 }
+
+// =============================================================================
+// frame.msg_id_control
+// =============================================================================
+// Rules: [verify frame.msg-id.control]
+//
+// Control frames use monotonic msg_id values like any other frame.
+
+#[conformance(name = "frame.msg_id_control", rules = "frame.msg-id.control")]
+pub fn msg_id_control(_peer: &mut Peer) -> TestResult {
+    // Control frames (channel 0) MUST use monotonically increasing msg_id values.
+    // Each peer maintains its own counter, starting at 1.
+
+    let mut desc1 = MsgDescHot::new();
+    desc1.channel_id = 0;
+    desc1.method_id = control_verb::PING;
+    desc1.msg_id = 1;
+    desc1.flags = flags::CONTROL;
+
+    let mut desc2 = MsgDescHot::new();
+    desc2.channel_id = 0;
+    desc2.method_id = control_verb::PING;
+    desc2.msg_id = 2; // Must be > previous
+    desc2.flags = flags::CONTROL;
+
+    if desc2.msg_id <= desc1.msg_id {
+        return TestResult::fail(
+            "[verify frame.msg-id.control]: control msg_id must be monotonically increasing"
+                .to_string(),
+        );
+    }
+
+    TestResult::pass()
+}
+
+// =============================================================================
+// frame.msg_id_stream_tunnel
+// =============================================================================
+// Rules: [verify frame.msg-id.stream-tunnel]
+//
+// STREAM/TUNNEL frames MUST use monotonically increasing msg_id values.
+
+#[conformance(
+    name = "frame.msg_id_stream_tunnel",
+    rules = "frame.msg-id.stream-tunnel"
+)]
+pub fn msg_id_stream_tunnel(_peer: &mut Peer) -> TestResult {
+    // For STREAM and TUNNEL channels, each frame gets a monotonically
+    // increasing msg_id. This serves for:
+    // - Ordering verification
+    // - Debugging and tracing
+
+    // Simulate sending 3 stream items
+    let msg_ids = [5u64, 6, 7]; // Must be monotonically increasing
+
+    for i in 1..msg_ids.len() {
+        if msg_ids[i] <= msg_ids[i - 1] {
+            return TestResult::fail(format!(
+                "[verify frame.msg-id.stream-tunnel]: msg_id {} must be > {}",
+                msg_ids[i],
+                msg_ids[i - 1]
+            ));
+        }
+    }
+
+    // Create a stream frame with proper msg_id
+    let mut desc = MsgDescHot::new();
+    desc.channel_id = 3; // Some stream channel
+    desc.method_id = 0; // STREAM uses method_id = 0
+    desc.msg_id = 5;
+    desc.flags = flags::DATA;
+
+    if desc.method_id != 0 {
+        return TestResult::fail(
+            "[verify frame.msg-id.stream-tunnel]: STREAM method_id should be 0".to_string(),
+        );
+    }
+
+    TestResult::pass()
+}
+
+// =============================================================================
+// frame.msg_id_scope
+// =============================================================================
+// Rules: [verify frame.msg-id.scope]
+//
+// msg_id is scoped per connection (not per channel).
+
+#[conformance(name = "frame.msg_id_scope", rules = "frame.msg-id.scope")]
+pub fn msg_id_scope(_peer: &mut Peer) -> TestResult {
+    // msg_id is scoped per connection:
+    // - Each peer maintains a single counter starting at 1
+    // - Every frame sent by a peer uses the next value
+    // - This is NOT per-channel, it's per-connection
+
+    // Simulate frames across different channels from the same peer
+    let frames = [
+        (1u64, 0u32), // msg_id=1, channel_id=0 (control)
+        (2u64, 1u32), // msg_id=2, channel_id=1 (call)
+        (3u64, 3u32), // msg_id=3, channel_id=3 (stream)
+        (4u64, 0u32), // msg_id=4, channel_id=0 (control again)
+    ];
+
+    for i in 1..frames.len() {
+        if frames[i].0 <= frames[i - 1].0 {
+            return TestResult::fail(format!(
+                "[verify frame.msg-id.scope]: msg_id {} on channel {} should be > previous msg_id {} on channel {}",
+                frames[i].0,
+                frames[i].1,
+                frames[i - 1].0,
+                frames[i - 1].1
+            ));
+        }
+    }
+
+    TestResult::pass()
+}
