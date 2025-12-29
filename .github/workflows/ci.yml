@@ -245,34 +245,9 @@ jobs:
         working-directory: swift
         run: swift test
 
-  spec-rules:
-    name: Extract Spec Rules
-    runs-on: depot-ubuntu-24.04-4
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-
-      - name: Install tracey and generate _rules.json
-        run: |
-          cargo install tracey --git https://github.com/bearcove/tracey
-          mkdir -p docs/public
-          shopt -s globstar
-          tracey rules -o docs/public/_rules.json docs/content/spec/**/*.md
-
-      - name: Upload _rules.json
-        uses: actions/upload-artifact@v4
-        with:
-          name: spec-rules
-          path: docs/public/_rules.json
-          retention-days: 1
-
-  spec-coverage-rust:
-    name: Spec Coverage (Rust)
+  # Conformance tests - run each implementation against the reference peer
+  conformance-rust:
+    name: Conformance (Rust)
     runs-on: depot-ubuntu-24.04-16
     steps:
       - uses: actions/checkout@v4
@@ -286,35 +261,11 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Rust spec coverage
-        run: cargo nextest run -p rapace-conformance --test coverage --no-fail-fast
+      - name: Run conformance tests
+        run: cargo nextest run -p rapace-conformance --test conformance --no-fail-fast
 
-  spec-coverage-swift:
-    name: Spec Coverage (Swift)
-    needs: spec-rules
-    runs-on: depot-macos-14
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-
-      - name: Download _rules.json
-        uses: actions/download-artifact@v4
-        with:
-          name: spec-rules
-          path: docs/public
-
-      - name: Swift spec coverage
-        working-directory: swift
-        run: swift test --filter CoverageTests
-
-  spec-coverage-typescript:
-    name: Spec Coverage (TypeScript)
-    needs: spec-rules
+  conformance-typescript:
+    name: Conformance (TypeScript)
     runs-on: depot-ubuntu-24.04-4
     steps:
       - uses: actions/checkout@v4
@@ -325,11 +276,8 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
-      - name: Download _rules.json
-        uses: actions/download-artifact@v4
-        with:
-          name: spec-rules
-          path: docs/public
+      - name: Build conformance harness
+        run: cargo build -p rapace-conformance
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -351,6 +299,25 @@ jobs:
         working-directory: typescript
         run: pnpm build
 
-      - name: TypeScript spec coverage
+      - name: Run conformance tests
         working-directory: typescript
-        run: pnpm test:coverage
+        run: pnpm test -- --grep "Conformance"
+
+  conformance-swift:
+    name: Conformance (Swift)
+    runs-on: depot-macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build conformance harness
+        run: cargo build -p rapace-conformance
+
+      - name: Run conformance tests
+        working-directory: swift
+        run: swift test --filter ConformanceTests
