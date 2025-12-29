@@ -25,13 +25,15 @@ interface TestCase {
 // Find workspace root (where Cargo.toml is)
 function findWorkspaceRoot(): string {
   let dir = process.cwd();
-  while (dir !== "/") {
+  for (let i = 0; i < 100; i++) {
     try {
       const cargoToml = join(dir, "Cargo.toml");
       readFileSync(cargoToml);
       return dir;
     } catch {
-      dir = join(dir, "..");
+      const parent = join(dir, "..");
+      if (parent === dir) break;
+      dir = parent;
     }
   }
   throw new Error("Could not find workspace root");

@@ -25,12 +25,14 @@ final class CoverageTests: XCTestCase {
     /// Find workspace root (where Cargo.toml is)
     static func findWorkspaceRoot() -> URL {
         var dir = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-        while dir.path != "/" {
+        for _ in 0..<100 {
             let cargoToml = dir.appendingPathComponent("Cargo.toml")
             if FileManager.default.fileExists(atPath: cargoToml.path) {
                 return dir
             }
-            dir = dir.deletingLastPathComponent()
+            let parent = dir.deletingLastPathComponent()
+            if parent == dir { break }
+            dir = parent
         }
         fatalError("Could not find workspace root")
     }
@@ -85,7 +87,9 @@ final class CoverageTests: XCTestCase {
 
     /// Recursively scan for [impl ...] annotations in Swift files
     static func scanForImplAnnotations(dir: URL, covered: inout Set<String>) {
-        let implPattern = try! NSRegularExpression(pattern: #"\[impl ([a-z][a-z0-9._-]+)\]"#)
+        guard let implPattern = try? NSRegularExpression(pattern: #"\[impl ([a-z][a-z0-9._-]+)\]"#) else {
+            return
+        }
 
         guard let enumerator = FileManager.default.enumerator(at: dir, includingPropertiesForKeys: nil) else {
             return
