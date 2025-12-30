@@ -125,48 +125,7 @@ fn get_covered_rules() -> HashSet<String> {
 
     // 2. Scan implementation code for [impl ...] annotations
     let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-    scan_for_impl_annotations(workspace_root, &mut covered);
+    panic!("use tracey-core for that");
 
     covered
-}
-
-/// Recursively scan for [impl ...] patterns in implementation code.
-fn scan_for_impl_annotations(dir: &Path, covered: &mut HashSet<String>) {
-    let Ok(entries) = fs::read_dir(dir) else {
-        return;
-    };
-
-    for entry in entries.flatten() {
-        let path = entry.path();
-
-        // Skip hidden dirs, target, node_modules, conformance (we get that from the binary)
-        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        if name.starts_with('.')
-            || name == "target"
-            || name == "node_modules"
-            || name == "conformance"
-        {
-            continue;
-        }
-
-        if path.is_dir() {
-            scan_for_impl_annotations(&path, covered);
-        } else if path.extension().is_some_and(|e| e == "rs") {
-            scan_file(&path, covered);
-        }
-    }
-}
-
-/// Scan a single file for [impl ...] annotations.
-fn scan_file(path: &Path, covered: &mut HashSet<String>) {
-    let Ok(content) = fs::read_to_string(path) else {
-        return;
-    };
-
-    // Match patterns like "[impl core.channel.open]" (implementation annotations)
-    let impl_re = regex::Regex::new(r"\[impl ([a-z][a-z0-9._-]+)\]").unwrap();
-
-    for cap in impl_re.captures_iter(&content) {
-        covered.insert(cap[1].to_string());
-    }
 }
