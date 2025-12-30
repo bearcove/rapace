@@ -74,24 +74,7 @@ async fn do_handshake(peer: &mut Peer) -> Result<(), String> {
     rules = "frame.desc.size, frame.desc.sizeof"
 )]
 pub async fn descriptor_size(peer: &mut Peer) -> TestResult {
-    // Receive a frame with raw wire bytes preserved
-    let raw_frame = match peer.recv_raw().await {
-        Ok(f) => f,
-        Err(e) => return TestResult::fail(format!("failed to receive frame: {}", e)),
-    };
-
-    // Verify the raw descriptor is exactly 64 bytes
-    // (This is guaranteed by the type system - raw_desc is [u8; 64] - but we check anyway)
-    if raw_frame.raw_desc.len() != 64 {
-        return TestResult::fail(format!(
-            "[verify frame.desc.sizeof]: descriptor on wire is {} bytes, expected 64",
-            raw_frame.raw_desc.len()
-        ));
-    }
-
-    // The fact that we successfully received and parsed the frame with exactly 64 bytes
-    // for the descriptor proves the implementation sends 64-byte descriptors.
-    TestResult::pass()
+    panic!("all the old tests were garbage, we're remaking them all from scratch");
 }
 
 // =============================================================================
@@ -104,23 +87,7 @@ pub async fn descriptor_size(peer: &mut Peer) -> TestResult {
 
 #[conformance(name = "frame.inline_payload_max", rules = "frame.payload.inline")]
 pub async fn inline_payload_max(peer: &mut Peer) -> TestResult {
-    // Receive Hello frame
-    let frame = match peer.recv().await {
-        Ok(f) => f,
-        Err(e) => return TestResult::fail(format!("failed to receive frame: {}", e)),
-    };
-
-    // If payload_slot indicates inline, verify payload_len <= 16
-    if frame.desc.payload_slot == INLINE_PAYLOAD_SLOT
-        && frame.desc.payload_len > INLINE_PAYLOAD_SIZE as u32
-    {
-        return TestResult::fail(format!(
-            "[verify frame.payload.inline]: inline payload_len {} exceeds max {}",
-            frame.desc.payload_len, INLINE_PAYLOAD_SIZE
-        ));
-    }
-
-    TestResult::pass()
+    panic!("all the old tests were garbage, we're remaking them all from scratch");
 }
 
 // =============================================================================
@@ -133,25 +100,7 @@ pub async fn inline_payload_max(peer: &mut Peer) -> TestResult {
 
 #[conformance(name = "frame.sentinel_inline", rules = "frame.sentinel.values")]
 pub async fn sentinel_inline(peer: &mut Peer) -> TestResult {
-    // Receive Hello frame
-    let frame = match peer.recv().await {
-        Ok(f) => f,
-        Err(e) => return TestResult::fail(format!("failed to receive frame: {}", e)),
-    };
-
-    // Hello payload is small, likely inline
-    // If it's inline, payload_slot must be INLINE_PAYLOAD_SLOT
-    if frame.desc.payload_len <= INLINE_PAYLOAD_SIZE as u32 && frame.desc.payload_len > 0 {
-        // Small payload - should be inline with correct sentinel
-        if frame.desc.payload_slot != INLINE_PAYLOAD_SLOT {
-            return TestResult::fail(format!(
-                "[verify frame.sentinel.values]: inline payload should have payload_slot={:#X}, got {:#X}",
-                INLINE_PAYLOAD_SLOT, frame.desc.payload_slot
-            ));
-        }
-    }
-
-    TestResult::pass()
+    panic!("all the old tests were garbage, we're remaking them all from scratch");
 }
 
 // =============================================================================
@@ -164,27 +113,7 @@ pub async fn sentinel_inline(peer: &mut Peer) -> TestResult {
 
 #[conformance(name = "frame.sentinel_no_deadline", rules = "frame.sentinel.values")]
 pub async fn sentinel_no_deadline(peer: &mut Peer) -> TestResult {
-    // Complete handshake
-    if let Err(e) = do_handshake(peer).await {
-        return TestResult::fail(e);
-    }
-
-    // Receive next frame (OpenChannel or data)
-    let frame = match peer.try_recv().await {
-        Ok(Some(f)) => f,
-        Ok(None) => return TestResult::pass(), // No more frames is fine
-        Err(e) => return TestResult::fail(format!("failed to receive: {}", e)),
-    };
-
-    // If deadline_ns is not the NO_DEADLINE sentinel, it should be a valid timestamp
-    // The NO_DEADLINE sentinel is 0xFFFFFFFFFFFFFFFF
-    if frame.desc.deadline_ns != NO_DEADLINE {
-        // It's a real deadline - just verify it's a reasonable value
-        // (not checking actual time, just that it's not garbage)
-        // Any non-sentinel value is valid as long as it's interpreted correctly
-    }
-
-    TestResult::pass()
+    panic!("all the old tests were garbage, we're remaking them all from scratch");
 }
 
 // =============================================================================
@@ -197,90 +126,7 @@ pub async fn sentinel_no_deadline(peer: &mut Peer) -> TestResult {
 
 #[conformance(name = "frame.encoding_little_endian", rules = "frame.desc.encoding")]
 pub async fn encoding_little_endian(peer: &mut Peer) -> TestResult {
-    // Receive Hello frame with raw wire bytes preserved
-    let raw_frame = match peer.recv_raw().await {
-        Ok(f) => f,
-        Err(e) => return TestResult::fail(format!("failed to receive frame: {}", e)),
-    };
-
-    // Use the RAW bytes from the wire, not re-serialized bytes!
-    // This actually tests the implementation's encoding, not ours.
-    let bytes = &raw_frame.raw_desc;
-
-    // Descriptor layout (all little-endian):
-    // 0-7:   msg_id (u64)
-    // 8-11:  channel_id (u32)
-    // 12-15: method_id (u32)
-    // 16-19: payload_slot (u32)
-    // 20-23: payload_generation (u32)
-    // 24-27: payload_offset (u32)
-    // 28-31: payload_len (u32)
-    // 32-35: flags (u32)
-    // 36-39: credit_grant (u32)
-    // 40-47: deadline_ns (u64)
-    // 48-63: inline_payload (16 bytes)
-
-    // Check that msg_id (bytes 0-7) is little-endian
-    let msg_id_from_wire = u64::from_le_bytes(bytes[0..8].try_into().unwrap());
-    if msg_id_from_wire != raw_frame.desc.msg_id {
-        return TestResult::fail(format!(
-            "[verify frame.desc.encoding]: msg_id wire bytes don't match when parsed as little-endian: \
-             wire bytes {:02x?} parse to {}, but descriptor has {}",
-            &bytes[0..8],
-            msg_id_from_wire,
-            raw_frame.desc.msg_id
-        ));
-    }
-
-    // Check that channel_id (bytes 8-11) is little-endian
-    let channel_id_from_wire = u32::from_le_bytes(bytes[8..12].try_into().unwrap());
-    if channel_id_from_wire != raw_frame.desc.channel_id {
-        return TestResult::fail(format!(
-            "[verify frame.desc.encoding]: channel_id wire bytes don't match when parsed as little-endian: \
-             wire bytes {:02x?} parse to {}, but descriptor has {}",
-            &bytes[8..12],
-            channel_id_from_wire,
-            raw_frame.desc.channel_id
-        ));
-    }
-
-    // Check that method_id (bytes 12-15) is little-endian
-    let method_id_from_wire = u32::from_le_bytes(bytes[12..16].try_into().unwrap());
-    if method_id_from_wire != raw_frame.desc.method_id {
-        return TestResult::fail(format!(
-            "[verify frame.desc.encoding]: method_id wire bytes don't match when parsed as little-endian: \
-             wire bytes {:02x?} parse to {}, but descriptor has {}",
-            &bytes[12..16],
-            method_id_from_wire,
-            raw_frame.desc.method_id
-        ));
-    }
-
-    // Check flags (bytes 32-35)
-    let flags_from_wire = u32::from_le_bytes(bytes[32..36].try_into().unwrap());
-    if flags_from_wire != raw_frame.desc.flags {
-        return TestResult::fail(format!(
-            "[verify frame.desc.encoding]: flags wire bytes don't match when parsed as little-endian: \
-             wire bytes {:02x?} parse to {}, but descriptor has {}",
-            &bytes[32..36],
-            flags_from_wire,
-            raw_frame.desc.flags
-        ));
-    }
-
-    // Check deadline_ns (bytes 40-47)
-    let deadline_from_wire = u64::from_le_bytes(bytes[40..48].try_into().unwrap());
-    if deadline_from_wire != raw_frame.desc.deadline_ns {
-        return TestResult::fail(format!(
-            "[verify frame.desc.encoding]: deadline_ns wire bytes don't match when parsed as little-endian: \
-             wire bytes {:02x?} parse to {}, but descriptor has {}",
-            &bytes[40..48],
-            deadline_from_wire,
-            raw_frame.desc.deadline_ns
-        ));
-    }
-
-    TestResult::pass()
+    panic!("all the old tests were garbage, we're remaking them all from scratch");
 }
 
 // =============================================================================
@@ -293,37 +139,7 @@ pub async fn encoding_little_endian(peer: &mut Peer) -> TestResult {
 
 #[conformance(name = "frame.msg_id_control", rules = "frame.msg-id.control")]
 pub async fn msg_id_control(peer: &mut Peer) -> TestResult {
-    // Receive Hello (first control frame)
-    let hello = match do_handshake_return_hello(peer).await {
-        Ok(f) => f,
-        Err(e) => return TestResult::fail(e),
-    };
-
-    let first_msg_id = hello.desc.msg_id;
-
-    // The Hello frame should have msg_id >= 1 (implementations start at 1)
-    if first_msg_id == 0 {
-        return TestResult::fail(
-            "[verify frame.msg-id.control]: control frame msg_id should not be 0".to_string(),
-        );
-    }
-
-    // Try to receive another control frame (OpenChannel)
-    let frame = match peer.try_recv().await {
-        Ok(Some(f)) => f,
-        Ok(None) => return TestResult::pass(), // No more frames is acceptable
-        Err(e) => return TestResult::fail(format!("error receiving: {}", e)),
-    };
-
-    // If it's a control frame (channel 0), verify msg_id is greater
-    if frame.desc.channel_id == 0 && frame.desc.msg_id <= first_msg_id {
-        return TestResult::fail(format!(
-            "[verify frame.msg-id.control]: control msg_id {} not greater than previous {}",
-            frame.desc.msg_id, first_msg_id
-        ));
-    }
-
-    TestResult::pass()
+    panic!("all the old tests were garbage, we're remaking them all from scratch");
 }
 
 // =============================================================================
@@ -339,34 +155,7 @@ pub async fn msg_id_control(peer: &mut Peer) -> TestResult {
     rules = "frame.msg-id.stream-tunnel"
 )]
 pub async fn msg_id_stream_tunnel(peer: &mut Peer) -> TestResult {
-    // Complete handshake
-    if let Err(e) = do_handshake(peer).await {
-        return TestResult::fail(e);
-    }
-
-    // Collect frames and verify msg_id is monotonically increasing
-    let mut last_msg_id: Option<u64> = None;
-
-    loop {
-        match peer.try_recv().await {
-            Ok(Some(frame)) => {
-                // For any frame, msg_id should be greater than previous
-                if let Some(prev) = last_msg_id
-                    && frame.desc.msg_id <= prev
-                {
-                    return TestResult::fail(format!(
-                        "[verify frame.msg-id.stream-tunnel]: msg_id {} not greater than previous {}",
-                        frame.desc.msg_id, prev
-                    ));
-                }
-                last_msg_id = Some(frame.desc.msg_id);
-            }
-            Ok(None) => break, // EOF or timeout
-            Err(_) => break,   // Error
-        }
-    }
-
-    TestResult::pass()
+    panic!("all the old tests were garbage, we're remaking them all from scratch");
 }
 
 // =============================================================================
@@ -379,31 +168,5 @@ pub async fn msg_id_stream_tunnel(peer: &mut Peer) -> TestResult {
 
 #[conformance(name = "frame.msg_id_scope", rules = "frame.msg-id.scope")]
 pub async fn msg_id_scope(peer: &mut Peer) -> TestResult {
-    // Receive Hello
-    let hello = match do_handshake_return_hello(peer).await {
-        Ok(f) => f,
-        Err(e) => return TestResult::fail(e),
-    };
-
-    let mut last_msg_id = hello.desc.msg_id;
-
-    // Collect more frames across any channel
-    loop {
-        match peer.try_recv().await {
-            Ok(Some(frame)) => {
-                // msg_id should be greater than previous, regardless of channel
-                if frame.desc.msg_id <= last_msg_id {
-                    return TestResult::fail(format!(
-                        "[verify frame.msg-id.scope]: msg_id {} on channel {} not greater than previous {} (msg_id is per-connection, not per-channel)",
-                        frame.desc.msg_id, frame.desc.channel_id, last_msg_id
-                    ));
-                }
-                last_msg_id = frame.desc.msg_id;
-            }
-            Ok(None) => break,
-            Err(_) => break,
-        }
-    }
-
-    TestResult::pass()
+    panic!("all the old tests were garbage, we're remaking them all from scratch");
 }
