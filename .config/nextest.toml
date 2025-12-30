@@ -8,6 +8,9 @@ fail-fast = true
 # Status level
 status-level = "pass"
 
+# Timeout: 10s per attempt, 3 attempts max
+slow-timeout = { period = "10s", terminate-after = 3 }
+
 # Note: Rust spec conformance tests are run via `cargo run -p rapace-spec-tests`
 # which orchestrates rapace-spec-peer and rapace-spec-subject
 
