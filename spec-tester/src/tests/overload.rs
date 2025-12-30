@@ -56,44 +56,9 @@ async fn do_handshake(peer: &mut Peer) -> Result<(), String> {
 // When limits exceeded: max_channels -> CancelChannel, max_pending -> RESOURCE_EXHAUSTED
 
 #[conformance(name = "overload.limits_response", rules = "overload.limits.response")]
-pub async fn limits_response(_peer: &mut Peer) -> TestResult {
-    // This rule specifies responses for limit violations:
-    // - max_channels exceeded -> CancelChannel { reason: ResourceExhausted }
-    // - max_pending_calls exceeded -> CallResult { status: RESOURCE_EXHAUSTED }
-    // - max_payload_size exceeded -> protocol error, close connection
-
-    // Verify CancelReason::ResourceExhausted exists
-    if CancelReason::ResourceExhausted as u8 != 3 {
-        return TestResult::fail(format!(
-            "[verify overload.limits.response]: ResourceExhausted should be 3, got {}",
-            CancelReason::ResourceExhausted as u8
-        ));
-    }
-
-    // Verify error code exists
-    if error_code::RESOURCE_EXHAUSTED != 8 {
-        return TestResult::fail(format!(
-            "[verify overload.limits.response]: RESOURCE_EXHAUSTED error should be 8, got {}",
-            error_code::RESOURCE_EXHAUSTED
-        ));
-    }
-
-    // Verify CancelChannel can express ResourceExhausted
-    let cancel = CancelChannel {
-        channel_id: 5,
-        reason: CancelReason::ResourceExhausted,
-    };
-
-    let encoded = facet_postcard::to_vec(&cancel).expect("encode");
-    let decoded: CancelChannel = facet_postcard::from_slice(&encoded).expect("decode");
-
-    if decoded.reason != CancelReason::ResourceExhausted {
-        return TestResult::fail(
-            "[verify overload.limits.response]: CancelChannel roundtrip failed".to_string(),
-        );
-    }
-
-    TestResult::pass()
+pub async fn limits_response(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -218,23 +183,9 @@ pub async fn goaway_new_rejected(peer: &mut Peer) -> TestResult {
 // After sending GoAway, peer MUST NOT open new channels.
 
 #[conformance(name = "overload.goaway_no_new", rules = "overload.goaway.no-new")]
-pub async fn goaway_no_new(_peer: &mut Peer) -> TestResult {
-    // This rule specifies that after sending GoAway:
-    // - The sender MUST NOT send any OpenChannel messages
-    // - This is enforced by the sender, verified by receiver
-
-    // Verify GoAway can be constructed
-    let goaway = GoAway {
-        reason: GoAwayReason::Shutdown,
-        last_channel_id: 100,
-        message: "shutdown".to_string(),
-        metadata: Vec::new(),
-    };
-
-    // After sending this, the sender commits to not opening new channels
-    let _ = facet_postcard::to_vec(&goaway).expect("encode");
-
-    TestResult::pass()
+pub async fn goaway_no_new(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -245,37 +196,9 @@ pub async fn goaway_no_new(_peer: &mut Peer) -> TestResult {
 // Sender MUST close connection after grace period.
 
 #[conformance(name = "overload.goaway_drain", rules = "overload.goaway.drain")]
-pub async fn goaway_drain(_peer: &mut Peer) -> TestResult {
-    // This rule specifies:
-    // - After sending GoAway, wait for grace period
-    // - Then close the connection
-
-    // Verify GoAwayReason values exist
-    if GoAwayReason::Shutdown as u8 != 1 {
-        return TestResult::fail(
-            "[verify overload.goaway.drain]: Shutdown should be 1".to_string(),
-        );
-    }
-
-    if GoAwayReason::Maintenance as u8 != 2 {
-        return TestResult::fail(
-            "[verify overload.goaway.drain]: Maintenance should be 2".to_string(),
-        );
-    }
-
-    if GoAwayReason::Overload as u8 != 3 {
-        return TestResult::fail(
-            "[verify overload.goaway.drain]: Overload should be 3".to_string(),
-        );
-    }
-
-    if GoAwayReason::ProtocolError as u8 != 4 {
-        return TestResult::fail(
-            "[verify overload.goaway.drain]: ProtocolError should be 4".to_string(),
-        );
-    }
-
-    TestResult::pass()
+pub async fn goaway_drain(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -289,23 +212,9 @@ pub async fn goaway_drain(_peer: &mut Peer) -> TestResult {
     name = "overload.drain_grace_period",
     rules = "overload.drain.grace-period"
 )]
-pub async fn drain_grace_period(_peer: &mut Peer) -> TestResult {
-    // Grace period formula:
-    // grace_period = max(latest_pending_deadline - now(), 30 seconds)
-
-    // This is a timing behavior that's hard to test structurally
-    // We verify the concept is expressible
-
-    // Default grace period is 30 seconds
-    const DEFAULT_GRACE_PERIOD_SECS: u64 = 30;
-
-    if DEFAULT_GRACE_PERIOD_SECS != 30 {
-        return TestResult::fail(
-            "[verify overload.drain.grace-period]: default should be 30s".to_string(),
-        );
-    }
-
-    TestResult::pass()
+pub async fn drain_grace_period(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -319,36 +228,9 @@ pub async fn drain_grace_period(_peer: &mut Peer) -> TestResult {
     name = "overload.drain_after_grace",
     rules = "overload.drain.after-grace"
 )]
-pub async fn drain_after_grace(_peer: &mut Peer) -> TestResult {
-    // After grace period, implementations MUST:
-    // 1. Cancel remaining calls with DeadlineExceeded
-    // 2. Send CloseChannel for all open channels
-    // 3. Close the transport connection
-
-    // Verify DeadlineExceeded error code exists
-    if error_code::DEADLINE_EXCEEDED != 4 {
-        return TestResult::fail(format!(
-            "[verify overload.drain.after-grace]: DEADLINE_EXCEEDED should be 4, got {}",
-            error_code::DEADLINE_EXCEEDED
-        ));
-    }
-
-    // Verify CloseChannel structure
-    let close = CloseChannel {
-        channel_id: 5,
-        reason: CloseReason::Normal,
-    };
-
-    let encoded = facet_postcard::to_vec(&close).expect("encode");
-    let decoded: CloseChannel = facet_postcard::from_slice(&encoded).expect("decode");
-
-    if decoded.channel_id != 5 {
-        return TestResult::fail(
-            "[verify overload.drain.after-grace]: CloseChannel roundtrip failed".to_string(),
-        );
-    }
-
-    TestResult::pass()
+pub async fn drain_after_grace(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -359,43 +241,9 @@ pub async fn drain_after_grace(_peer: &mut Peer) -> TestResult {
 // Clients MUST check rapace.retryable trailer; if 0, MUST NOT retry.
 
 #[conformance(name = "overload.retry_retryable", rules = "overload.retry.retryable")]
-pub async fn retry_retryable(_peer: &mut Peer) -> TestResult {
-    // The rapace.retryable trailer indicates if a request can be retried
-    // - 1 (or absent): retryable
-    // - 0: not retryable
-
-    // Verify we can express this in CallResult trailers
-    let result = CallResult {
-        status: Status {
-            code: error_code::RESOURCE_EXHAUSTED,
-            message: "overloaded".to_string(),
-            details: Vec::new(),
-        },
-        trailers: vec![
-            ("rapace.retryable".to_string(), vec![0]), // Not retryable
-        ],
-        body: None,
-    };
-
-    let encoded = facet_postcard::to_vec(&result).expect("encode");
-    let decoded: CallResult = facet_postcard::from_slice(&encoded).expect("decode");
-
-    // Check trailer is preserved
-    let retryable = decoded
-        .trailers
-        .iter()
-        .find(|(k, _)| k == "rapace.retryable");
-
-    match retryable {
-        Some((_, v)) if v == &[0] => TestResult::pass(),
-        Some((_, v)) => TestResult::fail(format!(
-            "[verify overload.retry.retryable]: expected [0], got {:?}",
-            v
-        )),
-        None => TestResult::fail(
-            "[verify overload.retry.retryable]: rapace.retryable trailer missing".to_string(),
-        ),
-    }
+pub async fn retry_retryable(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -409,33 +257,9 @@ pub async fn retry_retryable(_peer: &mut Peer) -> TestResult {
     name = "overload.goaway_client_stop",
     rules = "overload.goaway.client.stop"
 )]
-pub async fn goaway_client_stop(_peer: &mut Peer) -> TestResult {
-    // When a client receives GoAway, it MUST:
-    // - Stop sending new calls on this connection
-    // - Route new RPCs elsewhere
-
-    // Verify GoAway can be received and parsed
-    let goaway = GoAway {
-        reason: GoAwayReason::Shutdown,
-        last_channel_id: 10,
-        message: "server shutting down".to_string(),
-        metadata: Vec::new(),
-    };
-
-    let encoded = facet_postcard::to_vec(&goaway).expect("encode");
-    let decoded: GoAway = facet_postcard::from_slice(&encoded).expect("decode");
-
-    if decoded.last_channel_id != 10 {
-        return TestResult::fail(
-            "[verify overload.goaway.client.stop]: GoAway last_channel_id not preserved"
-                .to_string(),
-        );
-    }
-
-    // After receiving GoAway, client must not send OpenChannel for new calls
-    // This is a behavioral requirement enforced by client implementation
-
-    TestResult::pass()
+pub async fn goaway_client_stop(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -449,31 +273,9 @@ pub async fn goaway_client_stop(_peer: &mut Peer) -> TestResult {
     name = "overload.goaway_client_complete",
     rules = "overload.goaway.client.complete"
 )]
-pub async fn goaway_client_complete(_peer: &mut Peer) -> TestResult {
-    // When a client receives GoAway:
-    // - Pending calls on channel_id <= last_channel_id MUST be allowed to complete
-    // - Client must not abort in-flight requests prematurely
-
-    let goaway = GoAway {
-        reason: GoAwayReason::Shutdown,
-        last_channel_id: 20,
-        message: "draining".to_string(),
-        metadata: Vec::new(),
-    };
-
-    let encoded = facet_postcard::to_vec(&goaway).expect("encode");
-    let decoded: GoAway = facet_postcard::from_slice(&encoded).expect("decode");
-
-    // Calls on channels 1..20 must be allowed to complete
-    // Calls on channels > 20 will be rejected with ResourceExhausted
-
-    if decoded.last_channel_id != 20 {
-        return TestResult::fail(
-            "[verify overload.goaway.client.complete]: last_channel_id not preserved".to_string(),
-        );
-    }
-
-    TestResult::pass()
+pub async fn goaway_client_complete(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -487,38 +289,9 @@ pub async fn goaway_client_complete(_peer: &mut Peer) -> TestResult {
     name = "overload.goaway_client_reconnect",
     rules = "overload.goaway.client.reconnect"
 )]
-pub async fn goaway_client_reconnect(_peer: &mut Peer) -> TestResult {
-    // When a client receives GoAway:
-    // - Client MUST establish a new connection to the same or different server
-    // - This ensures continued availability
-
-    // GoAwayReason helps client decide reconnection strategy
-    let goaway_shutdown = GoAway {
-        reason: GoAwayReason::Shutdown,
-        last_channel_id: 10,
-        message: "planned shutdown".to_string(),
-        metadata: Vec::new(),
-    };
-
-    let goaway_overload = GoAway {
-        reason: GoAwayReason::Overload,
-        last_channel_id: 10,
-        message: "server overloaded".to_string(),
-        metadata: Vec::new(),
-    };
-
-    // Verify reasons are distinguishable
-    let _ = facet_postcard::to_vec(&goaway_shutdown).expect("encode");
-    let _ = facet_postcard::to_vec(&goaway_overload).expect("encode");
-
-    if GoAwayReason::Shutdown as u8 == GoAwayReason::Overload as u8 {
-        return TestResult::fail(
-            "[verify overload.goaway.client.reconnect]: Shutdown and Overload must be distinct"
-                .to_string(),
-        );
-    }
-
-    TestResult::pass()
+pub async fn goaway_client_reconnect(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -532,38 +305,9 @@ pub async fn goaway_client_reconnect(_peer: &mut Peer) -> TestResult {
     name = "overload.goaway_client_respect",
     rules = "overload.goaway.client.respect"
 )]
-pub async fn goaway_client_respect(_peer: &mut Peer) -> TestResult {
-    // When a client receives GoAway:
-    // - Client MUST NOT flood the server with retries
-    // - Client MUST respect the drain window (time for pending calls to complete)
-
-    // GoAway provides information for respectful behavior:
-    // - last_channel_id: which channels are still valid
-    // - reason: why server is going away
-    // - message: human-readable context
-
-    let goaway = GoAway {
-        reason: GoAwayReason::Overload,
-        last_channel_id: 5,
-        message: "please back off".to_string(),
-        metadata: Vec::new(),
-    };
-
-    let encoded = facet_postcard::to_vec(&goaway).expect("encode");
-    let decoded: GoAway = facet_postcard::from_slice(&encoded).expect("decode");
-
-    // Client should use this information to:
-    // 1. Not retry to this server immediately
-    // 2. Wait for pending calls on ch 1-5 to complete
-    // 3. Connect elsewhere if possible
-
-    if decoded.reason != GoAwayReason::Overload {
-        return TestResult::fail(
-            "[verify overload.goaway.client.respect]: reason not preserved".to_string(),
-        );
-    }
-
-    TestResult::pass()
+pub async fn goaway_client_respect(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -577,55 +321,7 @@ pub async fn goaway_client_respect(_peer: &mut Peer) -> TestResult {
     name = "overload.retry_retry_after",
     rules = "overload.retry.retry-after"
 )]
-pub async fn retry_retry_after(_peer: &mut Peer) -> TestResult {
-    // The rapace.retry_after_ms trailer specifies minimum wait time
-
-    let retry_after_ms: u32 = 100;
-
-    let result = CallResult {
-        status: Status {
-            code: error_code::RESOURCE_EXHAUSTED,
-            message: "overloaded".to_string(),
-            details: Vec::new(),
-        },
-        trailers: vec![
-            ("rapace.retryable".to_string(), vec![1]),
-            (
-                "rapace.retry_after_ms".to_string(),
-                retry_after_ms.to_le_bytes().to_vec(),
-            ),
-        ],
-        body: None,
-    };
-
-    let encoded = facet_postcard::to_vec(&result).expect("encode");
-    let decoded: CallResult = facet_postcard::from_slice(&encoded).expect("decode");
-
-    // Check trailer is preserved
-    let retry_after = decoded
-        .trailers
-        .iter()
-        .find(|(k, _)| k == "rapace.retry_after_ms");
-
-    match retry_after {
-        Some((_, v)) if v.len() == 4 => {
-            let value = u32::from_le_bytes([v[0], v[1], v[2], v[3]]);
-            if value == retry_after_ms {
-                TestResult::pass()
-            } else {
-                TestResult::fail(format!(
-                    "[verify overload.retry.retry-after]: expected {}, got {}",
-                    retry_after_ms, value
-                ))
-            }
-        }
-        Some((_, v)) => TestResult::fail(format!(
-            "[verify overload.retry.retry-after]: expected 4 bytes, got {:?}",
-            v
-        )),
-        None => TestResult::fail(
-            "[verify overload.retry.retry-after]: rapace.retry_after_ms trailer missing"
-                .to_string(),
-        ),
-    }
+pub async fn retry_retry_after(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }

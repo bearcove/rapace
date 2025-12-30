@@ -230,20 +230,9 @@ pub async fn request_flags(peer: &mut Peer) -> TestResult {
 // Response frames must have DATA | EOS | RESPONSE.
 
 #[conformance(name = "call.response_flags", rules = "core.call.response.flags")]
-pub async fn response_flags(_peer: &mut Peer) -> TestResult {
-    // This tests OUR response (peer), not the implementation
-    // We verify we set the right flags when we respond
-    let expected = flags::DATA | flags::EOS | flags::RESPONSE;
-
-    // Just verify the constants
-    if expected != 0b0010_0000_0101 {
-        return TestResult::fail(format!(
-            "[verify core.call.response.flags]: expected flags {:#b}, computed {:#b}",
-            0b0010_0000_0101, expected
-        ));
-    }
-
-    TestResult::pass()
+pub async fn response_flags(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -443,19 +432,9 @@ pub async fn unknown_method(peer: &mut Peer) -> TestResult {
 // Request frames MUST include the method_id field.
 
 #[conformance(name = "call.request_method_id", rules = "core.call.request.method-id")]
-pub async fn request_method_id(_peer: &mut Peer) -> TestResult {
-    // The method_id identifies which method to invoke.
-    // It's computed from "ServiceName.method_name" using FNV-1a.
-    // A zero method_id is invalid for data channels (reserved for control).
-
-    let method_id = compute_method_id("Test", "echo");
-    if method_id == 0 {
-        return TestResult::fail(
-            "[verify core.call.request.method-id]: method_id should not be zero".to_string(),
-        );
-    }
-
-    TestResult::pass()
+pub async fn request_method_id(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -811,45 +790,9 @@ pub async fn call_complete(peer: &mut Peer) -> TestResult {
 // Ports 1-100 on a CALL are optional client-to-server streams.
 
 #[conformance(name = "call.call_optional_ports", rules = "core.call.optional-ports")]
-pub async fn call_optional_ports(_peer: &mut Peer) -> TestResult {
-    // Ports 1-100: optional client→server streams
-    // Ports 101-200: optional server→client streams
-    // Port assignments are method-specific.
-
-    // This test verifies the semantic rule about port numbering.
-    // Actual streaming port tests require more complex setup.
-
-    // Verify the port ranges are understood:
-    // - Ports 1-100: client → server (optional)
-    // - Ports 101-200: server → client (optional)
-    // These are attached via OpenChannel.attach field
-
-    const CLIENT_TO_SERVER_MIN: u32 = 1;
-    const CLIENT_TO_SERVER_MAX: u32 = 100;
-    const SERVER_TO_CLIENT_MIN: u32 = 101;
-    const SERVER_TO_CLIENT_MAX: u32 = 200;
-
-    // Verify ranges don't overlap (adjacent is fine: 100 and 101 don't overlap)
-    if CLIENT_TO_SERVER_MAX >= SERVER_TO_CLIENT_MIN {
-        return TestResult::fail(
-            "[verify core.call.optional-ports]: port ranges overlap".to_string(),
-        );
-    }
-
-    // Verify there are 100 ports in each direction
-    if CLIENT_TO_SERVER_MAX - CLIENT_TO_SERVER_MIN + 1 != 100 {
-        return TestResult::fail(
-            "[verify core.call.optional-ports]: wrong number of client→server ports".to_string(),
-        );
-    }
-
-    if SERVER_TO_CLIENT_MAX - SERVER_TO_CLIENT_MIN + 1 != 100 {
-        return TestResult::fail(
-            "[verify core.call.optional-ports]: wrong number of server→client ports".to_string(),
-        );
-    }
-
-    TestResult::pass()
+pub async fn call_optional_ports(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -863,24 +806,7 @@ pub async fn call_optional_ports(_peer: &mut Peer) -> TestResult {
     name = "call.call_required_port_missing",
     rules = "core.call.required-port-missing"
 )]
-pub async fn call_required_port_missing(_peer: &mut Peer) -> TestResult {
-    // If a method requires a streaming port and it's not attached,
-    // the server should respond with INVALID_ARGUMENT error.
-
-    // Verify the error code exists and is correct
-    if error_code::INVALID_ARGUMENT != 3 {
-        return TestResult::fail(format!(
-            "[verify core.call.required-port-missing]: INVALID_ARGUMENT should be 3, got {}",
-            error_code::INVALID_ARGUMENT
-        ));
-    }
-
-    // The semantic rule: when a method signature requires an attached stream
-    // (e.g., a streaming input parameter) and the client doesn't attach one,
-    // the server MUST respond with INVALID_ARGUMENT.
-
-    // This is enforced at the application layer based on method signatures.
-    // The protocol just provides the mechanism (attached streams via OpenChannel).
-
-    TestResult::pass()
+pub async fn call_required_port_missing(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }

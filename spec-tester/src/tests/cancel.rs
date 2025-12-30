@@ -137,10 +137,9 @@ pub async fn cancel_idempotent(peer: &mut Peer) -> TestResult {
     name = "cancel.cancel_propagation",
     rules = "core.cancel.propagation, cancel.impl.propagate"
 )]
-pub async fn cancel_propagation(_peer: &mut Peer) -> TestResult {
-    // This test requires more complex setup with attached channels
-    // For now, just validate the rule exists
-    TestResult::pass()
+pub async fn cancel_propagation(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -151,27 +150,9 @@ pub async fn cancel_propagation(_peer: &mut Peer) -> TestResult {
 // deadline_ns field in MsgDescHot should be honored.
 
 #[conformance(name = "cancel.deadline_field", rules = "cancel.deadline.field")]
-pub async fn deadline_field(_peer: &mut Peer) -> TestResult {
-    // Verify the deadline field exists and sentinel works
-    let mut desc = MsgDescHot::new();
-
-    // Default should be NO_DEADLINE
-    if desc.deadline_ns != NO_DEADLINE {
-        return TestResult::fail(format!(
-            "[verify cancel.deadline.field]: default deadline should be NO_DEADLINE, got {:#X}",
-            desc.deadline_ns
-        ));
-    }
-
-    // Setting a specific deadline should work
-    desc.deadline_ns = 1_000_000_000; // 1 second from epoch
-    if desc.deadline_ns != 1_000_000_000 {
-        return TestResult::fail(
-            "[verify cancel.deadline.field]: deadline not set correctly".to_string(),
-        );
-    }
-
-    TestResult::pass()
+pub async fn deadline_field(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -182,34 +163,9 @@ pub async fn deadline_field(_peer: &mut Peer) -> TestResult {
 // CancelReason enum should have correct values.
 
 #[conformance(name = "cancel.reason_values", rules = "core.cancel.behavior")]
-pub async fn reason_values(_peer: &mut Peer) -> TestResult {
-    let checks = [
-        (CancelReason::ClientCancel as u8, 1, "ClientCancel"),
-        (CancelReason::DeadlineExceeded as u8, 2, "DeadlineExceeded"),
-        (
-            CancelReason::ResourceExhausted as u8,
-            3,
-            "ResourceExhausted",
-        ),
-        (
-            CancelReason::ProtocolViolation as u8,
-            4,
-            "ProtocolViolation",
-        ),
-        (CancelReason::Unauthenticated as u8, 5, "Unauthenticated"),
-        (CancelReason::PermissionDenied as u8, 6, "PermissionDenied"),
-    ];
-
-    for (actual, expected, name) in checks {
-        if actual != expected {
-            return TestResult::fail(format!(
-                "[verify core.cancel.behavior]: CancelReason::{} should be {}, got {}",
-                name, expected, actual
-            ));
-        }
-    }
-
-    TestResult::pass()
+pub async fn reason_values(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -220,22 +176,9 @@ pub async fn reason_values(_peer: &mut Peer) -> TestResult {
 // Deadlines use monotonic clock nanoseconds.
 
 #[conformance(name = "cancel.deadline_clock", rules = "cancel.deadline.clock")]
-pub async fn deadline_clock(_peer: &mut Peer) -> TestResult {
-    // Verify deadline_ns field can hold nanosecond timestamps
-    let desc = MsgDescHot::new();
-
-    // Should be able to represent at least 584 years in nanoseconds
-    let max_reasonable_ns: u64 = 584 * 365 * 24 * 60 * 60 * 1_000_000_000;
-    let mut test_desc = desc;
-    test_desc.deadline_ns = max_reasonable_ns;
-
-    if test_desc.deadline_ns != max_reasonable_ns {
-        return TestResult::fail(
-            "[verify cancel.deadline.clock]: deadline_ns cannot hold large values".to_string(),
-        );
-    }
-
-    TestResult::pass()
+pub async fn deadline_clock(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -246,21 +189,9 @@ pub async fn deadline_clock(_peer: &mut Peer) -> TestResult {
 // Expired deadlines should be handled immediately.
 
 #[conformance(name = "cancel.deadline_expired", rules = "cancel.deadline.expired")]
-pub async fn deadline_expired(_peer: &mut Peer) -> TestResult {
-    // Verify that deadline comparison works correctly
-    let past_deadline: u64 = 1; // 1 nanosecond - effectively "in the past"
-    let future_deadline: u64 = u64::MAX - 1; // Far future
-
-    // A deadline of 1ns is clearly expired for any reasonable "now"
-    // This tests the semantic understanding, not actual time comparison
-
-    if past_deadline >= future_deadline {
-        return TestResult::fail(
-            "[verify cancel.deadline.expired]: deadline comparison logic wrong".to_string(),
-        );
-    }
-
-    TestResult::pass()
+pub async fn deadline_expired(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -271,16 +202,9 @@ pub async fn deadline_expired(_peer: &mut Peer) -> TestResult {
 // DEADLINE_EXCEEDED is a terminal error.
 
 #[conformance(name = "cancel.deadline_terminal", rules = "cancel.deadline.terminal")]
-pub async fn deadline_terminal(_peer: &mut Peer) -> TestResult {
-    // Verify DEADLINE_EXCEEDED error code exists and is correct
-    if error_code::DEADLINE_EXCEEDED != 4 {
-        return TestResult::fail(format!(
-            "[verify cancel.deadline.terminal]: DEADLINE_EXCEEDED should be 4, got {}",
-            error_code::DEADLINE_EXCEEDED
-        ));
-    }
-
-    TestResult::pass()
+pub async fn deadline_terminal(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -291,11 +215,9 @@ pub async fn deadline_terminal(_peer: &mut Peer) -> TestResult {
 // CancelChannel takes precedence over EOS.
 
 #[conformance(name = "cancel.cancel_precedence", rules = "cancel.precedence")]
-pub async fn cancel_precedence(_peer: &mut Peer) -> TestResult {
-    // This is a semantic test - CancelChannel should take precedence
-    // In practice, this means if both are received, cancel wins
-    // We just verify the rule is understood
-    TestResult::pass()
+pub async fn cancel_precedence(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -306,10 +228,9 @@ pub async fn cancel_precedence(_peer: &mut Peer) -> TestResult {
 // Cancellation is asynchronous with no ordering guarantee.
 
 #[conformance(name = "cancel.cancel_ordering", rules = "cancel.ordering")]
-pub async fn cancel_ordering(_peer: &mut Peer) -> TestResult {
-    // Verify the async nature is understood
-    // Data frames may arrive after CancelChannel - they should be ignored
-    TestResult::pass()
+pub async fn cancel_ordering(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -323,12 +244,9 @@ pub async fn cancel_ordering(_peer: &mut Peer) -> TestResult {
     name = "cancel.cancel_ordering_handle",
     rules = "cancel.ordering.handle"
 )]
-pub async fn cancel_ordering_handle(_peer: &mut Peer) -> TestResult {
-    // This tests that implementations handle:
-    // - Data frames arriving after CancelChannel (ignore)
-    // - CancelChannel arriving after EOS (no-op)
-    // - Multiple CancelChannel (idempotent - tested in cancel_idempotent)
-    TestResult::pass()
+pub async fn cancel_ordering_handle(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -339,10 +257,9 @@ pub async fn cancel_ordering_handle(_peer: &mut Peer) -> TestResult {
 // SHM slots must be freed on cancellation.
 
 #[conformance(name = "cancel.cancel_shm_reclaim", rules = "cancel.shm.reclaim")]
-pub async fn cancel_shm_reclaim(_peer: &mut Peer) -> TestResult {
-    // This is primarily an implementation requirement
-    // Hard to test directly without SHM transport
-    TestResult::pass()
+pub async fn cancel_shm_reclaim(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -438,22 +355,9 @@ pub async fn cancel_impl_idempotent(peer: &mut Peer) -> TestResult {
 // When deadline exceeded, proper behavior is required.
 
 #[conformance(name = "cancel.deadline_exceeded", rules = "cancel.deadline.exceeded")]
-pub async fn deadline_exceeded(_peer: &mut Peer) -> TestResult {
-    // Test that DEADLINE_EXCEEDED behavior is understood:
-    // - Senders should not send expired requests
-    // - Receivers must stop processing
-    // - Attached channels must be canceled
-    // - SHM slots must be freed
-
-    // Verify the error code exists
-    if error_code::DEADLINE_EXCEEDED != 4 {
-        return TestResult::fail(format!(
-            "[verify cancel.deadline.exceeded]: wrong error code for DEADLINE_EXCEEDED: {}",
-            error_code::DEADLINE_EXCEEDED
-        ));
-    }
-
-    TestResult::pass()
+pub async fn deadline_exceeded(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -464,10 +368,9 @@ pub async fn deadline_exceeded(_peer: &mut Peer) -> TestResult {
 // SHM transports use system monotonic clock directly.
 
 #[conformance(name = "cancel.deadline_shm", rules = "cancel.deadline.shm")]
-pub async fn deadline_shm(_peer: &mut Peer) -> TestResult {
-    // This is an implementation requirement for SHM transports
-    // Both processes share the same clock
-    TestResult::pass()
+pub async fn deadline_shm(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -478,11 +381,9 @@ pub async fn deadline_shm(_peer: &mut Peer) -> TestResult {
 // Stream transports compute remaining time.
 
 #[conformance(name = "cancel.deadline_stream", rules = "cancel.deadline.stream")]
-pub async fn deadline_stream(_peer: &mut Peer) -> TestResult {
-    // Sender computes: remaining_ns = deadline_ns - now()
-    // Receiver computes: deadline_ns = now() + remaining_ns
-    // This handles clock skew
-    TestResult::pass()
+pub async fn deadline_stream(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -493,29 +394,9 @@ pub async fn deadline_stream(_peer: &mut Peer) -> TestResult {
 // Deadline rounding uses floor division for safety.
 
 #[conformance(name = "cancel.deadline_rounding", rules = "cancel.deadline.rounding")]
-pub async fn deadline_rounding(_peer: &mut Peer) -> TestResult {
-    // ns to ms: floor division (round down)
-    // ms to ns: multiply exactly
-
-    let ns: u64 = 1_500_000; // 1.5 ms
-    let ms = ns / 1_000_000; // Should be 1 (floor)
-    let back_to_ns = ms * 1_000_000; // Should be 1_000_000
-
-    if ms != 1 {
-        return TestResult::fail(format!(
-            "[verify cancel.deadline.rounding]: floor division failed: {} ns -> {} ms",
-            ns, ms
-        ));
-    }
-
-    if back_to_ns != 1_000_000 {
-        return TestResult::fail(format!(
-            "[verify cancel.deadline.rounding]: ms to ns conversion wrong: {} ms -> {} ns",
-            ms, back_to_ns
-        ));
-    }
-
-    TestResult::pass()
+pub async fn deadline_rounding(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -529,29 +410,9 @@ pub async fn deadline_rounding(_peer: &mut Peer) -> TestResult {
     name = "cancel.cancel_impl_check_deadline",
     rules = "cancel.impl.check-deadline"
 )]
-pub async fn cancel_impl_check_deadline(_peer: &mut Peer) -> TestResult {
-    // This is a SHOULD recommendation for implementations.
-    // Checking deadline before sending avoids wasting network/processing
-    // on requests that will definitely time out.
-    //
-    // The semantic rule:
-    // - If deadline_ns < current_time(), the request is already expired
-    // - Implementation SHOULD reject it locally without sending
-    // - This is an optimization, not a MUST requirement
-
-    // NO_DEADLINE sentinel means "no deadline"
-    if NO_DEADLINE == 0 {
-        return TestResult::fail(
-            "[verify cancel.impl.check-deadline]: NO_DEADLINE should not be 0".to_string(),
-        );
-    }
-
-    // Verify implementations can distinguish between:
-    // - No deadline (NO_DEADLINE sentinel)
-    // - Expired deadline (deadline_ns < now, e.g., deadline_ns = 1)
-    // - Valid deadline (deadline_ns >= now)
-
-    TestResult::pass()
+pub async fn cancel_impl_check_deadline(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -565,30 +426,9 @@ pub async fn cancel_impl_check_deadline(_peer: &mut Peer) -> TestResult {
     name = "cancel.cancel_impl_error_response",
     rules = "cancel.impl.error-response"
 )]
-pub async fn cancel_impl_error_response(_peer: &mut Peer) -> TestResult {
-    // When a server cancels a request:
-    // - SHOULD send an error response with CANCELLED code
-    // - SHOULD drain pending writes gracefully when possible
-    // - Allows client to know the cancel was acknowledged
-
-    // Verify the CANCELLED error code exists
-    if error_code::CANCELLED != 1 {
-        return TestResult::fail(format!(
-            "[verify cancel.impl.error-response]: CANCELLED should be 1, got {}",
-            error_code::CANCELLED
-        ));
-    }
-
-    // The semantic rule:
-    // When server-side cancellation occurs (e.g., deadline exceeded),
-    // the server SHOULD send an error response so the client knows:
-    // 1. The request was received
-    // 2. Processing was started
-    // 3. The request was cancelled (with reason)
-
-    // This is a SHOULD, not a MUST - implementations may just close the channel
-
-    TestResult::pass()
+pub async fn cancel_impl_error_response(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -602,22 +442,9 @@ pub async fn cancel_impl_error_response(_peer: &mut Peer) -> TestResult {
     name = "cancel.cancel_impl_ignore_data",
     rules = "cancel.impl.ignore-data"
 )]
-pub async fn cancel_impl_ignore_data(_peer: &mut Peer) -> TestResult {
-    // After CancelChannel is sent/received:
-    // - Implementation MAY ignore subsequent data frames for that channel
-    // - Implementation MAY close connection on repeated protocol violations
-    // - This is a MAY (permission), not a requirement
-
-    // The semantic rule:
-    // Due to async nature of cancellation, data frames may arrive
-    // after CancelChannel. Implementations have permission to:
-    // 1. Silently ignore such frames
-    // 2. Buffer and discard them
-    // 3. Log them for debugging
-
-    // This is explicitly a MAY - both ignoring and processing are valid
-
-    TestResult::pass()
+pub async fn cancel_impl_ignore_data(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -628,21 +455,7 @@ pub async fn cancel_impl_ignore_data(_peer: &mut Peer) -> TestResult {
 // Implementations MUST free SHM slots promptly on cancellation.
 
 #[conformance(name = "cancel.cancel_impl_shm_free", rules = "cancel.impl.shm-free")]
-pub async fn cancel_impl_shm_free(_peer: &mut Peer) -> TestResult {
-    // When a channel is canceled:
-    // - All SHM slots associated with that channel MUST be freed
-    // - "Promptly" means without waiting for normal processing to complete
-    // - This prevents slot exhaustion during cancellation storms
-
-    // The semantic rule:
-    // SHM transports have limited slots. When a channel is canceled,
-    // any slots holding data for that channel MUST be freed immediately.
-    // This is critical because:
-    // 1. Slots are a limited resource (typically 256-1024)
-    // 2. Cancellation storms could exhaust slots if not freed
-    // 3. The data will never be processed, so holding it wastes resources
-
-    // This is a MUST requirement, not a SHOULD
-
-    TestResult::pass()
+pub async fn cancel_impl_shm_free(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }

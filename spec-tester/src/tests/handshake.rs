@@ -548,17 +548,9 @@ pub async fn method_registry_zero(peer: &mut Peer) -> TestResult {
     name = "handshake.explicit_required",
     rules = "handshake.explicit-required"
 )]
-pub async fn explicit_required(_peer: &mut Peer) -> TestResult {
-    // This rule states that explicit Hello exchange is mandatory.
-    // There is no implicit handshake mode.
-    //
-    // All conforming implementations MUST:
-    // 1. Send Hello immediately after transport connection
-    // 2. Receive Hello before any other communication
-    // 3. Not process any frames until handshake completes
-
-    // We document the rule - actual verification is in valid_hello_exchange
-    TestResult::pass()
+pub async fn explicit_required(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -572,23 +564,9 @@ pub async fn explicit_required(_peer: &mut Peer) -> TestResult {
     name = "handshake.registry_cross_service",
     rules = "handshake.registry.cross-service"
 )]
-pub async fn registry_cross_service(_peer: &mut Peer) -> TestResult {
-    // Method ID collisions can occur across services because:
-    // - method_id = FNV-1a("ServiceName.methodName")
-    // - Two different service.method combinations could hash to same value
-    //
-    // Example (hypothetical collision):
-    //   FNV-1a("ServiceA.foo") == FNV-1a("ServiceB.bar")
-    //
-    // This is detected at:
-    // 1. Code generation time (MUST fail build)
-    // 2. Handshake time (duplicate method_id in registry)
-
-    // The rule: runtime dispatch is by method_id only.
-    // There is no separate service routing layer.
-    // Cross-service collisions are treated the same as within-service collisions.
-
-    TestResult::pass()
+pub async fn registry_cross_service(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -602,45 +580,9 @@ pub async fn registry_cross_service(_peer: &mut Peer) -> TestResult {
     name = "handshake.registry_failure",
     rules = "handshake.registry.failure"
 )]
-pub async fn registry_failure(_peer: &mut Peer) -> TestResult {
-    // On registry validation failure:
-    // 1. Send CloseChannel { channel_id: 0, reason: Error("...") }
-    // 2. Close the transport connection
-
-    // Verify CloseChannel structure supports error reason
-    let close = CloseChannel {
-        channel_id: 0,
-        reason: CloseReason::Error("duplicate method_id".to_string()),
-    };
-
-    let payload = match facet_postcard::to_vec(&close) {
-        Ok(p) => p,
-        Err(e) => return TestResult::fail(format!("failed to encode CloseChannel: {}", e)),
-    };
-
-    let decoded: CloseChannel = match facet_postcard::from_slice(&payload) {
-        Ok(c) => c,
-        Err(e) => return TestResult::fail(format!("failed to decode CloseChannel: {}", e)),
-    };
-
-    // Verify reason carries the error message
-    match decoded.reason {
-        CloseReason::Error(msg) => {
-            if msg.is_empty() {
-                return TestResult::fail(
-                    "[verify handshake.registry.failure]: error message should not be empty"
-                        .to_string(),
-                );
-            }
-        }
-        CloseReason::Normal => {
-            return TestResult::fail(
-                "[verify handshake.registry.failure]: expected Error reason".to_string(),
-            );
-        }
-    }
-
-    TestResult::pass()
+pub async fn registry_failure(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
 
 // =============================================================================
@@ -651,19 +593,7 @@ pub async fn registry_failure(_peer: &mut Peer) -> TestResult {
 // Implementations MUST impose a handshake timeout.
 
 #[conformance(name = "handshake.timeout", rules = "handshake.timeout")]
-pub async fn timeout(_peer: &mut Peer) -> TestResult {
-    // Handshake timeout requirements:
-    // - MUST be at most 30 seconds
-    // - MAY be shorter (e.g., 2 seconds for localhost)
-    // - If Hello not received in time, connection MUST be closed
-
-    // This is a behavioral requirement. We document:
-    // - Recommended default: 30 seconds
-    // - Shorter timeouts are acceptable for trusted networks
-
-    // The timeout prevents:
-    // - Slowloris-style attacks
-    // - Resource exhaustion from stalled connections
-
-    TestResult::pass()
+pub async fn timeout(peer: &mut Peer) -> TestResult {
+    let _ = peer;
+    panic!("TODO: this test should be interactive and actually test spec-subject");
 }
