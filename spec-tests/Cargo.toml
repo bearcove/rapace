@@ -1,0 +1,16 @@
+[package]
+name = "rapace-spec-tests"
+version = "0.1.0"
+edition = "2024"
+description = "Test orchestrator for rapace spec conformance"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[[bin]]
+name = "rapace-spec-tests"
+path = "src/main.rs"
+
+[dependencies]
+libtest-mimic = "0.8"
+facet.workspace = true
+facet-json.workspace = true

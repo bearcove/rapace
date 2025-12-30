@@ -26,9 +26,11 @@ members = [
     "demos/http-tunnel",
     "test-external-service",
     "xtask",
-    "conformance",
-    "conformance/macros",
-    "conformance/tests-runner",
+    "spec-tester",
+    "spec-tester-macros",
+    "spec-proto",
+    "spec-subject",
+    "spec-tests",
 ]
 exclude = ["fuzz"]
 
@@ -102,6 +104,11 @@ js-sys = "0.3"
 web-sys = { version = "0.3", features = ["console", "WebSocket", "MessageEvent", "BinaryType", "ErrorEvent", "CloseEvent"] }
 gloo-timers = { version = "0.3", features = ["futures"] }
 web-time = "1"
+
+[workspace.metadata.cargo-shear]
+# These are used by spec-subject and spec-proto but cargo-shear doesn't see it
+# because the code is stub/TODO - they will be used when implemented
+ignored = ["rapace", "rapace-core", "rapace-protocol", "rapace-spec-proto", "facet", "facet-postcard"]
 
 [profile.release]
 debug = 1

@@ -8,12 +8,8 @@ fail-fast = true
 # Status level
 status-level = "pass"
 
-# Exclude coverage tests from default runs - they track spec compliance gaps
-# Run them explicitly with: cargo nextest run -p rapace-conformance --test coverage
-#
-# Note: The Rust conformance integration tests are in a separate binary crate
-# (rapace-conformance-tests) and are run separately in CI via `cargo run -p rapace-conformance-tests`
-default-filter = 'not (package(rapace-conformance) & test(/^rule\./))' 
+# Note: Rust spec conformance tests are run via `cargo run -p rapace-spec-tests`
+# which orchestrates rapace-spec-tester and rapace-spec-subject
 
 # Pre-build helper binaries before running tests
 [scripts.setup.build-helpers]
