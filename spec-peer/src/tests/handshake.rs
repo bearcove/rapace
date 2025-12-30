@@ -13,7 +13,7 @@ use rapace_spec_peer_macros::conformance;
 // Rules: [verify handshake.required], [verify handshake.ordering]
 //
 // This test acts as ACCEPTOR. The implementation under test (INITIATOR) should:
-// 1. Send a valid Hello frame on channel 0 with method_id 0 (HELLO control verb)
+// 1. Send a valid Hello frame on channel 0 with method_id control_verb::HELLO
 // 2. Receive our Hello response
 // 3. Connection is now ready for use
 //
@@ -53,7 +53,10 @@ pub async fn valid_hello_exchange(peer: &mut Peer) -> TestResult {
 
     // Verify CONTROL flag is set
     if frame.desc.flags & flags::CONTROL == 0 {
-        return TestResult::fail("CONTROL flag not set on Hello frame");
+        return TestResult::fail(format!(
+            "CONTROL flag not set on Hello frame (flags: {:#x})",
+            frame.desc.flags
+        ));
     }
 
     // Deserialize the Hello payload
