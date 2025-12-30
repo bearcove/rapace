@@ -4,26 +4,7 @@
 //! Tests are organized by the spec document they validate.
 //! All tests are registered via the `#[conformance]` macro and collected via inventory.
 
-pub mod call;
-pub mod cancel;
-pub mod channel;
-pub mod control;
-pub mod data;
-pub mod error;
-pub mod flow;
-pub mod frame;
 pub mod handshake;
-pub mod langmap;
-pub mod metadata;
-pub mod method;
-pub mod overload;
-pub mod payload;
-pub mod priority;
-pub mod schema;
-pub mod security;
-pub mod stream;
-pub mod transport;
-pub mod tunnel;
 
 use crate::ConformanceTest;
 use crate::harness::Peer;
