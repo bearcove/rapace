@@ -6,11 +6,17 @@ description = "Test orchestrator for rapace spec conformance"
 license = "MIT OR Apache-2.0"
 publish = false
 
-[[bin]]
-name = "rapace-spec-tests"
-path = "src/main.rs"
+# facet is used transitively via facet-json in tests
+[package.metadata.cargo-shear]
+ignored = ["facet"]
 
 [dependencies]
-libtest-mimic = "0.8"
 facet.workspace = true
+
+[[test]]
+name = "spec"
+harness = false
+
+[dev-dependencies]
 facet-json.workspace = true
+libtest-mimic = "0.8"

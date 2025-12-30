@@ -11,6 +11,10 @@ publish = false
 [package.metadata."docs.rs"]
 rustdoc-args = ["--html-in-header", "arborium-header.html"]
 
+# TODO: These will be used when we implement the real subject
+[package.metadata.cargo-shear]
+ignored = ["rapace-core", "rapace-protocol", "rapace-spec-proto", "facet", "facet-postcard"]
+
 [[bin]]
 name = "rapace-spec-subject"
 path = "src/main.rs"

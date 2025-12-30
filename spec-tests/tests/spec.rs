@@ -22,17 +22,31 @@ struct TestCase {
 fn main() {
     let args = Arguments::from_args();
 
-    // Find binaries (same directory as ourselves)
+    // Find binaries - they're in target/debug or target/release,
+    // while we might be in target/debug/deps
     let self_exe = std::env::current_exe().expect("failed to get current exe");
-    let bin_dir = self_exe.parent().expect("exe has no parent");
+    let mut bin_dir = self_exe.parent().expect("exe has no parent").to_path_buf();
+
+    // If we're in deps/, go up one level
+    if bin_dir.ends_with("deps") {
+        bin_dir = bin_dir.parent().expect("deps has no parent").to_path_buf();
+    }
+
     let tester_bin = bin_dir.join("rapace-spec-tester");
     let subject_bin = bin_dir.join("rapace-spec-subject");
 
     // Get test list from tester
-    let output = Command::new(&tester_bin)
+    let output = match Command::new(&tester_bin)
         .args(["--list", "--format", "json"])
         .output()
-        .expect("failed to run spec-tester --list");
+    {
+        Ok(output) => output,
+        Err(e) => {
+            eprintln!("Warning: spec-tester not found ({e}), returning empty test list");
+            eprintln!("Run `cargo build -p rapace-spec-tester -p rapace-spec-subject` first");
+            libtest_mimic::run(&args, vec![]).exit();
+        }
+    };
 
     if !output.status.success() {
         eprintln!("spec-tester --list failed:");

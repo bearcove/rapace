@@ -217,10 +217,10 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Build spec test binaries
-        run: cargo build -p rapace-spec-tester -p rapace-spec-subject -p rapace-spec-tests
+        run: cargo build -p rapace-spec-tester -p rapace-spec-subject
 
       - name: Run spec tests
-        run: cargo run -p rapace-spec-tests
+        run: cargo nextest run -p rapace-spec-tests
 
   typescript-test:
     name: TypeScript / Unit Tests
