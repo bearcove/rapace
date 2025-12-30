@@ -5,7 +5,7 @@
 use crate::harness::{Frame, Peer};
 use crate::protocol::*;
 use crate::testcase::TestResult;
-use rapace_spec_tester_macros::conformance;
+use rapace_spec_peer_macros::conformance;
 
 // =============================================================================
 // handshake.valid_hello_exchange

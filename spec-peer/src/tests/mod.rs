@@ -16,7 +16,10 @@ use crate::testcase::TestResult;
 pub async fn run(name: &str) -> TestResult {
     for test in inventory::iter::<ConformanceTest> {
         if test.name == name {
-            let mut peer = Peer::new();
+            let mut peer = match Peer::connect().await {
+                Ok(p) => p,
+                Err(e) => return TestResult::fail(format!("failed to connect: {}", e)),
+            };
             return (test.func)(&mut peer).await;
         }
     }
