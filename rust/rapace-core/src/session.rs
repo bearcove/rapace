@@ -230,27 +230,95 @@ pub struct RpcSession<T: Transport> {
 }
 
 impl<T: Transport> RpcSession<T> {
-    /// Create a new RPC session wrapping the given transport.
+    /// Create a new RPC session as the initiator (client).
     ///
-    /// The session starts with channel ID 1 (odd channel IDs: 1, 3, 5, ...).
-    /// For bidirectional RPC, use `with_channel_start` to coordinate channel IDs:
-    /// - Host session: start at 1 (uses odd channel IDs)
-    /// - Plugin session: start at 2 (uses even channel IDs)
+    /// The initiator:
+    /// - Sends Hello first during handshake
+    /// - Uses odd channel IDs (1, 3, 5, ...)
     ///
-    /// Spec: `[impl core.channel.id.parity.initiator]` - initiator uses odd IDs (1, 3, 5, ...).
-    /// Spec: `[impl core.channel.id.parity.acceptor]` - acceptor uses even IDs (2, 4, 6, ...).
+    /// Use this when your code initiates the connection (e.g., client connecting to server).
+    ///
+    /// Spec: `[impl core.channel.id.parity.initiator]` - initiator uses odd IDs.
+    /// Spec: `[impl handshake.ordering]` - initiator sends Hello first.
     pub fn new(transport: T) -> Self {
-        Self::with_channel_start(transport, 1)
+        Self::new_initiator(transport)
+    }
+
+    /// Create a new RPC session as the initiator (client).
+    ///
+    /// The initiator:
+    /// - Sends Hello first during handshake
+    /// - Uses odd channel IDs (1, 3, 5, ...)
+    ///
+    /// Use this when your code initiates the connection (e.g., client connecting to server).
+    ///
+    /// Spec: `[impl core.channel.id.parity.initiator]` - initiator uses odd IDs.
+    /// Spec: `[impl handshake.ordering]` - initiator sends Hello first.
+    pub fn new_initiator(transport: T) -> Self {
+        Self::with_role(transport, Role::Initiator)
+    }
+
+    /// Create a new RPC session as the acceptor (server).
+    ///
+    /// The acceptor:
+    /// - Waits for peer's Hello first during handshake
+    /// - Uses even channel IDs (2, 4, 6, ...)
+    ///
+    /// Use this when your code accepts incoming connections (e.g., server handling clients).
+    ///
+    /// Spec: `[impl core.channel.id.parity.acceptor]` - acceptor uses even IDs.
+    /// Spec: `[impl handshake.ordering]` - acceptor receives Hello first.
+    pub fn new_acceptor(transport: T) -> Self {
+        Self::with_role(transport, Role::Acceptor)
+    }
+
+    /// Create a new RPC session with an explicit role.
+    ///
+    /// This is the most explicit constructor - use it when you want to be
+    /// completely clear about the session's role in the connection.
+    ///
+    /// # Arguments
+    ///
+    /// * `transport` - The underlying transport for sending/receiving frames
+    /// * `role` - Whether this session is the Initiator or Acceptor
+    ///
+    /// The role determines:
+    /// - Handshake order (initiator sends Hello first)
+    /// - Channel ID parity (initiator uses odd IDs, acceptor uses even)
+    pub fn with_role(transport: T, role: Role) -> Self {
+        let start_channel_id = match role {
+            Role::Initiator => 1, // Odd IDs: 1, 3, 5, ...
+            Role::Acceptor => 2,  // Even IDs: 2, 4, 6, ...
+        };
+        Self {
+            transport,
+            role,
+            pending: Mutex::new(HashMap::new()),
+            tunnels: Mutex::new(HashMap::new()),
+            open_channels: Mutex::new(std::collections::HashSet::new()),
+            dispatcher: Mutex::new(None),
+            next_msg_id: AtomicU64::new(1),
+            next_channel_id: AtomicU32::new(start_channel_id),
+        }
     }
 
     /// Create a new RPC session with a custom starting channel ID.
     ///
-    /// Use this when you need to coordinate channel IDs between two sessions.
-    /// For bidirectional RPC over a single transport pair:
-    /// - Host session: start at 1 (uses odd channel IDs, Role::Initiator)
-    /// - Plugin session: start at 2 (uses even channel IDs, Role::Acceptor)
+    /// **Prefer `new_initiator()`, `new_acceptor()`, or `with_role()` instead.**
+    ///
+    /// This constructor exists for advanced use cases where you need fine-grained
+    /// control over channel ID allocation. The role is derived from the channel ID:
+    /// - Odd start (1, 3, ...) → Initiator
+    /// - Even start (2, 4, ...) → Acceptor
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // For bidirectional RPC over a single transport pair:
+    /// let host_session = RpcSession::with_channel_start(transport_a, 1);   // Initiator
+    /// let plugin_session = RpcSession::with_channel_start(transport_b, 2); // Acceptor
+    /// ```
     pub fn with_channel_start(transport: T, start_channel_id: u32) -> Self {
-        // Derive role from channel start: odd = initiator, even = acceptor
         let role = if start_channel_id % 2 == 1 {
             Role::Initiator
         } else {
@@ -1385,13 +1453,18 @@ impl<T: Transport> RpcSession<T> {
             Err(e) => {
                 tracing::error!(?e, "RpcSession::run: handshake failed");
                 self.transport.close();
-                return Err(TransportError::Io(
-                    std::io::Error::new(
-                        std::io::ErrorKind::ConnectionRefused,
-                        format!("handshake failed: {}", e),
-                    )
-                    .into(),
-                ));
+                // Convert RpcError to TransportError, preserving error details
+                let transport_err = match e {
+                    RpcError::Transport(te) => te,
+                    RpcError::Status { code, message } => {
+                        TransportError::HandshakeFailed { code, message }
+                    }
+                    other => TransportError::HandshakeFailed {
+                        code: ErrorCode::Internal,
+                        message: other.to_string(),
+                    },
+                };
+                return Err(transport_err);
             }
         }
 

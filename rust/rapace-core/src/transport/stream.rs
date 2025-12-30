@@ -108,11 +108,11 @@ impl StreamTransport {
 }
 
 fn desc_to_bytes(desc: &MsgDescHot) -> [u8; DESC_SIZE] {
-    unsafe { std::mem::transmute_copy(desc) }
+    desc.to_bytes()
 }
 
 fn bytes_to_desc(bytes: &[u8; DESC_SIZE]) -> MsgDescHot {
-    unsafe { std::mem::transmute_copy(bytes) }
+    MsgDescHot::from_bytes(bytes)
 }
 
 impl Transport for StreamTransport {

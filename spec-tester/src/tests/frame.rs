@@ -74,27 +74,23 @@ async fn do_handshake(peer: &mut Peer) -> Result<(), String> {
     rules = "frame.desc.size, frame.desc.sizeof"
 )]
 pub async fn descriptor_size(peer: &mut Peer) -> TestResult {
-    // Receive a frame from the implementation
-    // The harness Peer.recv() reads exactly 64 bytes for the descriptor
-    // If we receive successfully, the descriptor was the right size
-    let frame = match peer.recv().await {
+    // Receive a frame with raw wire bytes preserved
+    let raw_frame = match peer.recv_raw().await {
         Ok(f) => f,
         Err(e) => return TestResult::fail(format!("failed to receive frame: {}", e)),
     };
 
-    // The fact that we received a valid frame means the descriptor was 64 bytes
-    // (Peer.recv() reads exactly 64 bytes for the descriptor)
-
-    // Additional validation: the descriptor should have been parsed correctly
-    // Check that the descriptor bytes match our expected layout
-    let bytes = frame.desc.to_bytes();
-    if bytes.len() != 64 {
+    // Verify the raw descriptor is exactly 64 bytes
+    // (This is guaranteed by the type system - raw_desc is [u8; 64] - but we check anyway)
+    if raw_frame.raw_desc.len() != 64 {
         return TestResult::fail(format!(
-            "[verify frame.desc.sizeof]: descriptor serializes to {} bytes, expected 64",
-            bytes.len()
+            "[verify frame.desc.sizeof]: descriptor on wire is {} bytes, expected 64",
+            raw_frame.raw_desc.len()
         ));
     }
 
+    // The fact that we successfully received and parsed the frame with exactly 64 bytes
+    // for the descriptor proves the implementation sends 64-byte descriptors.
     TestResult::pass()
 }
 
@@ -201,41 +197,86 @@ pub async fn sentinel_no_deadline(peer: &mut Peer) -> TestResult {
 
 #[conformance(name = "frame.encoding_little_endian", rules = "frame.desc.encoding")]
 pub async fn encoding_little_endian(peer: &mut Peer) -> TestResult {
-    // Receive Hello frame
-    let frame = match peer.recv().await {
+    // Receive Hello frame with raw wire bytes preserved
+    let raw_frame = match peer.recv_raw().await {
         Ok(f) => f,
         Err(e) => return TestResult::fail(format!("failed to receive frame: {}", e)),
     };
 
-    // Re-serialize the descriptor to verify it uses little-endian
-    let bytes = frame.desc.to_bytes();
+    // Use the RAW bytes from the wire, not re-serialized bytes!
+    // This actually tests the implementation's encoding, not ours.
+    let bytes = &raw_frame.raw_desc;
+
+    // Descriptor layout (all little-endian):
+    // 0-7:   msg_id (u64)
+    // 8-11:  channel_id (u32)
+    // 12-15: method_id (u32)
+    // 16-19: payload_slot (u32)
+    // 20-23: payload_generation (u32)
+    // 24-27: payload_offset (u32)
+    // 28-31: payload_len (u32)
+    // 32-35: flags (u32)
+    // 36-39: credit_grant (u32)
+    // 40-47: deadline_ns (u64)
+    // 48-63: inline_payload (16 bytes)
 
     // Check that msg_id (bytes 0-7) is little-endian
-    let msg_id_from_bytes = u64::from_le_bytes([
-        bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
-    ]);
-    if msg_id_from_bytes != frame.desc.msg_id {
+    let msg_id_from_wire = u64::from_le_bytes(bytes[0..8].try_into().unwrap());
+    if msg_id_from_wire != raw_frame.desc.msg_id {
         return TestResult::fail(format!(
-            "[verify frame.desc.encoding]: msg_id not little-endian: expected {}, parsed {}",
-            frame.desc.msg_id, msg_id_from_bytes
+            "[verify frame.desc.encoding]: msg_id wire bytes don't match when parsed as little-endian: \
+             wire bytes {:02x?} parse to {}, but descriptor has {}",
+            &bytes[0..8],
+            msg_id_from_wire,
+            raw_frame.desc.msg_id
         ));
     }
 
     // Check that channel_id (bytes 8-11) is little-endian
-    let channel_id_from_bytes = u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]);
-    if channel_id_from_bytes != frame.desc.channel_id {
+    let channel_id_from_wire = u32::from_le_bytes(bytes[8..12].try_into().unwrap());
+    if channel_id_from_wire != raw_frame.desc.channel_id {
         return TestResult::fail(format!(
-            "[verify frame.desc.encoding]: channel_id not little-endian: expected {}, parsed {}",
-            frame.desc.channel_id, channel_id_from_bytes
+            "[verify frame.desc.encoding]: channel_id wire bytes don't match when parsed as little-endian: \
+             wire bytes {:02x?} parse to {}, but descriptor has {}",
+            &bytes[8..12],
+            channel_id_from_wire,
+            raw_frame.desc.channel_id
         ));
     }
 
     // Check that method_id (bytes 12-15) is little-endian
-    let method_id_from_bytes = u32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]);
-    if method_id_from_bytes != frame.desc.method_id {
+    let method_id_from_wire = u32::from_le_bytes(bytes[12..16].try_into().unwrap());
+    if method_id_from_wire != raw_frame.desc.method_id {
         return TestResult::fail(format!(
-            "[verify frame.desc.encoding]: method_id not little-endian: expected {}, parsed {}",
-            frame.desc.method_id, method_id_from_bytes
+            "[verify frame.desc.encoding]: method_id wire bytes don't match when parsed as little-endian: \
+             wire bytes {:02x?} parse to {}, but descriptor has {}",
+            &bytes[12..16],
+            method_id_from_wire,
+            raw_frame.desc.method_id
+        ));
+    }
+
+    // Check flags (bytes 32-35)
+    let flags_from_wire = u32::from_le_bytes(bytes[32..36].try_into().unwrap());
+    if flags_from_wire != raw_frame.desc.flags {
+        return TestResult::fail(format!(
+            "[verify frame.desc.encoding]: flags wire bytes don't match when parsed as little-endian: \
+             wire bytes {:02x?} parse to {}, but descriptor has {}",
+            &bytes[32..36],
+            flags_from_wire,
+            raw_frame.desc.flags
+        ));
+    }
+
+    // Check deadline_ns (bytes 40-47)
+    let deadline_from_wire = u64::from_le_bytes(bytes[40..48].try_into().unwrap());
+    if deadline_from_wire != raw_frame.desc.deadline_ns {
+        return TestResult::fail(format!(
+            "[verify frame.desc.encoding]: deadline_ns wire bytes don't match when parsed as little-endian: \
+             wire bytes {:02x?} parse to {}, but descriptor has {}",
+            &bytes[40..48],
+            deadline_from_wire,
+            raw_frame.desc.deadline_ns
         ));
     }
 
