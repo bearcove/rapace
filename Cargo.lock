@@ -1981,12 +1981,10 @@ dependencies = [
  "inventory",
  "libtest-mimic",
  "rapace-conformance-macros",
- "rapace-core",
  "rapace-protocol",
  "regex",
  "tokio",
  "tracey-core",
- "tracing",
 ]
 
 [[package]]
@@ -1995,6 +1993,18 @@ version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
+]
+
+[[package]]
+name = "rapace-conformance-tests"
+version = "0.1.0"
+dependencies = [
+ "facet-postcard",
+ "libtest-mimic",
+ "rapace-core",
+ "rapace-protocol",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -2930,7 +2940,7 @@ checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
 [[package]]
 name = "tracey-core"
 version = "0.5.0"
-source = "git+https://github.com/bearcove/tracey#2b2dcdbdc6be7a6ad576dec8afc93fac0247db9f"
+source = "git+https://github.com/bearcove/tracey#2004c8c9ea9afba8824daacbd7e5424f2f60c8a3"
 dependencies = [
  "eyre",
  "facet",

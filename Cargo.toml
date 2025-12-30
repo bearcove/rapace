@@ -28,6 +28,7 @@ members = [
     "xtask",
     "conformance",
     "conformance/macros",
+    "conformance/tests-runner",
 ]
 exclude = ["fuzz"]
 

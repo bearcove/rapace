@@ -216,8 +216,11 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
 
+      - name: Build conformance binaries
+        run: cargo build -p rapace-conformance -p rapace-conformance-tests
+
       - name: Run conformance tests
-        run: cargo nextest run -p rapace-conformance --test conformance --no-fail-fast
+        run: cargo run -p rapace-conformance-tests
 
   typescript-test:
     name: TypeScript / Unit Tests

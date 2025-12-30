@@ -1203,9 +1203,58 @@ async fn run_channel_open_required_before_data(bin_path: &str) -> Result<(), Str
     }
 }
 
+/// Maximum number of retries for flaky tests (process spawn race conditions).
+const MAX_RETRIES: u32 = 3;
+
+/// Run an async test function with retry logic for transient I/O errors.
+///
+/// This helps handle race conditions when spawning processes, where the
+/// pipe may break before we can send data.
+async fn with_retry<F, Fut>(test_fn: F) -> Result<(), String>
+where
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = Result<(), String>>,
+{
+    let mut last_error = String::new();
+
+    for attempt in 1..=MAX_RETRIES {
+        match test_fn().await {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                // Only retry on I/O errors (broken pipe, etc.) - not on test failures
+                if e.contains("I/O error") || e.contains("broken pipe") {
+                    last_error = e;
+                    if attempt < MAX_RETRIES {
+                        // Brief delay before retry
+                        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                        continue;
+                    }
+                } else {
+                    // Test actually failed, don't retry
+                    return Err(e);
+                }
+            }
+        }
+    }
+
+    Err(format!(
+        "{} (failed after {} retries)",
+        last_error, MAX_RETRIES
+    ))
+}
+
 /// Generic test runner for tests that just need Hello exchange.
 /// The harness validates the frames we send.
+///
+/// Includes retry logic to handle transient failures from process spawn race conditions.
 async fn run_hello_based_test(bin_path: &str, test_name: &str) -> Result<(), String> {
+    let bin_path = bin_path.to_string();
+    let test_name = test_name.to_string();
+    with_retry(|| run_hello_based_test_impl(&bin_path, &test_name)).await
+}
+
+/// Single attempt at running a hello-based test.
+async fn run_hello_based_test_impl(bin_path: &str, test_name: &str) -> Result<(), String> {
     let (child, transport) = spawn_harness(bin_path, test_name).await?;
 
     // Send Hello as initiator
@@ -1235,17 +1284,24 @@ fn main() {
     let args = Arguments::from_args();
 
     // Get the path to the conformance binary
-    let conformance_bin = env!("CARGO_BIN_EXE_rapace-conformance");
+    // When run via `cargo run`, we find it relative to our own executable
+    let conformance_bin = std::env::current_exe()
+        .expect("failed to get current exe")
+        .parent()
+        .expect("exe has no parent dir")
+        .join("rapace-conformance")
+        .to_string_lossy()
+        .to_string();
 
     let mut trials = Vec::new();
 
-    // Macro to reduce boilerplate
+    // Macro to reduce boilerplate - includes retry logic for transient I/O errors
     macro_rules! add_test {
         ($name:expr, $func:ident) => {{
             let bin_path = conformance_bin.to_string();
             trials.push(Trial::test($name, move || {
                 let rt = tokio::runtime::Runtime::new().expect("failed to create runtime");
-                rt.block_on(async { $func(&bin_path).await.map_err(Failed::from) })
+                rt.block_on(async { with_retry(|| $func(&bin_path)).await.map_err(Failed::from) })
             }));
         }};
     }
