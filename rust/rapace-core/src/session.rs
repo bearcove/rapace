@@ -86,9 +86,9 @@ use parking_lot::Mutex;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::{
-    BufferPool, CancelChannel, CancelReason, ErrorCode, Frame, FrameFlags, INLINE_PAYLOAD_SIZE,
-    MsgDescHot, OpenChannel, Ping, Pong, PooledBuf, RpcError, Transport, TransportError,
-    control_method,
+    BufferPool, CancelChannel, CancelReason, ErrorCode, Frame, FrameFlags, Hello,
+    INLINE_PAYLOAD_SIZE, Limits, MsgDescHot, OpenChannel, Ping, Pong, PooledBuf, Role, RpcError,
+    Transport, TransportError, control_method,
 };
 
 const DEFAULT_MAX_PENDING: usize = 8192;
@@ -199,6 +199,10 @@ pub type BoxedDispatcher = Box<
 pub struct RpcSession<T: Transport> {
     transport: T,
 
+    /// Our role in the connection (Initiator or Acceptor).
+    /// Spec: `[impl handshake.role.validation]` - roles must be complementary.
+    role: Role,
+
     /// Pending response waiters: channel_id -> oneshot sender.
     /// When a client sends a request, it registers a waiter here.
     /// When a response arrives, the demux loop finds the waiter and delivers.
@@ -243,11 +247,18 @@ impl<T: Transport> RpcSession<T> {
     ///
     /// Use this when you need to coordinate channel IDs between two sessions.
     /// For bidirectional RPC over a single transport pair:
-    /// - Host session: start at 1 (uses odd channel IDs)
-    /// - Plugin session: start at 2 (uses even channel IDs)
+    /// - Host session: start at 1 (uses odd channel IDs, Role::Initiator)
+    /// - Plugin session: start at 2 (uses even channel IDs, Role::Acceptor)
     pub fn with_channel_start(transport: T, start_channel_id: u32) -> Self {
+        // Derive role from channel start: odd = initiator, even = acceptor
+        let role = if start_channel_id % 2 == 1 {
+            Role::Initiator
+        } else {
+            Role::Acceptor
+        };
         Self {
             transport,
+            role,
             pending: Mutex::new(HashMap::new()),
             tunnels: Mutex::new(HashMap::new()),
             open_channels: Mutex::new(std::collections::HashSet::new()),
@@ -255,6 +266,11 @@ impl<T: Transport> RpcSession<T> {
             next_msg_id: AtomicU64::new(1),
             next_channel_id: AtomicU32::new(start_channel_id),
         }
+    }
+
+    /// Get our role in this connection.
+    pub fn role(&self) -> Role {
+        self.role
     }
 
     /// Get a reference to the buffer pool for optimized serialization.
@@ -723,6 +739,174 @@ impl<T: Transport> RpcSession<T> {
     }
 
     // ========================================================================
+    // Handshake
+    // ========================================================================
+
+    /// Send a Hello frame.
+    ///
+    /// Spec: `[impl handshake.required]` - Hello MUST be sent before any other frames.
+    async fn send_hello(&self) -> Result<(), RpcError> {
+        let hello = Hello {
+            protocol_version: rapace_protocol::PROTOCOL_VERSION_1_0,
+            role: self.role,
+            required_features: rapace_protocol::features::ATTACHED_STREAMS
+                | rapace_protocol::features::CALL_ENVELOPE,
+            supported_features: rapace_protocol::features::ATTACHED_STREAMS
+                | rapace_protocol::features::CALL_ENVELOPE
+                | rapace_protocol::features::CREDIT_FLOW_CONTROL
+                | rapace_protocol::features::RAPACE_PING,
+            limits: Limits::default(),
+            methods: Vec::new(), // TODO: populate from registry
+            params: Vec::new(),
+        };
+
+        let payload = facet_postcard::to_vec(&hello).map_err(|e| RpcError::Status {
+            code: ErrorCode::Internal,
+            message: format!("failed to encode Hello: {}", e),
+        })?;
+
+        let mut desc = MsgDescHot::new();
+        desc.msg_id = self.next_msg_id();
+        desc.channel_id = 0;
+        desc.method_id = control_method::HELLO;
+        desc.flags = FrameFlags::CONTROL;
+
+        let frame = if payload.len() <= INLINE_PAYLOAD_SIZE {
+            Frame::with_inline_payload(desc, &payload).expect("inline payload should fit")
+        } else {
+            Frame::with_payload(desc, payload)
+        };
+
+        tracing::debug!(role = ?self.role, "sending Hello");
+        self.transport
+            .send_frame(frame)
+            .await
+            .map_err(RpcError::Transport)
+    }
+
+    /// Receive and validate a Hello frame from the peer.
+    ///
+    /// Spec: `[impl handshake.ordering]` - Hello must be the first frame received.
+    /// Spec: `[impl handshake.role.validation]` - roles must be complementary.
+    async fn recv_hello(&self) -> Result<Hello, RpcError> {
+        let frame = self
+            .transport
+            .recv_frame()
+            .await
+            .map_err(RpcError::Transport)?;
+
+        // Validate it's a Hello on channel 0
+        if frame.desc.channel_id != 0 {
+            return Err(RpcError::Status {
+                code: ErrorCode::InvalidArgument,
+                message: format!(
+                    "[verify handshake.ordering]: first frame must be on channel 0, got {}",
+                    frame.desc.channel_id
+                ),
+            });
+        }
+
+        if !frame.desc.flags.contains(FrameFlags::CONTROL) {
+            return Err(RpcError::Status {
+                code: ErrorCode::InvalidArgument,
+                message: "[verify core.control.flag-set]: Hello must have CONTROL flag set"
+                    .to_string(),
+            });
+        }
+
+        if frame.desc.method_id != control_method::HELLO {
+            return Err(RpcError::Status {
+                code: ErrorCode::InvalidArgument,
+                message: format!(
+                    "[verify handshake.ordering]: first frame must be Hello (method_id=0), got {}",
+                    frame.desc.method_id
+                ),
+            });
+        }
+
+        // Decode Hello payload
+        let hello: Hello =
+            facet_postcard::from_slice(frame.payload_bytes()).map_err(|e| RpcError::Status {
+                code: ErrorCode::InvalidArgument,
+                message: format!(
+                    "[verify core.control.payload-encoding]: failed to decode Hello: {}",
+                    e
+                ),
+            })?;
+
+        // Validate role is complementary
+        let expected_peer_role = match self.role {
+            Role::Initiator => Role::Acceptor,
+            Role::Acceptor => Role::Initiator,
+        };
+        if hello.role != expected_peer_role {
+            return Err(RpcError::Status {
+                code: ErrorCode::InvalidArgument,
+                message: format!(
+                    "[verify handshake.role.validation]: expected peer role {:?}, got {:?}",
+                    expected_peer_role, hello.role
+                ),
+            });
+        }
+
+        // Validate protocol version (major must be 1)
+        let major = hello.protocol_version >> 16;
+        if major != 1 {
+            return Err(RpcError::Status {
+                code: ErrorCode::InvalidArgument,
+                message: format!(
+                    "[verify handshake.version.major]: expected major version 1, got {}",
+                    major
+                ),
+            });
+        }
+
+        // Check that peer supports our required features
+        let our_required =
+            rapace_protocol::features::ATTACHED_STREAMS | rapace_protocol::features::CALL_ENVELOPE;
+        if hello.supported_features & our_required != our_required {
+            return Err(RpcError::Status {
+                code: ErrorCode::InvalidArgument,
+                message: format!(
+                    "[verify handshake.features.required]: peer doesn't support required features (need {:x}, got {:x})",
+                    our_required, hello.supported_features
+                ),
+            });
+        }
+
+        tracing::debug!(
+            peer_role = ?hello.role,
+            protocol_version = hello.protocol_version,
+            "received Hello"
+        );
+
+        Ok(hello)
+    }
+
+    /// Perform the handshake sequence.
+    ///
+    /// - Initiator: send Hello first, then receive peer's Hello
+    /// - Acceptor: receive peer's Hello first, then send our Hello
+    ///
+    /// Spec: `[impl handshake.required]` - explicit handshake is mandatory.
+    /// Spec: `[impl handshake.ordering]` - initiator sends first.
+    async fn perform_handshake(&self) -> Result<Hello, RpcError> {
+        match self.role {
+            Role::Initiator => {
+                // Initiator sends first
+                self.send_hello().await?;
+                self.recv_hello().await
+            }
+            Role::Acceptor => {
+                // Acceptor waits first
+                let peer_hello = self.recv_hello().await?;
+                self.send_hello().await?;
+                Ok(peer_hello)
+            }
+        }
+    }
+
+    // ========================================================================
     // RPC APIs
     // ========================================================================
 
@@ -1176,13 +1360,39 @@ impl<T: Transport> RpcSession<T> {
     /// Run the demux loop.
     ///
     /// This is the main event loop that:
-    /// 1. Receives frames from the transport
-    /// 2. Routes tunnel frames to registered tunnel receivers
-    /// 3. Routes responses to waiting clients
-    /// 4. Dispatches requests to the registered handler
+    /// 1. Performs the Hello handshake
+    /// 2. Receives frames from the transport
+    /// 3. Routes tunnel frames to registered tunnel receivers
+    /// 4. Routes responses to waiting clients
+    /// 5. Dispatches requests to the registered handler
     ///
     /// This method consumes self and runs until the transport closes.
+    ///
+    /// Spec: `[impl handshake.required]` - Hello handshake is mandatory.
     pub async fn run(self: Arc<Self>) -> Result<(), TransportError> {
+        // Perform handshake first
+        tracing::debug!(role = ?self.role, "RpcSession::run: performing handshake");
+        match self.perform_handshake().await {
+            Ok(peer_hello) => {
+                tracing::debug!(
+                    peer_role = ?peer_hello.role,
+                    peer_version = peer_hello.protocol_version,
+                    "RpcSession::run: handshake complete"
+                );
+            }
+            Err(e) => {
+                tracing::error!(?e, "RpcSession::run: handshake failed");
+                self.transport.close();
+                return Err(TransportError::Io(
+                    std::io::Error::new(
+                        std::io::ErrorKind::ConnectionRefused,
+                        format!("handshake failed: {}", e),
+                    )
+                    .into(),
+                ));
+            }
+        }
+
         tracing::debug!("RpcSession::run: starting demux loop");
         loop {
             // Receive next frame
