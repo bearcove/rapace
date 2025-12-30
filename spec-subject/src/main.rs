@@ -46,12 +46,16 @@ async fn run_case(case: &str) {
     let session = Arc::new(RpcSession::new(transport));
 
     // For now, just run the session - it will:
-    // 1. Perform Hello handshake (once we implement it)
+    // 1. Perform Hello handshake
     // 2. Handle incoming frames (Ping -> Pong, etc.)
     // 3. Dispatch requests if we register a dispatcher
     //
     // Most conformance tests just need the session to be running
     // and responding to protocol-level messages.
+    //
+    // The case parameter will be used for case-specific behavior later
+    // (e.g., registering specific service handlers for certain tests).
+    let _ = case;
 
     eprintln!("[spec-subject] Starting session...");
 

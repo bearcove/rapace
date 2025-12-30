@@ -756,7 +756,9 @@ impl<T: Transport> RpcSession<T> {
                 | rapace_protocol::features::CREDIT_FLOW_CONTROL
                 | rapace_protocol::features::RAPACE_PING,
             limits: Limits::default(),
-            methods: Vec::new(), // TODO: populate from registry
+            // Empty methods list is valid per spec - method registry is optional
+            // and will be populated when service registration is implemented.
+            methods: Vec::new(),
             params: Vec::new(),
         };
 

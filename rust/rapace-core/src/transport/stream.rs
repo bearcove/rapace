@@ -89,6 +89,9 @@ impl StreamTransport {
     ///
     /// This is useful for CLI tools that communicate via stdio,
     /// such as conformance test subjects.
+    ///
+    /// Note: Requires the `io-std` tokio feature, which is enabled by default
+    /// for this crate on non-WASM targets.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn from_stdio() -> Self {
         Self::from_split(tokio::io::stdin(), tokio::io::stdout())
