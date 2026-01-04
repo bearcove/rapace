@@ -35,7 +35,7 @@ members = [
 exclude = ["fuzz"]
 
 [workspace.package]
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 rust-version = "1.91"
 license = "MIT OR Apache-2.0"
@@ -43,14 +43,14 @@ repository = "https://github.com/bearcove/rapace"
 
 [workspace.dependencies]
 # Internal crates
-rapace = { path = "rust/rapace", version = "0.5.0" }
-rapace-core = { path = "rust/rapace-core", version = "0.5.0" }
-rapace-protocol = { path = "rust/rapace-protocol", version = "0.5.0" }
+rapace = { path = "rust/rapace", version = "0.6.0" }
+rapace-core = { path = "rust/rapace-core", version = "0.6.0" }
+rapace-protocol = { path = "rust/rapace-protocol", version = "0.6.0" }
 rapace-http = { path = "rust/rapace-http", version = "0.5.0" }
-rapace-macros = { path = "rust/rapace-macros", version = "0.5.0" }
-rapace-registry = { path = "rust/rapace-registry", version = "0.5.0" }
-rapace-tracing = { path = "rust/rapace-tracing", version = "0.5.0" }
-shm-primitives = { path = "rust/shm-primitives", version = "0.5.0" }
+rapace-macros = { path = "rust/rapace-macros", version = "0.6.0" }
+rapace-registry = { path = "rust/rapace-registry", version = "0.6.0" }
+rapace-tracing = { path = "rust/rapace-tracing", version = "0.6.0" }
+shm-primitives = { path = "rust/shm-primitives", version = "0.6.0" }
 
 # External dependencies
 libc = "0.2"
