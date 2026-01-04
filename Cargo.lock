@@ -703,7 +703,7 @@ checksum = "2a2330da5de22e8a3cb63252ce2abb30116bf5265e89c0e01bc17015ce30a476"
 
 [[package]]
 name = "demo-helper-common"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "async-send-fd",
  "rapace",
@@ -1952,7 +1952,7 @@ dependencies = [
 
 [[package]]
 name = "rapace"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "facet",
  "facet-core",
@@ -1984,7 +1984,7 @@ dependencies = [
 
 [[package]]
 name = "rapace-browser-tests-client"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "console_error_panic_hook",
  "futures-util",
@@ -1998,7 +1998,7 @@ dependencies = [
 
 [[package]]
 name = "rapace-browser-tests-proto"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "facet",
  "rapace",
@@ -2006,7 +2006,7 @@ dependencies = [
 
 [[package]]
 name = "rapace-browser-tests-server"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "rapace",
  "rapace-browser-tests-proto",
@@ -2019,7 +2019,7 @@ dependencies = [
 
 [[package]]
 name = "rapace-cell"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "facet",
  "rapace",
@@ -2036,7 +2036,7 @@ dependencies = [
 
 [[package]]
 name = "rapace-core"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "allocator-api2 0.4.0",
  "axum",
@@ -2099,7 +2099,7 @@ dependencies = [
 
 [[package]]
 name = "rapace-explorer"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "facet",
  "rapace",
@@ -2107,7 +2107,7 @@ dependencies = [
 
 [[package]]
 name = "rapace-http"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "facet",
  "rapace",
@@ -2156,7 +2156,7 @@ dependencies = [
 
 [[package]]
 name = "rapace-introspection"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "rapace",
  "rapace-registry",
@@ -2166,7 +2166,7 @@ dependencies = [
 
 [[package]]
 name = "rapace-macros"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "facet-cargo-toml",
  "heck",
@@ -2179,14 +2179,14 @@ dependencies = [
 
 [[package]]
 name = "rapace-protocol"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "facet",
 ]
 
 [[package]]
 name = "rapace-registry"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "facet",
  "facet-core",
@@ -2267,7 +2267,7 @@ dependencies = [
 
 [[package]]
 name = "rapace-tracing"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "facet",
  "parking_lot",
@@ -2676,7 +2676,7 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "shm-primitives"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "libc",
  "loom",
@@ -2852,7 +2852,7 @@ dependencies = [
 
 [[package]]
 name = "test-external-service"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "rapace",
  "rapace-cell",
@@ -3280,7 +3280,7 @@ checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
 name = "ur-taking-me-with-you"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "libc",
  "tokio",
