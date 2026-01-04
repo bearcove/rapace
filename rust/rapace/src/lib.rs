@@ -137,10 +137,7 @@ pub mod transport {
     pub use rapace_core::websocket::WebSocketTransport;
 
     // Note: SHM transport requires more setup, exposed separately
-    #[cfg(all(
-        feature = "shm",
-        not(any(target_arch = "wasm32", target_family = "windows"))
-    ))]
+    #[cfg(all(feature = "shm", unix))]
     pub mod shm {
         pub use rapace_core::shm::*;
     }

@@ -44,8 +44,11 @@ fn assign_and_leak_job(job: HANDLE, process_handle: HANDLE) -> io::Result<()> {
             CloseHandle(job);
             return Err(err);
         }
-        // Leak the job handle so it stays open for the lifetime of the parent
-        let _ = job;
+        // Intentionally leak the job handle: we never call CloseHandle(job),
+        // so the kernel job object stays alive until this process exits.
+        // (HANDLE is Copy/isize, so drop/forget are no-ops—the "leak" is
+        // simply not calling CloseHandle.)
+        let _leaked = job;
         Ok(())
     }
 }
