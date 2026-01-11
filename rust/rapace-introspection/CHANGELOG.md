@@ -7,15 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.6.0](https://github.com/bearcove/rapace/compare/rapace-tracing-v0.5.0...rapace-tracing-v0.6.0) - 2026-01-11
+## [0.6.0](https://github.com/bearcove/rapace/compare/rapace-introspection-v0.5.0...rapace-introspection-v0.6.0) - 2026-01-11
 
 ### Other
 
 - Gut conformance tests for fresh rewrite ([#138](https://github.com/bearcove/rapace/pull/138))
 - Consolidate into multi-language monorepo ([#120](https://github.com/bearcove/rapace/pull/120))
-
-## [0.4.0](https://github.com/bearcove/rapace/compare/rapace-tracing-v0.3.0...rapace-tracing-v0.4.0) - 2025-12-14
-
-### Added
-
-- *(transport-shm)* store config in header, add open_file_auto
